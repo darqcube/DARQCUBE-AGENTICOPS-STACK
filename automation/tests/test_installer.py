@@ -6,6 +6,7 @@ checked here.
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import re
 import subprocess
@@ -112,3 +113,51 @@ def test_step_count_matches_the_documented_seven(inst):
 def test_readme_and_install_doc_point_at_the_installer():
     for doc in ("README.md", "docs/INSTALL.md"):
         assert "install.py" in (ROOT / doc).read_text(), f"{doc} does not mention install.py"
+
+
+def _sysctl_args(fix: bool):
+    return argparse.Namespace(fix_sysctl=fix, check=False, yes=True)
+
+
+def _run_sysctl_check(inst, monkeypatch, fix: bool, applied_value):
+    """Drive check_sysctls() against a host whose buffers are too small.
+
+    applied_value is what the kernel reports back after apply_sysctl() ran, so a
+    fix that took and a fix that silently did not can both be exercised.
+    """
+    monkeypatch.setattr(inst.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(inst, "current_sysctl", lambda key: 1024)
+    monkeypatch.setattr(inst, "apply_sysctl",
+                        lambda needs_fix: [
+                            (inst.ok if applied_value >= want else inst.bad)(f"{k} = {applied_value}")
+                            for k, (_, want) in needs_fix.items()
+                        ])
+    monkeypatch.setattr(inst, "_failed", False, raising=False)
+    inst.check_sysctls(_sysctl_args(fix))
+    return inst._failed
+
+
+def test_undersized_buffers_fail_preflight_without_the_fix_flag(inst, monkeypatch):
+    """Silent UDP loss is the worst failure mode here — it must stop the install."""
+    assert _run_sysctl_check(inst, monkeypatch, fix=False, applied_value=0) is True
+
+
+def test_a_successful_fix_does_not_leave_the_run_marked_failed(inst, monkeypatch):
+    """--fix-sysctl corrects the value, so the low reading is not a failure. The
+    failure flag is sticky, so flagging it before the fix stopped the installer
+    at step 1 with the fix already applied."""
+    biggest = max(inst.SYSCTLS.values())
+    assert _run_sysctl_check(inst, monkeypatch, fix=True, applied_value=biggest) is False
+
+
+def test_a_fix_that_did_not_take_still_fails(inst, monkeypatch):
+    assert _run_sysctl_check(inst, monkeypatch, fix=True, applied_value=2048) is True
+
+
+def test_fix_sysctl_stops_after_preflight(inst):
+    """It is documented as a run-once-under-sudo step. Carrying on would do the
+    whole install as root and leave .env and the volumes root-owned."""
+    source = INSTALLER.read_text()
+    loop = source.split("for n, (name, fn) in enumerate(STEPS, 1):", 1)[1]
+    guard = loop.split("break", 1)[0]
+    assert "args.fix_sysctl" in guard and "args.check" in guard

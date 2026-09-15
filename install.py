@@ -20,7 +20,7 @@ already holds real values.
 Common options:
     --check          run preflight only, change nothing
     --yes            never prompt; fail instead of asking
-    --fix-sysctl     apply the kernel settings (needs sudo)
+    --fix-sysctl     apply the kernel settings and stop (needs sudo)
     --skip-tests     stop after step 5
     --step N         run one step only
 """
@@ -567,32 +567,7 @@ def preflight(args) -> None:
     (ok if cpus >= 4 else warn)(f"{cpus} CPUs" + ("" if cpus >= 4 else " — 8 recommended"))
     (ok if disk_gb >= 50 else warn)(f"{disk_gb:.0f} GB free" + ("" if disk_gb >= 50 else " — 200 GB recommended"))
 
-    # --- kernel UDP buffers ---
-    # The single most consequential setting here: too small and syslog and flow
-    # are dropped by the kernel with no error, no log line and no retransmit.
-    if platform.system() == "Linux":
-        needs_fix = {}
-        for key, want in SYSCTLS.items():
-            have = current_sysctl(key)
-            if have is None:
-                warn(f"could not read {key}")
-            elif have < want:
-                needs_fix[key] = (have, want)
-            else:
-                ok(f"{key} = {have}")
-        if needs_fix:
-            for key, (have, want) in needs_fix.items():
-                bad(f"{key} = {have}, needs >= {want} — UDP syslog and flow will be dropped silently")
-            if args.fix_sysctl:
-                apply_sysctl(needs_fix)
-            else:
-                print(f"\n  {C['y']}Fix with:{C['x']}  sudo python3 install.py --fix-sysctl")
-                print(f"  {C['d']}or manually:{C['x']}")
-                for key, (_, want) in needs_fix.items():
-                    print(f"    echo '{key} = {want}' | sudo tee -a /etc/sysctl.d/99-darqcube.conf")
-                print("    sudo sysctl --system")
-    else:
-        info("kernel UDP buffer check skipped (not Linux)")
+    check_sysctls(args)
 
     # --- ports ---
     env = read_env() or read_env(ENV_EXAMPLE)
@@ -610,6 +585,45 @@ def preflight(args) -> None:
             bad(f"port {port} ({name}) is in use — change it in .env, see docs/how-to/change-ports.md")
     else:
         ok("all configured ports are free")
+
+
+def check_sysctls(args) -> None:
+    """The single most consequential host setting: too small and syslog and flow
+    are dropped by the kernel with no error, no log line and no retransmit."""
+    if platform.system() != "Linux":
+        info("kernel UDP buffer check skipped (not Linux)")
+        return
+
+    needs_fix = {}
+    for key, want in SYSCTLS.items():
+        have = current_sysctl(key)
+        if have is None:
+            warn(f"could not read {key}")
+        elif have < want:
+            needs_fix[key] = (have, want)
+        else:
+            ok(f"{key} = {have}")
+    if not needs_fix:
+        return
+
+    # With --fix-sysctl these values are about to be corrected, so they are not
+    # failures yet: apply_sysctl() reports the outcome and calls bad() only if one
+    # did not take. Calling bad() here first would set the sticky _failed flag and
+    # stop the run after a fix that worked.
+    report = warn if args.fix_sysctl else bad
+    for key, (have, want) in needs_fix.items():
+        report(f"{key} = {have}, needs >= {want} — "
+               f"{'fixing' if args.fix_sysctl else 'UDP syslog and flow will be dropped silently'}")
+
+    if args.fix_sysctl:
+        apply_sysctl(needs_fix)
+        return
+
+    print(f"\n  {C['y']}Fix with:{C['x']}  sudo python3 install.py --fix-sysctl")
+    print(f"  {C['d']}or manually:{C['x']}")
+    for key, (_, want) in needs_fix.items():
+        print(f"    echo '{key} = {want}' | sudo tee -a /etc/sysctl.d/99-darqcube.conf")
+    print("    sudo sysctl --system")
 
 
 def apply_sysctl(needs_fix: dict) -> None:
@@ -933,7 +947,7 @@ def main() -> int:
                     help=f"generate .env from a site file (default: ./{SITE.name} if present)")
     ap.add_argument("--check", action="store_true", help="preflight only, change nothing")
     ap.add_argument("--yes", action="store_true", help="never prompt")
-    ap.add_argument("--fix-sysctl", action="store_true", help="apply kernel settings (needs sudo)")
+    ap.add_argument("--fix-sysctl", action="store_true", help="apply kernel settings and stop (needs sudo)")
     ap.add_argument("--skip-tests", action="store_true", help="stop after initialise")
     ap.add_argument("--step", type=int, metavar="N", help="run step N only (1-7)")
     args = ap.parse_args()
@@ -953,7 +967,10 @@ def main() -> int:
         return 1 if _failed else 0
 
     for n, (name, fn) in enumerate(STEPS, 1):
-        if args.check and n > 1:
+        # --fix-sysctl is a host-preparation mode, run once per VM and under sudo.
+        # Continuing past preflight would do the whole install as root and leave
+        # .env and the volumes root-owned.
+        if (args.check or args.fix_sysctl) and n > 1:
             break
         if args.skip_tests and name in ("verify",):
             continue
@@ -967,7 +984,10 @@ def main() -> int:
     if _failed:
         print(f"\n{C['y']}Finished with failures — see above.{C['x']}")
         return 1
-    if args.check:
+    if args.fix_sysctl:
+        print(f"\n{C['g']}Kernel settings applied.{C['x']} Now install as your normal user "
+              f"(not root): python3 install.py")
+    elif args.check:
         print(f"\n{C['g']}Preflight passed.{C['x']} Run without --check to install.")
     return 0
 
