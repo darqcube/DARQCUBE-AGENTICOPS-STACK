@@ -27,6 +27,7 @@ Common options:
 from __future__ import annotations
 
 import argparse
+import getpass
 import ipaddress
 import json
 import os
@@ -488,6 +489,39 @@ def port_free(port: int) -> bool:
     return True
 
 
+def docker_unreachable(err: str) -> None:
+    """Turn docker's own stderr into the fix for it."""
+    first = next((l for l in err.splitlines() if l.strip()), "")
+    low = err.lower()
+
+    if "permission denied" in low and "docker.sock" in low:
+        user = getpass.getuser()
+        if _in_docker_group(user):
+            bad(f"{user} is in the docker group but this login session predates it, so "
+                f"the group is not in effect. Fix: log out and back in, or run: newgrp docker")
+        else:
+            bad(f"the docker daemon is running, but {user} is not allowed to reach "
+                f"/var/run/docker.sock. Fix: sudo usermod -aG docker $USER, "
+                f"then log out and back in (or run: newgrp docker)")
+        info("do not install as root — .env and the Docker volumes would end up root-owned")
+        return
+
+    if "cannot connect" in low or "is the docker daemon running" in low:
+        bad(f"the docker daemon is not reachable: {first} "
+            f"— try: sudo systemctl start docker")
+        return
+
+    bad(f"docker is installed but did not answer: {first}")
+
+
+def _in_docker_group(user: str) -> bool:
+    try:
+        import grp  # Unix only, and this branch is only reached on a Unix socket error
+        return user in grp.getgrnam("docker").gr_mem
+    except Exception:
+        return False
+
+
 def current_sysctl(key: str) -> int | None:
     try:
         out = subprocess.run(["sysctl", "-n", key], capture_output=True, text=True, timeout=10)
@@ -536,10 +570,17 @@ def preflight(args) -> None:
         bad("docker not found — see docs/install/01-prerequisites.md")
         return
     try:
-        v = run(["docker", "version", "--format", "{{.Server.Version}}"]).stdout.strip()
-        ok(f"docker {v}")
-    except Exception:
-        bad("docker is installed but the daemon is not reachable (try: sudo systemctl start docker)")
+        proc = run(["docker", "version", "--format", "{{.Server.Version}}"], check=False, timeout=30)
+    except Exception as exc:
+        bad(f"docker is installed but could not be run: {exc}")
+        return
+    if proc.returncode == 0:
+        ok(f"docker {proc.stdout.strip()}")
+    else:
+        # Docker already said what is wrong. Reporting a guess instead sends people
+        # to restart a daemon that is running — the usual cause is socket
+        # permissions, which systemctl cannot fix.
+        docker_unreachable((proc.stderr or proc.stdout).strip())
         return
 
     try:

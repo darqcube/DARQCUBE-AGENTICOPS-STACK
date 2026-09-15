@@ -26,3 +26,5 @@ venv/
 site.yml
 sites/*.yml
 !sites/example.yml
+
+/net-commander

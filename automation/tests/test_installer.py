@@ -161,3 +161,43 @@ def test_fix_sysctl_stops_after_preflight(inst):
     loop = source.split("for n, (name, fn) in enumerate(STEPS, 1):", 1)[1]
     guard = loop.split("break", 1)[0]
     assert "args.fix_sysctl" in guard and "args.check" in guard
+
+
+SOCK_DENIED = ("permission denied while trying to connect to the Docker daemon socket at "
+               "unix:///var/run/docker.sock: Get \"http://%2Fvar%2Frun%2Fdocker.sock/v1.52/version\": "
+               "dial unix /var/run/docker.sock: connect: permission denied")
+DAEMON_DOWN = ("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. "
+               "Is the docker daemon running?")
+
+
+def _diagnose(inst, monkeypatch, capsys, err, in_group=False):
+    monkeypatch.setattr(inst, "_in_docker_group", lambda user: in_group)
+    monkeypatch.setattr(inst, "_failed", False, raising=False)
+    inst.docker_unreachable(err)
+    return capsys.readouterr().out
+
+
+def test_socket_permission_denied_does_not_blame_the_daemon(inst, monkeypatch, capsys):
+    """The daemon is running in this case — telling someone to start it wastes
+    their time on the one step that cannot help."""
+    out = _diagnose(inst, monkeypatch, capsys, SOCK_DENIED)
+    assert "usermod -aG docker" in out
+    assert "systemctl start docker" not in out
+
+
+def test_docker_group_membership_that_is_not_yet_in_effect_is_named(inst, monkeypatch, capsys):
+    """usermod has already been run; the advice is to get a new login, not to
+    repeat the command that appears to have had no effect."""
+    out = _diagnose(inst, monkeypatch, capsys, SOCK_DENIED, in_group=True)
+    assert "newgrp docker" in out
+    assert "usermod" not in out
+
+
+def test_a_daemon_that_is_actually_down_still_says_so(inst, monkeypatch, capsys):
+    out = _diagnose(inst, monkeypatch, capsys, DAEMON_DOWN)
+    assert "systemctl start docker" in out
+
+
+def test_an_unrecognised_docker_error_is_quoted_rather_than_guessed_at(inst, monkeypatch, capsys):
+    out = _diagnose(inst, monkeypatch, capsys, "client version 1.52 is too new for server")
+    assert "client version 1.52 is too new for server" in out
