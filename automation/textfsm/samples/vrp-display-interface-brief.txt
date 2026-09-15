@@ -1,0 +1,9 @@
+PHY: Physical
+*down: administratively down
+^down: standby
+(l): loopback
+InUti/OutUti: input utility/output utility
+Interface                   PHY   Protocol InUti OutUti   inErrors  outErrors
+GigabitEthernet0/0/1        up    up          0%     0%          0          0
+GigabitEthernet0/0/2        down  down        0%     0%          0          0
+Vlanif1                     up    up          0%     0%          0          0

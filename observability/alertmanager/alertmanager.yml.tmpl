@@ -1,0 +1,34 @@
+# Alertmanager.
+#
+# THIS FILE IS A TEMPLATE. Alertmanager has NO environment-variable expansion
+# of its own, so the config-init service substitutes __ALERT_WEBHOOK_URL__ from
+# .env and writes the result into a volume before Alertmanager starts.
+# Edit this file, not the rendered copy.
+#
+# THIS IS THE AI-PLATFORM SEAM FOR ALERTS. Set ALERT_WEBHOOK_URL in .env to an
+# AI platform endpoint and every alert is delivered there — no other change to
+# the stack. Left empty it defaults to a local no-op, so the stack starts with
+# no external dependency.
+route:
+  receiver: default
+  group_by: [alertname, device]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: default
+      repeat_interval: 1h
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: __ALERT_WEBHOOK_URL__
+        send_resolved: true
+
+inhibit_rules:
+  # A device that is unreachable will also have every interface "down". Report
+  # the cause, not the hundred symptoms.
+  - source_matchers: [alertname="DeviceUnreachable"]
+    target_matchers: [alertname="InterfaceDown"]
+    equal: [device]

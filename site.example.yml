@@ -1,0 +1,109 @@
+# ---------------------------------------------------------------------------
+# SITE FILE — one deployment.
+#
+#   cp site.example.yml site.yml
+#   chmod 600 site.yml
+#   $EDITOR site.yml
+#   python3 install.py
+#
+# THIS FILE CONTAINS CREDENTIALS. site.yml is gitignored and install.py refuses
+# to run if it has been committed anyway. Treat it like any other credential:
+# do not paste it into a ticket, and delete it when the engagement ends.
+#
+# It is the INPUT. install.py generates .env from it — .env is the runtime
+# config and you should not hand-edit it. Nothing else in the repository is
+# touched, so `git pull` stays clean.
+#
+# Parsed by a small reader inside install.py, which has no third-party
+# dependencies. Keep the file to what you see here: comments, nested keys,
+# plain scalars and simple lists. No anchors, no multi-line strings, no flow
+# syntax.
+# ---------------------------------------------------------------------------
+
+site:
+  # A short name for this deployment. Appears as a label on every metric, so
+  # you can tell two customers apart if you ever federate them.
+  name: acme-hq
+
+  # THIS MACHINE'S ROUTABLE IP — the address network devices send syslog and
+  # flow to. Not 127.0.0.1, not a container address, not a DNS name.
+  #   ip -4 addr show scope global
+  # Getting this wrong is the single most common deployment mistake: the
+  # devices send, nothing arrives, and neither end reports an error.
+  collector_ip: 10.20.0.50
+
+  # The management subnets your devices live on. Used only to sanity-check
+  # that collector_ip can plausibly be reached from them — the stack does not
+  # route, and nothing here changes any configuration.
+  device_subnets:
+    - 10.20.10.0/24
+
+
+devices:
+  # The account the stack uses to SSH to every device. Create it on the
+  # devices first — see docs/devices/<vendor>.md.
+  ssh_user: netaiops
+  ssh_password: CHANGEME
+
+  snmpv3:
+    user: darqcube
+    # Must match exactly what you configured on the devices. SHA for
+    # authentication, AES for privacy.
+    auth: CHANGEME
+    priv: CHANGEME
+
+  # gNMI is Cisco IOS-XE only and optional. Leave blank unless you are using
+  # telemetry_mode: gnmi on some devices.
+  gnmi_user: ""
+  gnmi_password: ""
+
+
+scale:
+  # Roughly how many devices this site will poll. This is not a limit — it
+  # picks the polling interval, SNMP shard size and automation concurrency for
+  # you, which otherwise means reading docs/scale.md and doing arithmetic.
+  #
+  #     up to   50   30s polling — livelier, good for a demo
+  #     up to  400   60s polling — the tested ceiling
+  #     over   400   120s, and install.py will warn you
+  expected_devices: 120
+
+  # How long to keep metrics and logs. Raise only after checking disk:
+  # ~105,000 series at 60s is about 4 GB per 15 days.
+  metrics_retention: 15d
+  logs_retention: 336h
+
+
+ports:
+  # true  = the usual ports (Grafana 3000, Infrahub 8000, syslog 514 …)
+  # false = the shipped non-colliding set (13000, 18000, 1514 …), so the stack
+  #         can run alongside something already using the standard ones.
+  #
+  # Note that syslog on 514 needs root on most Linux hosts; the non-standard
+  # set uses 1514 and avoids that.
+  standard: false
+
+  # Override individual ports if you need to. Anything omitted follows the
+  # `standard` setting above.
+  # overrides:
+  #   grafana: 3000
+  #   syslog: 514
+
+
+alerts:
+  # Where Alertmanager delivers. Leave empty and alerts collect in the
+  # Alertmanager UI and go no further — the stack then has no external
+  # dependency. Point it at an AI platform, Slack relay or webhook receiver
+  # when you have one.
+  webhook_url: ""
+
+
+ai_platform:
+  # The six MCP servers give an AI platform read access to the stack. They are
+  # internal-only; see docs/how-to/connect-an-ai-platform.md to expose them.
+  enabled: true
+
+  # Whether an AI may PUSH CONFIGURATION to devices. false means the tool is
+  # not registered at all — it cannot be discovered, let alone called. Turn
+  # this on deliberately, not by default.
+  allow_write: false

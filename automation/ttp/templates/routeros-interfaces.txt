@@ -1,0 +1,6 @@
+<group name="interfaces*" method="table">
+set [ find default-name={{ interface }} ] comment="{{ description | re(".*") }}"
+</group>
+<group name="interfaces*" method="table">
+add name={{ interface }} {{ _line_ | re(".*") }}
+</group>

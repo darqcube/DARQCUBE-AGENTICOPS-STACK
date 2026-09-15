@@ -1,0 +1,113 @@
+{
+  "uid": "darqcube-network",
+  "title": "Network Overview",
+  "tags": ["darqcube", "network"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+        "query": "label_values(device_uptime, device)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "site",
+        "label": "Site",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+        "query": "label_values(device_uptime, site)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Devices monitored",
+      "description": "Devices currently reporting SNMP. Compare with the device count in Infrahub — a gap means a device exists in intent but is not being polled.",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "network:devices_monitored:count", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Interfaces down",
+      "description": "Admin-up but operationally down. Deliberately shut ports are excluded.",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "sum(interface_oper_status{device=~\"$device\"} == 2 and interface_admin_status{device=~\"$device\"} == 1) or vector(0)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Alerts firing",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "sum(ALERTS{alertstate=\"firing\"}) or vector(0)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "CPU usage",
+      "description": "Normalised across vendors. Cisco, Huawei and MikroTik use three different MIBs but produce the same metric name.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "device:cpu_usage:max{device=~\"$device\", site=~\"$site\"}", "legendFormat": "{{device}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "fillOpacity": 5 } }, "overrides": [] }
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Memory usage",
+      "description": "Derived by a recording rule: the three vendors report memory in percent, bytes and allocation units respectively. See observability/prometheus/rules/recording.yml.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "device:memory_used_percent:max{device=~\"$device\", site=~\"$site\"}", "legendFormat": "{{device}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "fillOpacity": 5 } }, "overrides": [] }
+    },
+    {
+      "id": 6, "type": "table", "title": "Interface status",
+      "description": "Every interface, with the site and role Infrahub holds for its device.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "interface_oper_status{device=~\"$device\", site=~\"$site\"}", "format": "table", "instant": true, "refId": "A" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true, "agent_host": true, "hostname": true }, "renameByName": { "Value": "oper", "ifName": "interface", "ifAlias": "description", "ifType": "type" } } }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "oper" }, "properties": [{ "id": "mappings", "value": [{ "type": "value", "options": { "1": { "text": "up", "color": "green", "index": 0 }, "2": { "text": "down", "color": "red", "index": 1 } } }] }, { "id": "custom.cellOptions", "value": { "type": "color-text" } }] }] }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Interface throughput",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [
+        { "expr": "rate(interface_in_octets{device=~\"$device\"}[5m]) * 8", "legendFormat": "{{device}} {{ifName}} in", "refId": "A" },
+        { "expr": "rate(interface_out_octets{device=~\"$device\"}[5m]) * 8", "legendFormat": "{{device}} {{ifName}} out", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bps", "custom": { "fillOpacity": 0 } }, "overrides": [] }
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Flow volume by protocol",
+      "description": "From NetFlow/IPFIX. Per-flow addresses and ports are deliberately not collected, so this shows how much traffic of what kind — not who is talking to whom.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "darqcube-prometheus" },
+      "targets": [{ "expr": "sum by (protocol) (rate(flow_bytes_total{device=~\"$device\"}[5m]))", "legendFormat": "{{protocol}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "id": 9, "type": "logs", "title": "Device logs",
+      "description": "Syslog via Logstash. Labelled with the same device/site/role as the metrics above, which is what lets the two line up.",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 21 },
+      "datasource": { "type": "loki", "uid": "darqcube-loki" },
+      "targets": [{ "expr": "{device=~\"$device\"}", "refId": "A" }],
+      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true }
+    }
+  ]
+}

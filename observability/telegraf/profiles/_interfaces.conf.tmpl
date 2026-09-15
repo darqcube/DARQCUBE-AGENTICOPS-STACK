@@ -1,0 +1,80 @@
+# Interfaces for the WHOLE FLEET in one SNMP input. IF-MIB is byte-identical on
+# Cisco, Huawei and MikroTik, so there is nothing vendor-specific to shard here.
+# Per-platform inputs (snmp-<platform>.conf) carry only CPU and memory.
+#
+# NUMERIC OIDs, NOT "IF-MIB::ifName". The telegraf image ships no MIB files, so
+# symbolic names fail at startup with "translating: MIB search path: ...".
+# Numeric OIDs need no MIB and are identical on every vendor, which keeps this
+# stack portable to any VM without building a custom Telegraf image.
+#
+# METRIC NAMING. Prometheus sees <measurement>_<field>, so the measurement name
+# is half the metric name. `name = "interface"` + `oper_status` is what produces
+# `interface_oper_status` — the name dashboards and alerts are written against.
+# Renaming a measurement here renames metrics everywhere.
+
+[[inputs.snmp]]
+  agents = [__AGENTS__]
+  version = 3
+  sec_name = "${SNMPV3_USER}"
+  sec_level = "authPriv"
+  auth_protocol = "SHA"
+  auth_password = "${SNMPV3_AUTH}"
+  priv_protocol = "AES"
+  priv_password = "${SNMPV3_PRIV}"
+  interval = "${SNMP_INTERVAL}"
+  timeout = "10s"
+  retries = 1
+  agent_host_tag = "agent_host"
+  name_override = "device"                    # -> device_uptime
+
+  # sysName is collected so a device that is reachable but MISSING from
+  # Infrahub still arrives with something identifying. processors.lookup
+  # overwrites `device` with the source-of-truth name when it has one.
+  [[inputs.snmp.field]]
+    name = "hostname"
+    oid = "1.3.6.1.2.1.1.5.0"
+    is_tag = true
+
+  [[inputs.snmp.field]]
+    name = "uptime"
+    oid = "1.3.6.1.2.1.1.3.0"
+
+  [[inputs.snmp.table]]
+    name = "interface"
+    inherit_tags = ["hostname"]
+
+    [[inputs.snmp.table.field]]
+      name = "ifName"
+      oid = "1.3.6.1.2.1.31.1.1.1.1"
+      is_tag = true
+    # ifType separates physical ports (6) from tunnels (131), SVIs (53) and
+    # loopbacks (24), so "which physical links are down" is answerable.
+    [[inputs.snmp.table.field]]
+      name = "ifType"
+      oid = "1.3.6.1.2.1.2.2.1.3"
+      is_tag = true
+    [[inputs.snmp.table.field]]
+      name = "ifAlias"
+      oid = "1.3.6.1.2.1.31.1.1.1.18"         # the port description
+      is_tag = true
+    [[inputs.snmp.table.field]]
+      name = "admin_status"
+      oid = "1.3.6.1.2.1.2.2.1.7"             # -> interface_admin_status
+    [[inputs.snmp.table.field]]
+      name = "oper_status"
+      oid = "1.3.6.1.2.1.2.2.1.8"             # -> interface_oper_status
+    [[inputs.snmp.table.field]]
+      name = "in_octets"
+      oid = "1.3.6.1.2.1.31.1.1.1.6"          # ifHCInOctets
+    [[inputs.snmp.table.field]]
+      name = "out_octets"
+      oid = "1.3.6.1.2.1.31.1.1.1.10"         # ifHCOutOctets
+    [[inputs.snmp.table.field]]
+      name = "in_errors"
+      oid = "1.3.6.1.2.1.2.2.1.14"
+    [[inputs.snmp.table.field]]
+      name = "out_errors"
+      oid = "1.3.6.1.2.1.2.2.1.20"
+    [[inputs.snmp.table.field]]
+      name = "speed"
+      oid = "1.3.6.1.2.1.31.1.1.1.15"         # ifHighSpeed, Mbit/s

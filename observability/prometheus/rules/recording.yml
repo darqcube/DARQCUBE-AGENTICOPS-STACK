@@ -1,0 +1,51 @@
+# Recording rules. Edit this file to add a derived metric.
+groups:
+  - name: memory-normalisation
+    interval: 30s
+    rules:
+      # THE THREE VENDORS DISAGREE ABOUT WHAT "MEMORY USED" MEANS:
+      #   Huawei   hwEntityMemUsage  -> already a percentage
+      #   Cisco    cempMemPoolHCUsed -> bytes, with a matching Free counter
+      #   MikroTik hrStorageUsed     -> allocation units, with a Size counter
+      #
+      # Emitting all three as one metric would be silently wrong — a Cisco box
+      # would read as 847000000% and no alert would ever fire. The memory_kind
+      # tag (set per platform in platforms.yml) says which shape the numbers
+      # are, and these three rules turn all of them into one comparable
+      # percentage. This is deliberately done here, where it is visible and
+      # testable, rather than hidden in collector config.
+
+      # One rule, three disjoint cases joined by `or`. Written as a single
+      # rule deliberately: three separate rules recording the same metric name
+      # is a promtool lint error, and would also make it harder to see that the
+      # cases are meant to be mutually exclusive.
+      - record: memory_used_percent
+        expr: >-
+          memory_used{memory_kind="percent"}
+          or
+          100 * memory_used{memory_kind="used_free"}
+            / (memory_used{memory_kind="used_free"} + memory_free)
+          or
+          100 * memory_used{memory_kind="used_total"} / memory_total
+
+  - name: rollups
+    interval: 30s
+    rules:
+      # CPU arrives one series per core / per entity. Collapse to one per device.
+      - record: device:cpu_usage:max
+        expr: max by (device, site, role, platform) (cpu_usage)
+
+      - record: device:memory_used_percent:max
+        expr: max by (device, site, role, platform) (memory_used_percent)
+
+      # ifType 6 is ethernetCsmacd — a real port, as opposed to a tunnel (131),
+      # an SVI (53) or a loopback (24).
+      - record: network:physical_interfaces_down:count
+        expr: >-
+          count by (device, site, role) (
+            interface_oper_status{ifType="6"} == 2
+            and interface_admin_status{ifType="6"} == 1
+          ) or on() vector(0)
+
+      - record: network:devices_monitored:count
+        expr: count(count by (device) (device_uptime))

@@ -1,0 +1,23 @@
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: darqcube-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 30s
+
+  - name: Loki
+    uid: darqcube-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      # Click a log line's device label and jump to that device's metrics.
+      derivedFields:
+        - name: device
+          matcherRegex: 'device=(\S+)'
+          url: '/d/darqcube-network/network-overview?var-device=${__value.raw}'
+          datasourceUid: darqcube-prometheus

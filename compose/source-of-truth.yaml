@@ -1,0 +1,231 @@
+# ---------------------------------------------------------------------------
+# GROUP: source-of-truth — Infrahub. Answers "what SHOULD exist?"
+#
+# Six containers, and that count is fixed by Infrahub's own architecture, not
+# by a choice made here: it needs a graph store (Neo4j), a cache (Redis), a
+# message bus (RabbitMQ), and a Postgres for its embedded Prefect task manager.
+#
+# Only infrahub-server is published. Everything else is reachable only inside
+# the compose network.
+# ---------------------------------------------------------------------------
+
+x-infrahub-env: &infrahub-env
+  INFRAHUB_DB_TYPE: neo4j
+  INFRAHUB_DB_ADDRESS: neo4j
+  INFRAHUB_DB_PORT: "7687"
+  INFRAHUB_DB_USERNAME: neo4j
+  INFRAHUB_DB_PASSWORD: ${NEO4J_PASSWORD:?set in .env}
+  INFRAHUB_BROKER_ADDRESS: rabbitmq
+  INFRAHUB_BROKER_USERNAME: ${RABBITMQ_USER:-infrahub}
+  INFRAHUB_BROKER_PASSWORD: ${RABBITMQ_PASSWORD:?set in .env}
+  INFRAHUB_CACHE_ADDRESS: redis
+  INFRAHUB_CACHE_PORT: "6379"
+  INFRAHUB_WORKFLOW_ADDRESS: task-manager
+  INFRAHUB_WORKFLOW_PORT: "4200"
+  PREFECT_API_URL: http://task-manager:4200/api
+  INFRAHUB_ADDRESS: http://infrahub-server:8000
+  INFRAHUB_INTERNAL_ADDRESS: http://infrahub-server:8000
+  INFRAHUB_SECURITY_SECRET_KEY: ${INFRAHUB_SECRET_KEY:?set in .env}
+  INFRAHUB_ALLOW_ANONYMOUS_ACCESS: "false"
+  INFRAHUB_STORAGE_DRIVER: local
+  INFRAHUB_PRODUCTION: "false"
+  INFRAHUB_LOG_LEVEL: INFO
+
+services:
+
+  neo4j:
+    image: neo4j:${NEO4J_VERSION:-2025.10.1-community}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: backend
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set in .env}
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 2G
+      NEO4J_server_memory_pagecache_size: 1G
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    expose: ["7687", "7474"]
+    healthcheck:
+      # Neo4j is the slowest thing in the stack to come up — 20 retries at 15s.
+      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    networks: [darqcube]
+    restart: unless-stopped
+
+  redis:
+    image: redis:${REDIS_VERSION:-8.4}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: backend
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    expose: ["6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [darqcube]
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION:-4.2.1-management}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: backend
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-infrahub}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set in .env}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    expose: ["5672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [darqcube]
+    restart: unless-stopped
+
+  task-db:
+    image: postgres:${POSTGRES_VERSION:-18-alpine}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: backend
+    environment:
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: prefect
+    volumes:
+      # Postgres 18+ REQUIRES the mount at /var/lib/postgresql — it puts data in
+      # a version subdirectory itself. Mounting /var/lib/postgresql/data (the
+      # pre-18 convention) is rejected at startup and the container never comes up.
+      - task-db-data:/var/lib/postgresql
+    expose: ["5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect -d prefect"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [darqcube]
+    restart: unless-stopped
+
+  task-manager:
+    # Prefect is EMBEDDED in the Infrahub image. There is no separate Prefect
+    # image to pull — this runs the Infrahub image with a Prefect entrypoint.
+    image: registry.opsmill.io/opsmill/infrahub:${INFRAHUB_VERSION:-1.10.9}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: backend
+    command:
+      - uvicorn
+      - --host=0.0.0.0
+      - --port=4200
+      - --factory
+      - infrahub.prefect_server.app:create_infrahub_prefect
+    environment:
+      <<: *infrahub-env
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:${POSTGRES_PASSWORD}@task-db:5432/prefect
+      PREFECT_HOME: /prefect
+    volumes:
+      - task-manager-data:/prefect
+    expose: ["4200"]
+    depends_on:
+      task-db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4200/api/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    networks: [darqcube]
+    restart: unless-stopped
+
+  infrahub-server:
+    image: registry.opsmill.io/opsmill/infrahub:${INFRAHUB_VERSION:-1.10.9}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: api
+    command:
+      - gunicorn
+      - --config=backend/infrahub/api/gunicorn_config.py
+      - --logger-class=infrahub.server.GunicornLogger
+      - infrahub.server:app
+    environment:
+      <<: *infrahub-env
+      INFRAHUB_INITIAL_ADMIN_TOKEN: ${INFRAHUB_ADMIN_TOKEN:?set in .env}
+      # Read by render-inventory.py, which runs inside this container.
+      SNMP_SHARD_SIZE: ${SNMP_SHARD_SIZE:-150}
+    volumes:
+      - infrahub-storage:/opt/infrahub/storage
+      # Mounted so `make seed` / `make render` can run inside this container,
+      # which already has the Infrahub SDK — no separate tooling image needed.
+      - ../source-of-truth/scripts:/scripts:ro
+      - ../source-of-truth/devices:/devices:ro
+      - ../source-of-truth/schema:/schema:ro
+      - ../platforms.yml:/platforms.yml:ro
+      - telegraf-generated:/generated
+    ports:
+      - "${INFRAHUB_PORT:-8000}:8000"
+    depends_on:
+      neo4j: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      task-manager: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/schema/summary').status==200 else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks: [darqcube]
+    restart: unless-stopped
+
+  infrahub-worker:
+    image: registry.opsmill.io/opsmill/infrahub:${INFRAHUB_VERSION:-1.10.9}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: backend
+    command:
+      - prefect
+      - worker
+      - start
+      - --type=infrahubasync
+      - --pool=infrahub-worker
+      - --with-healthcheck
+    environment:
+      <<: *infrahub-env
+      INFRAHUB_API_TOKEN: ${INFRAHUB_ADMIN_TOKEN:?set in .env}
+    volumes:
+      - infrahub-storage:/opt/infrahub/storage
+    depends_on:
+      infrahub-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "prefect version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [darqcube]
+    restart: unless-stopped
+
+volumes:
+  neo4j-data:
+  neo4j-logs:
+  redis-data:
+  rabbitmq-data:
+  task-db-data:
+  task-manager-data:
+  infrahub-storage:
+  # Shared with the observability group: render-inventory.py writes here,
+  # Telegraf and Logstash read from it. On one VM this replaces the HTTP
+  # transport a multi-VM deployment would need.
+  telegraf-generated:

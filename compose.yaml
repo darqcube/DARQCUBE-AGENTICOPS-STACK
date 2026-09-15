@@ -1,0 +1,27 @@
+# ---------------------------------------------------------------------------
+# DARQCUBE-AGENTICOPS-STACK — one VM, four functional groups.
+#
+# This file is deliberately thin. Each group lives in its own file under
+# compose/ so containers are organised by what they do:
+#
+#   source-of-truth  Infrahub — what SHOULD exist
+#   observability    Telegraf, Logstash, Prometheus, Loki, Alertmanager, Grafana
+#   automation       Nornir, Netmiko, TextFSM, TTP — get and put on devices
+#   mcp              the tool surface for an AI platform (optional)
+#
+# Every service carries `com.darqcube.group`, so a group can be selected with:
+#   docker ps --filter "label=com.darqcube.group=observability"
+#
+# `include:` needs Compose v2.20+. Check with: docker compose version
+# ---------------------------------------------------------------------------
+name: darqcube
+
+include:
+  - compose/source-of-truth.yaml
+  - compose/observability.yaml
+  - compose/automation.yaml
+  - compose/mcp.yaml
+
+networks:
+  darqcube:
+    name: darqcube

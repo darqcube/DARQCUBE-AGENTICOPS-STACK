@@ -1,0 +1,39 @@
+# Prometheus. Scrapes Telegraf (all device metrics) and the stack's own services.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  # NOTE: Prometheus does NOT expand environment variables in this file —
+  # a "${VAR}" here would be stored literally as the label value, and promtool
+  # would not complain. Anything that must vary per install is set in .env and
+  # substituted by the config-init service (see compose/observability.yaml).
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
+
+scrape_configs:
+  # Every device metric — SNMP, gNMI and flow — arrives through this one target.
+  # Telegraf has already attached device/site/role from the source of truth.
+  - job_name: telegraf
+    static_configs:
+      - targets: [telegraf:9273]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+
+  - job_name: loki
+    static_configs:
+      - targets: [loki:3100]
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: [alertmanager:9093]
+
+  - job_name: grafana
+    static_configs:
+      - targets: [grafana:3000]

@@ -1,0 +1,7 @@
+<group name="interfaces*">
+interface {{ interface }}
+ description {{ description | re(".+") }}
+ ip address {{ ip }} {{ mask }}
+ shutdown {{ shutdown | set(true) }}
+ switchport mode {{ switchport_mode }}
+</group>

@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Your network devices. This is the file you edit to add a device.
+#
+#   make seed      apply this file to Infrahub (idempotent)
+#   make render    push the result into Telegraf and Logstash
+#
+# Both are needed: seed updates the source of truth, render updates the
+# collectors. A device added without `make render` will never be polled.
+#
+# FIELDS
+#   name             MUST equal the device's configured hostname / sysname /
+#                    RouterOS identity. It is the key that joins a syslog line
+#                    to a metric to an Infrahub record. A mismatch means logs
+#                    arrive unlabelled and nothing correlates.
+#   site             must exist in sites.yml
+#   role             core | distribution | access | wan | edge | firewall
+#   platform         ios_xe | vrp | routeros   (see platforms.yml)
+#   management_ip    what the stack polls and SSHes to
+#   telemetry_mode   snmp (default) | gnmi — ios_xe only for gnmi
+#   flow_enabled     true if the device exports NetFlow/IPFIX
+#
+# The three below are EXAMPLES. Replace them with your real devices.
+# ---------------------------------------------------------------------------
+devices:
+  - name: cr1
+    site: hq
+    role: core
+    platform: ios_xe
+    management_ip: 10.0.0.11
+    telemetry_mode: snmp
+    flow_enabled: true
+    description: Core router
+
+  - name: sw-hw-01
+    site: hq
+    role: access
+    platform: vrp
+    management_ip: 10.0.0.21
+    flow_enabled: false
+    description: Huawei access switch
+
+  - name: mt-01
+    site: branch-01
+    role: wan
+    platform: routeros
+    management_ip: 10.0.0.31
+    flow_enabled: true
+    description: MikroTik WAN router

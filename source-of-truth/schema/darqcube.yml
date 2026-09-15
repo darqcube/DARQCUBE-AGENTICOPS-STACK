@@ -1,0 +1,118 @@
+# ---------------------------------------------------------------------------
+# Infrahub schema — what SHOULD exist on the network.
+#
+# Load with: make schema
+#
+# TWO RULES WHEN EDITING THIS FILE:
+#
+# 1. Keep every `description:` UNDER 128 CHARACTERS. Infrahub rejects the whole
+#    schema load with `string_too_long` and does NOT name the offending field,
+#    so one long line costs an hour of bisecting.
+#
+# 2. Every attribute you add needs a `default_value` or `optional: true`.
+#    A required attribute with no default makes every EXISTING node
+#    non-compliant the moment the field lands.
+#
+# Device credentials are deliberately NOT modelled here. They live in .env.
+# ---------------------------------------------------------------------------
+version: "1.0"
+
+nodes:
+  - name: Site
+    namespace: Network
+    label: Site
+    description: A physical or logical location grouping devices.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Short site identifier, used as a metric and log label.
+      - name: description
+        kind: Text
+        optional: true
+    relationships:
+      - name: devices
+        peer: NetworkDevice
+        optional: true
+        cardinality: many
+        kind: Component
+
+  - name: Device
+    namespace: Network
+    label: Network Device
+    description: A managed network device — polled, logged and automated.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Must equal the device hostname/sysname/identity exactly.
+
+      - name: role
+        kind: Dropdown
+        description: Function of the device. Becomes a metric and log label.
+        choices:
+          - name: core
+          - name: distribution
+          - name: access
+          - name: wan
+          - name: edge
+          - name: firewall
+
+      - name: platform
+        kind: Dropdown
+        description: Selects the entry in platforms.yml — OIDs, netmiko type.
+        choices:
+          - name: ios_xe
+            label: Cisco IOS-XE
+          - name: vrp
+            label: Huawei VRP
+          - name: routeros
+            label: MikroTik RouterOS
+
+      - name: management_ip
+        kind: IPHost
+        description: Address the stack polls and connects to.
+
+      - name: status
+        kind: Dropdown
+        default_value: active
+        description: Only active devices are rendered into the collectors.
+        choices:
+          - name: active
+          - name: provisioning
+          - name: maintenance
+          - name: decommissioned
+
+      - name: telemetry_mode
+        kind: Dropdown
+        default_value: snmp
+        description: Metrics transport. SNMP and gNMI are mutually exclusive.
+        choices:
+          - name: snmp
+          - name: gnmi
+
+      - name: flow_enabled
+        kind: Boolean
+        default_value: false
+        description: Device is expected to export NetFlow or IPFIX.
+
+      - name: description
+        kind: Text
+        optional: true
+
+    relationships:
+      - name: site
+        peer: NetworkSite
+        optional: false
+        cardinality: one
+        kind: Attribute

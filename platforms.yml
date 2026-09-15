@@ -1,0 +1,103 @@
+# ---------------------------------------------------------------------------
+# The vendor matrix. This is the ONE file you edit to add or change a platform.
+#
+# Read by:
+#   source-of-truth/scripts/render-inventory.py   -> Telegraf SNMP/gNMI configs
+#   automation/textfsm/parse.py                   -> netmiko_type for templates
+#   automation/nornir/tasks.py                    -> connection type per host
+#
+# Adding a vendor takes six edits — see docs/how-to/add-a-platform.md:
+#   1. an entry here
+#   2. a Logstash grok file  observability/logstash/patterns/<vendor>.grok
+#   3. a TextFSM template    automation/textfsm/templates/  (if ntc has none)
+#   4. a normaliser          automation/assurance/normalise.py
+#   5. the platform choice   source-of-truth/schema/darqcube.yml
+#   6. an onboarding doc     docs/devices/<name>.md
+# All six, or the vendor is half-supported — and half-support fails silently.
+#
+# WHAT IS *NOT* HERE
+#   Interface metrics. IF-MIB is byte-identical on every platform, so it is
+#   collected once for the whole fleet by a single shared SNMP input
+#   (observability/telegraf/profiles/_interfaces.conf.tmpl). Only CPU and
+#   memory genuinely differ per vendor, which is why this file is short.
+#
+# MEMORY UNITS — the one real inconsistency between vendors
+#   Huawei reports a PERCENTAGE directly. Cisco reports BYTES used/free.
+#   MikroTik reports ALLOCATION UNITS used/total. Emitting all three as
+#   `memory_used_percent` would be silently wrong, so each platform declares
+#   what its OIDs actually mean and Prometheus does the arithmetic in a
+#   recording rule (observability/prometheus/rules/recording.yml).
+#   `kind` is one of: percent | used_free | used_total
+#
+# netmiko_type vs textfsm_platform — THESE ARE NOT ALWAYS THE SAME
+#   netmiko_type     how Netmiko CONNECTS (prompt handling, paging, enable)
+#   textfsm_platform how ntc-templates NAMES its parsing templates
+#
+#   For Cisco IOS-XE they differ: Netmiko has "cisco_xe", but ntc-templates
+#   files every IOS/IOS-XE template under "cisco_ios" and has ZERO templates
+#   named cisco_xe. Using one value for both means every Cisco parse fails.
+#   Verify coverage for a new vendor with:
+#       .venv/bin/python -c "from ntc_templates.parse import parse_output; ..."
+# ---------------------------------------------------------------------------
+
+ios_xe:
+  display_name: Cisco IOS-XE
+  vendor: cisco
+  netmiko_type: cisco_xe
+  textfsm_platform: cisco_ios      # ntc-templates has NO cisco_xe templates
+  gnmi: true
+  gnmi_port: 57400
+  show_run: show running-config
+  state_cmd: show ip interface brief
+  onboarding_doc: docs/devices/cisco-ios-xe.md
+  snmp:
+    cpu:
+      oid: 1.3.6.1.4.1.9.9.109.1.1.1.1.8       # cpmCPUTotal5minRev — already a %
+      mib: CISCO-PROCESS-MIB
+    memory:
+      kind: used_free
+      used: 1.3.6.1.4.1.9.9.221.1.1.1.1.18     # cempMemPoolHCUsed  (bytes)
+      free: 1.3.6.1.4.1.9.9.221.1.1.1.1.20     # cempMemPoolHCFree  (bytes)
+      mib: CISCO-ENHANCED-MEMPOOL-MIB
+
+vrp:
+  display_name: Huawei VRP
+  vendor: huawei
+  netmiko_type: huawei_vrp
+  textfsm_platform: huawei_vrp
+  gnmi: false                                   # version/hardware dependent — out of scope
+  show_run: display current-configuration
+  state_cmd: display interface brief
+  onboarding_doc: docs/devices/huawei-vrp.md
+  snmp:
+    cpu:
+      oid: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7  # hwEntityCpuUsage — already a %
+      mib: HUAWEI-ENTITY-EXTENT-MIB
+    memory:
+      kind: percent                             # the one vendor that gives a % directly
+      used: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.11 # hwEntityMemUsage
+      mib: HUAWEI-ENTITY-EXTENT-MIB
+
+routeros:
+  display_name: MikroTik RouterOS
+  vendor: mikrotik
+  netmiko_type: mikrotik_routeros
+  textfsm_platform: mikrotik_routeros
+  gnmi: false                                   # RouterOS has no gNMI
+  show_run: /export terse
+  state_cmd: /interface print terse without-paging
+  onboarding_doc: docs/devices/mikrotik-routeros.md
+  snmp:
+    # RouterOS has NO vendor CPU MIB. MIKROTIK-MIB (enterprise 14988) carries
+    # health, voltage and wireless — not CPU. Both values come from the
+    # standard HOST-RESOURCES-MIB instead.
+    cpu:
+      oid: 1.3.6.1.2.1.25.3.3.1.2              # hrProcessorLoad — a % per core
+      mib: HOST-RESOURCES-MIB
+    memory:
+      kind: used_total
+      used: 1.3.6.1.2.1.25.2.3.1.6             # hrStorageUsed  (allocation units)
+      total: 1.3.6.1.2.1.25.2.3.1.5            # hrStorageSize  (allocation units)
+      mib: HOST-RESOURCES-MIB
+      # hrStorage indexes every storage type. Confirm which index is main
+      # memory on one box before trusting the numbers — it varies by build.

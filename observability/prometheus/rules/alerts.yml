@@ -1,0 +1,71 @@
+# Alerts. Edit this file to add or change one, then: make restart SVC=prometheus
+groups:
+  - name: network-devices
+    rules:
+      # admin-up but oper-down: the operator wants it up and it isn't. An
+      # interface that is deliberately shut is admin_status 2 and never fires.
+      - alert: InterfaceDown
+        expr: interface_oper_status == 2 and interface_admin_status == 1
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.ifName }} is down"
+          description: "Admin-up but oper-down for 2 minutes. {{ $labels.ifAlias }}"
+
+      - alert: InterfaceErrorRateHigh
+        expr: rate(interface_in_errors[5m]) + rate(interface_out_errors[5m]) > 10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.ifName }} error rate high"
+
+      - alert: DeviceCPUHigh
+        expr: device:cpu_usage:max > 85
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.device }} CPU at {{ $value | printf \"%.0f\" }}%"
+
+      - alert: DeviceMemoryHigh
+        expr: device:memory_used_percent:max > 90
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.device }} memory at {{ $value | printf \"%.0f\" }}%"
+
+      # A device that was being polled and has stopped. Covers a dead device, a
+      # broken SNMP credential and a management-path outage alike.
+      - alert: DeviceUnreachable
+        expr: up{job="telegraf"} == 1 and on() absent_over_time(device_uptime[5m])
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "No SNMP data from any device for 5 minutes"
+          description: "Telegraf is being scraped but no device is answering."
+
+  - name: flows
+    rules:
+      # Flow is device-initiated, so silence is the only symptom of an exporter
+      # that has stopped. Nothing else in the stack would notice.
+      - alert: NoFlowsReceived
+        expr: absent_over_time(flow_bytes_total[15m])
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "No NetFlow/IPFIX received for 15 minutes"
+          description: "Check /ip traffic-flow or the device's flow export config."
+
+  - name: platform
+    rules:
+      - alert: ScrapeTargetDown
+        expr: up == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.job }} is down"
+
+      - alert: PrometheusRuleEvaluationFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "Prometheus rule evaluations are failing"

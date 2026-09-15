@@ -1,0 +1,3 @@
+0 R name=ether1 default-name=ether1 type=ether mtu=1500 actual-mtu=1500 l2mtu=1598 mac-address=00:0C:29:11:22:33
+1 X name=ether2 default-name=ether2 type=ether mtu=1500 actual-mtu=1500 l2mtu=1598 mac-address=00:0C:29:11:22:34
+2 R name=bridge1 type=bridge mtu=auto actual-mtu=1500 l2mtu=1598 mac-address=00:0C:29:11:22:35

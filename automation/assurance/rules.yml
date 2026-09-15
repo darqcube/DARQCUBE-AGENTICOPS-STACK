@@ -1,0 +1,33 @@
+# Assurance rules — declarative, vendor-neutral.
+#
+# Rules run against NORMALISED state (see normalise.py), so one rule covers
+# Cisco, Huawei and MikroTik despite three completely different CLI formats.
+#
+# Add a rule by adding an entry here. No code change.
+#
+# Fields:
+#   name         short identifier, appears in results
+#   description  what it checks, and why it matters
+#   severity     error | warning
+#   applies_to   platforms, or "all"
+#   check        admin_up_means_oper_up | no_error_counters | min_interfaces
+#   ignore       interface names to skip (regex)
+
+rules:
+  - name: admin_up_interfaces_are_operational
+    description: An interface the operator has enabled should be carrying traffic.
+    severity: error
+    applies_to: all
+    check: admin_up_means_oper_up
+    # Tunnels and loopbacks legitimately differ from physical ports, and an
+    # unused access port being down is not a fault worth alerting a human about.
+    ignore: '^(Loopback|Null|Vlan|lo|bridge)'
+
+  - name: device_has_interfaces
+    description: >-
+      A device that reports zero interfaces is almost always a parsing failure
+      rather than a device with no ports.
+    severity: error
+    applies_to: all
+    check: min_interfaces
+    minimum: 1

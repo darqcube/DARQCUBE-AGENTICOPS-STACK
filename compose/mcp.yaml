@@ -1,0 +1,101 @@
+# ---------------------------------------------------------------------------
+# GROUP: mcp — the tool surface an AI platform uses.
+#
+# Six containers from ONE image. MCP_SERVER selects the module, PORT the port.
+#
+# OPTIONAL BY DESIGN. Drop `mcp` from COMPOSE_PROFILES and nothing else in the
+# stack loses a feature — Grafana, Prometheus, Loki and the automation API are
+# all still usable directly. Nothing depends on these servers.
+#
+# All six are `expose:` only. They are reached over the compose network, never
+# published to the host.
+# ---------------------------------------------------------------------------
+
+x-mcp: &mcp
+  build:
+    context: ../mcp
+  image: darqcube/mcp:local
+  profiles: [mcp]
+  labels:
+    com.darqcube.group: mcp
+    com.darqcube.role: mcp
+  networks: [darqcube]
+  restart: unless-stopped
+
+x-mcp-env: &mcp-env
+  MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?set in .env}
+
+x-mcp-health: &mcp-health
+  test: ["CMD-SHELL", "python -c \"import os,urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:'+os.environ['PORT']+'/healthz').status==200 else 1)\""]
+  interval: 20s
+  timeout: 5s
+  retries: 10
+  start_period: 15s
+
+services:
+
+  mcp-infrahub:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: infrahub
+      PORT: "9001"
+      INFRAHUB_URL: http://infrahub-server:8000
+      INFRAHUB_API_TOKEN: ${INFRAHUB_ADMIN_TOKEN:?set in .env}
+    expose: ["9001"]
+    healthcheck: *mcp-health
+
+  mcp-prometheus:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: prometheus
+      PORT: "9002"
+      PROMETHEUS_URL: http://prometheus:9090
+    expose: ["9002"]
+    healthcheck: *mcp-health
+
+  mcp-loki:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: loki
+      PORT: "9003"
+      LOKI_URL: http://loki:3100
+    expose: ["9003"]
+    healthcheck: *mcp-health
+
+  mcp-grafana:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: grafana
+      PORT: "9004"
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GRAFANA_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env}
+    expose: ["9004"]
+    healthcheck: *mcp-health
+
+  mcp-netmiko:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: netmiko
+      PORT: "9005"
+      AUTOMATION_URL: http://automation:8100
+      # false (the default) means push_device_config is NOT REGISTERED — it is
+      # absent from tools/list entirely, not merely refused when called.
+      MCP_ALLOW_WRITE: ${MCP_ALLOW_WRITE:-false}
+    expose: ["9005"]
+    healthcheck: *mcp-health
+
+  mcp-assurance:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: assurance
+      PORT: "9006"
+      AUTOMATION_URL: http://automation:8100
+    expose: ["9006"]
+    healthcheck: *mcp-health

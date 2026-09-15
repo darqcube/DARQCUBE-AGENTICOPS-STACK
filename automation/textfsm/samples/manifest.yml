@@ -1,0 +1,30 @@
+# What each captured sample is, and what command produced it.
+#
+# A manifest rather than filename-encoding, because a filename cannot carry a
+# command faithfully — RouterOS commands begin with "/", and commands contain
+# spaces and punctuation that would have to be escaped and unescaped. Being
+# explicit here also gives somewhere to record the firmware a sample came
+# from, which is the first question when a template stops matching.
+#
+# Adding a sample:
+#   1. capture real output into a .txt here
+#   2. add an entry below
+#   3. make test-templates
+samples:
+  - file: ios_xe-show-ip-interface-brief.txt
+    platform: ios_xe
+    command: show ip interface brief
+    source: Cisco IOS-XE 17.x
+    expect_keys: [interface, ip_address, status, proto]
+
+  - file: vrp-display-interface-brief.txt
+    platform: vrp
+    command: display interface brief
+    source: Huawei VRP8
+    expect_keys: [interface, phy, protocol]
+
+  - file: routeros-interface-print-terse.txt
+    platform: routeros
+    command: /interface print terse without-paging
+    source: MikroTik RouterOS 7.x
+    expect_keys: [id, name, type]

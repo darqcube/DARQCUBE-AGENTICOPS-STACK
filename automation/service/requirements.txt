@@ -1,0 +1,27 @@
+fastapi~=0.115
+uvicorn~=0.34
+pyyaml~=6.0
+
+# Infrahub SDK — live inventory, so there is no inventory file to keep in sync.
+# Must stay on the 1.x line: 0.x pins an SDK the Infrahub 1.10 server rejects.
+infrahub-sdk~=1.0
+
+# Nornir for fleet-wide runs, Netmiko for the CLI transport and for the
+# standalone single-device scripts.
+nornir~=3.5
+nornir-netmiko~=1.0
+nornir-infrahub~=1.1
+netmiko~=4.5
+
+# Parsing. TextFSM for tabular `show` output, TTP for hierarchical config.
+# ntc-templates is not pulled in by netmiko (it is an optional extra), so it is
+# declared explicitly.
+textfsm>=2.1
+ntc-templates>=7.0
+ttp>=0.9
+
+# Assurance. deepdiff compares pre/post state snapshots; rich formats the
+# standalone scripts' output.
+deepdiff>=8.0
+rich>=13.0
+

@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: darqcube
+    orgId: 1
+    folder: DarqCube
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards/darqcube

@@ -1,0 +1,8 @@
+# Sites. Edit this file and run `make seed` — it is idempotent, so re-running
+# updates existing sites rather than duplicating them.
+sites:
+  - name: hq
+    description: Head office
+
+  - name: branch-01
+    description: Branch site 1

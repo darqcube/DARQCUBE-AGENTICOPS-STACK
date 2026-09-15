@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------------------
+# GROUP: automation — gets and puts information and configuration on devices.
+#
+# One container holding Nornir, Netmiko, TextFSM, TTP and the assurance
+# engine. It is the ONLY
+# thing in the stack that opens an SSH session to a device — mcp-netmiko and
+# mcp-assurance call this API rather than talking to devices themselves, so there
+# is one code path for credentials, parsing and error handling.
+# ---------------------------------------------------------------------------
+
+services:
+
+  automation:
+    build:
+      context: ..
+      dockerfile: automation/service/Dockerfile
+    image: darqcube/automation:local
+    labels:
+      com.darqcube.group: automation
+      com.darqcube.role: api
+    profiles: [automation]
+    environment:
+      INFRAHUB_URL: http://infrahub-server:8000
+      INFRAHUB_API_TOKEN: ${INFRAHUB_ADMIN_TOKEN:?set in .env}
+      INFRAHUB_BRANCH: ${INFRAHUB_BRANCH:-main}
+      # One pair for Nornir and Netmiko alike. Do not split these.
+      DEVICE_USER: ${DEVICE_USER:?set in .env}
+      DEVICE_PASSWORD: ${DEVICE_PASSWORD:?set in .env}
+      # Points Netmiko at our own templates first; it falls back to the
+      # packaged ntc-templates library for anything not overridden.
+      NET_TEXTFSM: /app/automation/textfsm
+      MAX_CONFIG_LINES: ${MAX_CONFIG_LINES:-200}
+      AUTOMATION_CONCURRENCY: ${AUTOMATION_CONCURRENCY:-8}
+      LOKI_URL: http://loki:3100
+    volumes:
+      # Mounted rather than baked in, so a template or task can be edited and
+      # retried without a rebuild — this is the layer that gets iterated most.
+      - ../automation:/app/automation
+      - ../platforms.yml:/app/platforms.yml:ro
+    ports:
+      - "${AUTOMATION_PORT:-8100}:8100"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8100/healthz').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [darqcube]
+    restart: unless-stopped

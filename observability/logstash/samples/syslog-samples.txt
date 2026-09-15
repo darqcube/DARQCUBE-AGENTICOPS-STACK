@@ -1,0 +1,4 @@
+<189>264: cr1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.0.0.5
+<190>Sep 14 2026 10:23:45+05:00 sw-hw-01 %%01IFNET/4/LINK_STATE(l)[0]:Interface GE0/0/1 has turned into DOWN state
+<134>Sep 14 10:23:45 mt-01 system,info: user admin logged in from 10.0.0.5 via ssh
+<13>this line matches nothing in particular

@@ -1,0 +1,36 @@
+# Custom grok patterns for the three vendors' syslog formats.
+# Referenced by pipeline/syslog.conf via patterns_dir.
+
+# --- Cisco IOS / IOS-XE ---------------------------------------------------
+# IOS DOES NOT EMIT CONFORMANT RFC3164. A real line looks like:
+#   <189>264: cr1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: message
+# The sequence number and origin-id hostname come BEFORE the timestamp, where
+# RFC3164 expects "Mmm dd hh:mm:ss HOSTNAME TAG:". A strict RFC3164 parser
+# rejects every line and drops the packet with no error anywhere. The leading
+# "*" means the clock is not yet NTP-synchronised. Every one of those parts is
+# optional below, because which appear depends on the device's own config.
+CISCO_TS %{MONTH} +%{MONTHDAY} %{TIME}
+CISCO_SYSLOG <%{NONNEGINT:pri:int}>(?:%{NONNEGINT:seq:int}: )?(?:%{HOSTNAME:hostname}: )?[*.]?%{CISCO_TS:ts}(?: %{WORD:tz})?: %%{DATA:facility}-%{INT:severity_code:int}-%{WORD:mnemonic}: %{GREEDYDATA:msg}
+
+# --- Huawei VRP -----------------------------------------------------------
+# info-center format:
+#   <190>Sep 14 2026 10:23:45+05:00 sw-hw-01 %%01IFNET/4/LINK_STATE(l)[0]:message
+# The sysname sits after the timestamp, and the module/severity/mnemonic are
+# packed into a %%NN prefix rather than Cisco's %FACILITY-SEV-MNEMONIC.
+# NOTE ON ESCAPING: in a grok pattern file '%' is literal unless followed by
+# '{'. Matching the two percent signs Huawei sends needs exactly '%%'.
+VRP_TS %{MONTH} +%{MONTHDAY} %{YEAR} %{TIME}(?:[+-]%{HOUR}:%{MINUTE})?
+VRP_SYSLOG <%{NONNEGINT:pri:int}>%{VRP_TS:ts} %{HOSTNAME:hostname} %%(?<vrp_ver>[0-9]+)(?<facility>[A-Za-z0-9]+)/(?<severity_code>[0-9]+)/(?<mnemonic>[A-Za-z0-9_]+)(?:\((?<vrp_type>[a-z])\))?(?:\[[0-9]+\])?: ?%{GREEDYDATA:msg}
+
+# --- MikroTik RouterOS ----------------------------------------------------
+# RouterOS sends /system identity as the hostname and a comma-separated topic
+# list where Cisco puts %FACILITY-SEV-MNEMONIC:
+#   <134>Sep 14 10:23:45 mt-01 system,info message
+# There is no severity in the message body, so it comes from the PRI instead.
+ROS_SYSLOG <%{NONNEGINT:pri:int}>%{SYSLOGTIMESTAMP:ts} %{HOSTNAME:hostname} %{DATA:topics}: %{GREEDYDATA:msg}
+ROS_SYSLOG_NOHOST <%{NONNEGINT:pri:int}>%{SYSLOGTIMESTAMP:ts} %{DATA:topics}: %{GREEDYDATA:msg}
+
+# --- Last resort ----------------------------------------------------------
+# Anything unrecognised is still DELIVERED, tagged, never dropped. A log you
+# cannot parse is worth far more than a log you threw away.
+ANY_SYSLOG <%{NONNEGINT:pri:int}>%{GREEDYDATA:msg}

@@ -1,0 +1,40 @@
+# CPU and memory for ONE platform. These are the only metrics that genuinely
+# differ per vendor; everything else is IF-MIB and shared.
+#
+# Two tables, `cpu` and `memory`, because Prometheus sees <measurement>_<field>
+# — so `cpu` + `usage` is what yields `cpu_usage`, and `memory` + `used` yields
+# `memory_used`, identically on all three vendors.
+#
+# These OIDs are tables everywhere (per core, per pool, per storage entity), so
+# each row arrives separately tagged with its index. Aggregation is left to
+# PromQL — `max by (device)(cpu_usage)` — rather than being flattened here,
+# where the choice would be invisible to whoever reads the graph.
+#
+# memory_kind says what the memory numbers MEAN (percent | used_free |
+# used_total). Prometheus recording rules use it to derive a comparable
+# memory_used_percent — the vendors genuinely disagree on units.
+
+[[inputs.snmp]]
+  agents = [__AGENTS__]
+  version = 3
+  sec_name = "${SNMPV3_USER}"
+  sec_level = "authPriv"
+  auth_protocol = "SHA"
+  auth_password = "${SNMPV3_AUTH}"
+  priv_protocol = "AES"
+  priv_password = "${SNMPV3_PRIV}"
+  interval = "${SNMP_INTERVAL}"
+  timeout = "10s"
+  retries = 1
+  agent_host_tag = "agent_host"
+
+  [inputs.snmp.tags]
+    platform = "__PLATFORM__"
+    memory_kind = "__MEMORY_KIND__"
+
+  [[inputs.snmp.field]]
+    name = "hostname"
+    oid = "1.3.6.1.2.1.1.5.0"
+    is_tag = true
+
+__RESOURCE_TABLES__
