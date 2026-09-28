@@ -157,7 +157,7 @@ docker compose exec telegraf nc -zvu 10.0.0.11 161
 curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query?query=device_uptime{device=\"cr1\"}"
 curl -sG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={device="cr1"}'
 make state DEV=cr1
-make check DEV=cr1          # assurance rules
+make check DEV=cr1          # interface rules via TextFSM, BGP via pyATS learn("bgp")
 ```
 
 ## gNMI (optional)

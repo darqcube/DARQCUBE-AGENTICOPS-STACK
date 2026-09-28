@@ -33,7 +33,7 @@ flowchart LR
       GF["Grafana :3000"]
     end
     subgraph AUT["⚙️ automation"]
-      AU["Nornir · Netmiko<br/>TextFSM · TTP<br/>:8100"]
+      AU["Nornir · Netmiko<br/>TextFSM · TTP · pyATS<br/>:8100"]
     end
     subgraph MCPG["🔌 mcp"]
       MS["6 servers<br/>internal only"]
@@ -192,7 +192,7 @@ Each feed has exactly one owner. No feed is collected twice.
 | Streaming telemetry | gNMI / TCP 57400 | stack pulls | **Telegraf** | Prometheus |
 | Flow records | NetFlow, IPFIX / UDP | device pushes | **Telegraf** | Prometheus |
 | Events | Syslog / UDP 514 | device pushes | **Logstash** | Loki |
-| Config & state | SSH / TCP 22 | stack pulls + puts | **Nornir · Netmiko · TextFSM · TTP** | files + API |
+| Config & state | SSH / TCP 22 | stack pulls + puts | **Nornir · Netmiko · TextFSM · TTP · pyATS** | files + API |
 
 Telegraf never listens for syslog; Logstash never polls a device.
 
@@ -205,12 +205,13 @@ of series within hours. The stack answers "how much traffic, of what kind", not
 "who is talking to whom". The latter needs a flow store, which this stack does
 not run.
 
-**Assurance is vendor-neutral, and that shaped the tooling.** There is one path
-for all three platforms: Netmiko gets the text, TextFSM parses tabular `show`
-output, TTP parses hierarchical config, and `automation/assurance/normalise.py`
-flattens the vendor differences into one shape.
+**Assurance has two engines, and pyATS is additive.** TextFSM covers interface
+state on every platform: `automation/assurance/normalise.py` flattens three
+vendors' CLI formats into one shape, so a single rule set covers the fleet.
 
-A single `rules.yml` then covers the fleet, and adding a check is a YAML edit
-rather than a code change. The cost is one normaliser function per platform —
-about fifteen lines — which is what a second vendor-specific assurance path
-would have cost many times over.
+pyATS/Genie runs on top wherever Genie genuinely returns data — Cisco fully,
+Huawei for BGP only, MikroTik not at all. It is never a platform's only path,
+so a gap in Genie's coverage cannot silently remove a platform's checks; an
+unsupported rule reports `skipped` rather than `pass`. What each platform gets
+is declared in `platforms.yml` and verified against the installed Genie by a
+test that runs inside the automation image.

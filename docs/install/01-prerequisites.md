@@ -48,7 +48,8 @@ package** — that catches people out more than anything else here.
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker "$USER"
-newgrp docker                       # or log out and back in
+# then log out and back in — group membership is read at login
+# (newgrp docker does it without reconnecting, where that command exists)
 ```
 
 Verify — **Compose must be v2.20 or newer**, because `compose.yaml` uses

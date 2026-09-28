@@ -3,7 +3,7 @@
 #
 #   cp site.example.yml site.yml
 #   chmod 600 site.yml
-#   $EDITOR site.yml
+#   ${EDITOR:-nano} site.yml
 #   python3 install.py
 #
 # THIS FILE CONTAINS CREDENTIALS. site.yml is gitignored and install.py refuses

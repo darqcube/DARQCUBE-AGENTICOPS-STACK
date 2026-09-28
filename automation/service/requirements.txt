@@ -25,3 +25,14 @@ ttp>=0.9
 deepdiff>=8.0
 rich>=13.0
 
+# pyATS / Genie — used ONLY where Genie actually returns data, declared per
+# platform in platforms.yml under `pyats:`.
+#   Cisco IOS-XE   unicon `iosxe` + Genie learn(): interface, platform, bgp, lldp
+#   Huawei VRP     unicon `hvrp`  + Genie parsers for `display bgp peer` ONLY.
+#                  There are no hvrp learn() models and no interface parsers,
+#                  so Huawei interface checks stay on TextFSM.
+#   MikroTik       no unicon plugin, no parsers — TextFSM only.
+# textfsm>=2.1 above is required by Genie; pinning textfsm 1.x makes pip
+# backtrack for minutes and then fail.
+pyats[library]>=25.5
+

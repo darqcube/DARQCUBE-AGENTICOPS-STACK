@@ -1,4 +1,4 @@
-# Automation — Nornir, Netmiko, TextFSM, TTP
+# Automation — Nornir, Netmiko, TextFSM, TTP, pyATS
 
 ## What it does here
 
@@ -21,15 +21,39 @@ automation MCP servers with it.
 | **TextFSM** + ntc-templates | tabular `show` output → rows. This is what makes "get state" return JSON rather than a wall of text. |
 | **TTP** | hierarchical *config* → structure. A running-config is a tree, and TextFSM has no notion of nested blocks. |
 | **normalise.py** | flattens three vendors' rows into one shape, so one rule set covers the fleet. |
+| **pyATS / Genie** | structured `learn()` models and parsers, used where Genie supports the platform — see below. |
 | **DeepDiff** | compares pre/post snapshots, so a config push reports what it actually changed. |
 | **rich** | readable output from the standalone scripts. |
 
-### One code path for every vendor
+### Two engines, and pyATS is additive
 
-The three vendors describe interface state in three incompatible ways.
-`normalise.py` maps all of them to `{interface, admin_up, oper_up}` before any
-rule runs, so the assurance layer is one implementation rather than one per
-vendor. The per-vendor mapping is documented where you need it —
+**TextFSM** handles interface state for every platform. The three vendors
+describe it in three incompatible ways; `normalise.py` maps all of them to
+`{interface, admin_up, oper_up}` so one set of interface rules covers the fleet.
+
+**pyATS / Genie** runs on top, wherever Genie genuinely returns data:
+
+| Platform | pyATS does | How |
+|---|---|---|
+| Cisco IOS-XE | BGP session state | `learn("bgp")` — a full Genie model |
+| Huawei VRP | BGP session state | `parse("display bgp peer")` — Genie's hvrp library is BGP parsers only |
+| MikroTik | nothing | unicon has no RouterOS plugin, Genie no parsers |
+
+Declared per platform in `platforms.yml` under `pyats:`. A platform is never
+assured by pyATS alone — if Genie turned out to cover less than assumed, the
+platform would still have every interface check.
+
+**Huawei is the case to understand.** pyATS connects to it (unicon `hvrp`) and
+Genie parses its BGP output — but there is no hvrp interface parser and no hvrp
+`learn()` model at all. `learn("interface")` against a VRP device connects
+successfully and returns nothing. That is why Huawei interface checks stay on
+TextFSM, and why a test fails if anyone declares `learn:` under `vrp`.
+
+pyATS opens its own SSH session through unicon, separate from Netmiko's. The
+assurance run holds the device lock across both, so they never overlap on one
+device.
+
+The per-vendor mappings and how to add a rule:
 [../how-to/change-assurance-rules.md](../how-to/change-assurance-rules.md).
 
 ## Configuration
@@ -41,6 +65,7 @@ vendor. The per-vendor mapping is documented where you need it —
 | `automation/textfsm/` | parsing: `parse.py`, `index`, `templates/`, `samples/` |
 | `automation/ttp/` | TTP config parsing: `parse.py`, `templates/` |
 | `automation/assurance/` | `normalise.py`, `engine.py`, `rules.yml` |
+| `automation/pyats/` | `testbed.py`, `checks.py`, and `samples/` — Genie's own golden fixtures |
 | `automation/service/main.py` | the HTTP API |
 | `.env` → `DEVICE_USER` / `DEVICE_PASSWORD` | one pair, used by all of the above |
 | `.env` → `AUTOMATION_CONCURRENCY` | devices talked to at once (default 8) |
@@ -58,7 +83,7 @@ vendor. The per-vendor mapping is documented where you need it —
 | `GET /device/{name}/config/structured` | running config parsed with TTP |
 | `GET /device/{name}/snapshot` | comparable state, for pre/post comparison |
 | `POST /device/{name}/config` | push config lines (reports what changed) |
-| `POST /device/{name}/check` | run the assurance rules — **every platform** |
+| `POST /device/{name}/check` | run the assurance rules — TextFSM on every platform, pyATS where supported |
 
 Or from the Makefile:
 

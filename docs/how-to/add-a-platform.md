@@ -86,15 +86,6 @@ exists, add a sample so the coverage is verified:
 syslog destination, flow export, NTP, and the rule that the device hostname
 must equal its Infrahub name. Copy the shape of an existing one.
 
-## Verify
-
-```bash
-make test                      # schema/platform parity, template coverage
-make seed && make render
-ls observability/telegraf/generated/     # expect snmp-nx_os.conf
-make state DEV=<a device of the new platform>
-```
-
 ## 6. An assurance normaliser
 
 `automation/assurance/normalise.py` — this is what lets one set of rules cover
@@ -119,3 +110,43 @@ worse than an error, because the result still looks like data. This is a real
 bug that happened here: RouterOS flags live in `status`, not `flags`.
 
 A test asserts every platform in `platforms.yml` has a normaliser.
+
+## 7. Optionally, pyATS
+
+Only if Genie genuinely supports the OS — and declare only what it supports:
+
+```yaml
+nx_os:
+  pyats:
+    os: nxos                 # a unicon plugin name
+    learn: [bgp, interface]  # Genie ops models that exist for this os
+    # or, where Genie has parsers but no learn() models:
+    # parse:
+    #   bgp: show bgp sessions
+```
+
+Check before you trust it, inside the automation image:
+
+```bash
+docker compose exec automation python -c "
+import os, genie.libs.ops as O
+print(sorted(d for d in os.listdir(os.path.dirname(O.__file__)+'/bgp')))"
+```
+
+**A `learn()` with no model for that OS connects successfully and returns
+nothing.** Huawei is the live example: unicon connects to `hvrp`, but Genie has
+no hvrp interface model — only BGP parsers. The pyATS layer fails loudly on an
+empty result, and `test_declared_pyats_matches_real_genie` fails the build if
+`platforms.yml` claims support the installed Genie does not have.
+
+pyATS is always *in addition* to step 6. Never skip the normaliser because a
+platform has pyATS support.
+
+## Verify
+
+```bash
+make test                      # schema/platform parity, template coverage
+make seed && make render
+ls observability/telegraf/generated/     # expect snmp-nx_os.conf
+make state DEV=<a device of the new platform>
+```

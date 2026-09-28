@@ -55,7 +55,9 @@ def test_referenced_env_vars_exist(doc):
     # Only ${VAR} / $VAR forms that look like our own settings.
     used = set(re.findall(r"\$\{([A-Z][A-Z0-9_]{3,})(?::-[^}]*)?\}", doc.read_text()))
     # Variables set by the user's shell or by compose, not by .env.example.
-    external = {"PWD", "HOME", "USER", "MAKEFILE_LIST", "COMPOSE_PROJECT_NAME"}
+    # Shell variables the READER'S environment supplies, not ours. EDITOR is
+    # used as ${EDITOR:-nano} so the docs work whether or not it is set.
+    external = {"PWD", "HOME", "USER", "EDITOR", "MAKEFILE_LIST", "COMPOSE_PROJECT_NAME"}
     # Placeholders in worked examples — a doc showing how to add a service
     # necessarily names variables that do not exist yet.
     placeholders = {"SOME_SETTING", "MY_SERVICE_PORT", "REQUIRED_SECRET", "VAR"}

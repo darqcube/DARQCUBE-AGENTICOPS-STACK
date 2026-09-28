@@ -161,15 +161,19 @@ RouterOS output is columnar with flag letters in a leading column (`0 R`,
 coverage is thinner than for Cisco. Expect to write a template for any command
 beyond the basics — [../how-to/add-a-textfsm-template.md](../how-to/add-a-textfsm-template.md).
 
-## Assurance works the same as every other platform
+## Assurance — TextFSM only
 
-RouterOS has no gNMI, so metrics come from SNMP. Everything else takes the same
-path as Cisco and Huawei: Netmiko gets the text, TextFSM parses it, and
+RouterOS has no gNMI, so metrics come from SNMP. Interface assurance takes the
+same path as Cisco and Huawei: Netmiko gets the text, TextFSM parses it, and
 `automation/assurance/normalise.py` maps RouterOS's flag letters to the same
 shape the other vendors produce.
 
+There is **no pyATS support** for RouterOS — unicon has no plugin for it and
+Genie no parsers. The BGP rule therefore comes back `skipped` with the reason,
+never as a pass: treat it as "not checked", not as "healthy".
+
 ```bash
-make check DEV=mt-01        # the same rules that run against Cisco
+make check DEV=mt-01        # interface rules; the BGP rule reports "skipped"
 make snapshot DEV=mt-01     # comparable state, for pre/post comparison
 ```
 

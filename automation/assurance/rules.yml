@@ -31,3 +31,21 @@ rules:
     applies_to: all
     check: min_interfaces
     minimum: 1
+
+  # --- pyATS / Genie ---------------------------------------------------------
+  # These run only where platforms.yml declares the feature under `pyats:`.
+  # A platform without it gets `skipped` with the reason — never a pass.
+  #   Cisco IOS-XE   learn("bgp")
+  #   Huawei VRP     parse("display bgp peer")
+  #   MikroTik       no pyATS support — skipped
+
+  - name: bgp_peers_established
+    description: >-
+      Every BGP peer the device knows about should be Established. A peer
+      stuck in Idle, Connect or Active is a session that is not carrying routes.
+    severity: error
+    source: pyats
+    feature: bgp
+    check: bgp_peers_established
+    # Peers that are expected to be down (a planned turn-up, a lab stub):
+    # ignore_peers: [192.0.2.1]

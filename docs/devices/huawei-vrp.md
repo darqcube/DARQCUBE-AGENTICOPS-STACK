@@ -169,14 +169,34 @@ curl -sG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'quer
 make state DEV=sw-hw-01
 ```
 
-## Assurance works the same as every other platform
+## Assurance — TextFSM for interfaces, pyATS for BGP
 
-Operational state comes from **Netmiko + TextFSM**, and the assurance rules that
-run against Cisco run identically here — `automation/assurance/normalise.py`
+**Interface state** comes from **Netmiko + TextFSM**, and the interface rules
+that run against Cisco run identically here — `automation/assurance/normalise.py`
 maps VRP's `phy` / `protocol` columns to the same shape.
 
+**BGP session state** comes from **pyATS**. unicon connects to VRP through its
+`hvrp` plugin, and Genie parses `display bgp peer`:
+
+```yaml
+# platforms.yml
+vrp:
+  pyats:
+    os: hvrp
+    parse:
+      bgp: display bgp peer
+```
+
+That is the whole of Genie's hvrp support — BGP parsers only. There is no hvrp
+interface parser and no hvrp `learn()` model, so `learn("interface")` against a
+VRP box connects and returns nothing. Interface checks deliberately stay on
+TextFSM, and a test fails if `learn:` is ever added under `vrp`.
+
+BGP failures name the VRF and address family — `default/ipv4 5.5.5.5` — since
+the same peer address can have separate sessions in several VRFs.
+
 ```bash
-make check DEV=sw-hw-01     # the same rules that run against Cisco
+make check DEV=sw-hw-01     # interface rules via TextFSM, BGP via pyATS
 make snapshot DEV=sw-hw-01  # comparable state, for pre/post comparison
 ```
 

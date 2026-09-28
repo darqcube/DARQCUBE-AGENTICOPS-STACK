@@ -52,13 +52,19 @@ _cache_lock = threading.Lock()
 # One lock per device: the fleet still runs concurrently, a single device is
 # serialised. This is also what a device wants; most will not accept many
 # simultaneous sessions from one source anyway.
-_device_locks: dict[str, threading.Lock] = {}
+#
+# REENTRANT, deliberately. Assurance holds the lock across its whole run — the
+# TextFSM read AND the pyATS session — so the two never hit one device at once.
+# The TextFSM read takes the same lock internally; with a plain Lock that
+# re-acquisition from the same thread deadlocks. RLock lets the owning thread
+# re-enter while still excluding every other thread.
+_device_locks: dict[str, threading.RLock] = {}
 _locks_guard = threading.Lock()
 
 
-def device_lock(device: str) -> threading.Lock:
+def device_lock(device: str) -> threading.RLock:
     with _locks_guard:
-        return _device_locks.setdefault(device, threading.Lock())
+        return _device_locks.setdefault(device, threading.RLock())
 
 
 class DeviceError(RuntimeError):
@@ -290,13 +296,35 @@ def _put_config(device: str, lines: list[str]) -> dict:
 def run_assurance(device: str) -> dict:
     """Run the assurance rules against a device's live state.
 
-    Vendor-neutral: the same rules run for Cisco, Huawei and MikroTik, because
-    the parsed rows are normalised to one shape first.
+    Two engines, one result:
+
+      TextFSM   interface rules — every platform, through the normaliser
+      pyATS     Genie-backed rules — only where platforms.yml declares a
+                `pyats:` block, and only for the features it lists
+
+    pyATS is additive: a platform is never assured by pyATS alone, so a gap in
+    Genie's coverage cannot silently remove a platform's checks.
+
+    The device lock is held across BOTH. pyATS opens its own SSH session through
+    unicon, separate from Netmiko's; holding the lock keeps the two from ever
+    being open on one device at once. The lock is reentrant, so get_state()
+    taking it again from this thread is fine.
     """
     from automation.assurance import engine
+    from automation.pyats import checks as pyats_checks
+    from automation.pyats.testbed import pyats_spec
 
-    state = get_state(device)
-    result = engine.run_rules(state["platform"], state["rows"])
+    with device_lock(device):
+        state = get_state(device)
+        features, pyats_error = {}, None
+        if pyats_spec(state["platform"]):
+            try:
+                features = pyats_checks.collect(device)
+            except Exception as exc:
+                # Reported on the pyATS rules; the TextFSM results still stand.
+                pyats_error = f"pyATS could not collect: {exc}"
+        result = engine.run_rules(state["platform"], state["rows"], features, pyats_error)
+
     result["device"] = device
     result["command"] = state["command"]
     return result

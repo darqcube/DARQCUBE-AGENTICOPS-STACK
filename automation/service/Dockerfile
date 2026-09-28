@@ -1,11 +1,12 @@
-# The automation container: Nornir, Netmiko, TextFSM, TTP and the assurance
-# engine in one image.
+# The automation container: Nornir, Netmiko, TextFSM, TTP, pyATS/Genie and the
+# assurance engine in one image. pyATS is most of the size (~800 MB).
 # It is the only thing in the stack that opens an SSH session to a device.
 FROM python:3.12-slim
-# Netmiko connects through paramiko, so no system ssh client is needed.
+# Netmiko connects through paramiko, but pyATS's unicon spawns the SYSTEM ssh
+# client — so openssh-client is required for the pyATS checks.
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
+ && apt-get install -y --no-install-recommends curl openssh-client \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -9,8 +9,8 @@ A single-VM Docker Compose stack that collects telemetry from network devices, h
 state in Infrahub, automates get/put of configuration, and exposes all of it over MCP so an AI
 platform can use it. Cisco IOS-XE, Huawei VRP, MikroTik RouterOS.
 
-Device work is **Netmiko + TextFSM + TTP** throughout, for every vendor. There is one code path,
-not one per vendor.
+Device work is **Netmiko + TextFSM + TTP** for every vendor, with **pyATS/Genie added** wherever
+Genie genuinely returns data. pyATS is additive — never a platform's only path.
 
 Built for demos, PoCs and small production networks — **sized and tested to 400 devices** on one
 Ubuntu box. It is deliberately not hardened: no TLS between components, no approval workflows, no
@@ -32,7 +32,7 @@ Four groups, each with its own compose file and top-level directory:
 |---|---|---|---|
 | source-of-truth | `source-of-truth/` | `compose/source-of-truth.yaml` | Infrahub — what should exist |
 | observability | `observability/` | `compose/observability.yaml` | Telegraf, Logstash, Prometheus, Loki, Alertmanager, Grafana |
-| automation | `automation/` | `compose/automation.yaml` | Nornir, Netmiko, TextFSM, TTP, assurance |
+| automation | `automation/` | `compose/automation.yaml` | Nornir, Netmiko, TextFSM, TTP, pyATS, assurance |
 | mcp | `mcp/` | `compose/mcp.yaml` | six servers, one image |
 
 Telegraf ingests SNMP, gNMI and NetFlow/IPFIX. **Logstash ingests syslog** — not Telegraf. That
@@ -51,6 +51,7 @@ split is deliberate; don't merge them.
   `ntc-templates` has none), a normaliser in `automation/assurance/normalise.py`, the `platform`
   dropdown in the Infrahub schema, and an onboarding doc. All six, or the vendor is
   half-supported — and half-support fails *silently*, which is worse than not supporting it.
+  A `pyats:` block is optional and comes on top — declare only what Genie really has for that OS.
 
 ## Commands
 
@@ -103,7 +104,7 @@ nothing is connected.
 **After touching anything TextFSM, run `make test-templates` first.** It needs no stack and no
 devices and finishes in seconds.
 
-## Device work — one path for every vendor
+## Device work — two engines, pyATS additive
 
 | Layer | Tool | Job |
 |---|---|---|
@@ -111,12 +112,29 @@ devices and finishes in seconds.
 | tabular parsing | **TextFSM** + ntc-templates | `show` output → rows (`automation/textfsm/`) |
 | config parsing | **TTP** | running-config → structure (`automation/ttp/`) |
 | normalising | `automation/assurance/normalise.py` | three vendors' rows → one shape |
-| assurance | `automation/assurance/rules.yml` | declarative checks over the normalised shape |
+| structured state | **pyATS / Genie** | `learn()` / `parse()` where Genie supports it (`automation/pyats/`) |
+| assurance | `automation/assurance/rules.yml` | rules with `source: interfaces` or `source: pyats` |
 | comparison | **DeepDiff** | pre/post snapshots → what actually changed |
 
-The normaliser is what makes this vendor-neutral: one rule set covers Cisco,
-Huawei and MikroTik. Adding a rule is a YAML edit; adding a vendor needs a
-normaliser function.
+**What Genie actually supports — verified against the installed library, not the docs:**
+
+| Platform | unicon | Genie parsers | Genie `learn()` | pyATS used for |
+|---|---|---|---|---|
+| Cisco IOS-XE | `iosxe` | hundreds | interface, platform, bgp, lldp, … | BGP (`learn`) |
+| Huawei VRP | `hvrp` | **BGP only** — `display bgp peer` | **none** | BGP (`parse`) |
+| MikroTik | — | — | — | nothing |
+
+**Read that Huawei row carefully.** pyATS *connects* to Huawei and Genie *parses* its BGP output,
+so "pyATS supports Huawei" is true — but there is no hvrp interface parser and no hvrp `learn()`
+model of any kind. `learn("interface")` on a VRP box connects successfully and returns nothing.
+This is why pyATS is additive: interface assurance stays on TextFSM for every platform.
+
+What each platform gets is declared in `platforms.yml` under `pyats:` (`os`, `learn`, `parse`).
+Two tests keep it honest: one against a hardcoded table of verified support, one that runs inside
+the automation image and checks every declaration against the **installed** Genie.
+
+A pyATS rule a platform cannot support returns **`skipped`** with the reason — never `pass`
+(which would claim a check ran) and never `fail` (which would blame the device for Genie's gap).
 
 ## Gotchas that cost real time
 
@@ -140,6 +158,9 @@ normaliser function.
 | Normalising | a normaliser reading a field the parser does not emit yields plausible but **wrong** booleans. `_require()` in `automation/assurance/normalise.py` exists because RouterOS flags live in `status`, not `flags` — reading the wrong key reported every running interface as down |
 | Parsing split | **TextFSM** for tabular `show` output, **TTP** for hierarchical config. Do not point TextFSM at a config file; it has no notion of nested blocks |
 | ntc-templates | IOS-XE templates are filed under `cisco_ios`, not `cisco_xe`. That is why `platforms.yml` carries both `netmiko_type` (how to connect) and `textfsm_platform` (how templates are named) |
+| pyATS sessions | unicon opens its **own** SSH session, separate from Netmiko's. `run_assurance` holds `device_lock` across both so they never overlap on one device — which is why that lock is an `RLock`: the TextFSM read re-takes it from the same thread, and a plain `Lock` deadlocks |
+| BGP sessions | identify by **(vrf, af, peer)**, never by peer address alone. Genie's own iosxe fixture has 2.2.2.2 in both VRF1 and default — separate sessions. Collapsing by IP lets one being down hide behind the other being up |
+| Genie fixtures | `automation/pyats/samples/*.json` are Genie's **own** golden test data, copied out of the installed package. Use them to test pyATS logic offline; don't hand-write Genie output |
 
 ## Don't
 

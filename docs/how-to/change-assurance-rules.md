@@ -1,8 +1,14 @@
 # Add or change an assurance check
 
-Rules live in `automation/assurance/rules.yml`. They run against **normalised**
-state, so one rule covers Cisco, Huawei and MikroTik despite three completely
-different CLI formats.
+Rules live in `automation/assurance/rules.yml`. Each one names its **source**:
+
+| `source:` | Data | Platforms |
+|---|---|---|
+| `interfaces` (default) | TextFSM rows, normalised to one shape | every platform |
+| `pyats` | Genie `learn()` / `parse()` output | only those with a `pyats:` block declaring the feature |
+
+A `pyats` rule on a platform that cannot support it comes back **`skipped`**
+with the reason — never `pass`, never `fail`.
 
 ```bash
 make check DEV=cr1
@@ -25,10 +31,41 @@ directory is bind-mounted.
 
 ## The checks available
 
-| `check:` | Does |
+| `check:` | `source:` | Does |
+|---|---|---|
+| `admin_up_means_oper_up` | interfaces | flags interfaces the operator enabled that are not passing traffic |
+| `min_interfaces` | interfaces | fails if fewer than `minimum:` interfaces were found — usually a parsing failure, not a device with no ports |
+| `bgp_peers_established` | pyats | fails for every BGP session not `Established`. Needs `feature: bgp` |
+
+## A pyATS rule
+
+```yaml
+  - name: bgp_peers_established
+    description: Every BGP peer should be Established.
+    severity: error
+    source: pyats
+    feature: bgp                     # must match a key under `pyats:` in platforms.yml
+    check: bgp_peers_established
+    ignore_peers: [192.0.2.1]        # a bare address (any VRF), or "VRF1 192.0.2.1"
+```
+
+Which platforms can run it is decided by `platforms.yml`, not by the rule:
+
+| Platform | `feature: bgp` from |
 |---|---|
-| `admin_up_means_oper_up` | flags interfaces the operator enabled that are not passing traffic |
-| `min_interfaces` | fails if fewer than `minimum:` interfaces were found — usually a parsing failure, not a device with no ports |
+| Cisco IOS-XE | `learn: [bgp]` |
+| Huawei VRP | `parse: {bgp: display bgp peer}` |
+| MikroTik | not supported — the rule is skipped |
+
+BGP sessions are identified by **VRF, address family and peer** — failures read
+`VRF1 2.2.2.2` or `default/ipv4 5.5.5.5`. The same peer address routinely has a
+separate session in several VRFs, and collapsing them would let one being down
+hide behind another being up.
+
+A new pyATS check is a function in `automation/pyats/checks.py`, registered in
+its `CHECKS`. It receives the Genie data for the rule's feature. Test it against
+the golden fixtures in `automation/pyats/samples/` — they are Genie's own test
+data, so the shape is real.
 
 ## Add a new kind of check
 

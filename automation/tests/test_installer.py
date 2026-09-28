@@ -170,9 +170,11 @@ DAEMON_DOWN = ("Cannot connect to the Docker daemon at unix:///var/run/docker.so
                "Is the docker daemon running?")
 
 
-def _diagnose(inst, monkeypatch, capsys, err, in_group=False):
+def _diagnose(inst, monkeypatch, capsys, err, in_group=False, have=()):
+    """`have` is the set of shadow utils this pretend host ships."""
     monkeypatch.setattr(inst, "_in_docker_group", lambda user: in_group)
     monkeypatch.setattr(inst, "_failed", False, raising=False)
+    monkeypatch.setattr(inst.shutil, "which", lambda c: f"/usr/bin/{c}" if c in have else None)
     inst.docker_unreachable(err)
     return capsys.readouterr().out
 
@@ -189,8 +191,22 @@ def test_docker_group_membership_that_is_not_yet_in_effect_is_named(inst, monkey
     """usermod has already been run; the advice is to get a new login, not to
     repeat the command that appears to have had no effect."""
     out = _diagnose(inst, monkeypatch, capsys, SOCK_DENIED, in_group=True)
-    assert "newgrp docker" in out
+    assert "log out and back in" in out
     assert "usermod" not in out
+
+
+def test_the_fix_never_depends_on_a_command_the_host_lacks(inst, monkeypatch, capsys):
+    """newgrp and sg ship in the shadow utils, which minimal and container images
+    drop. Naming a missing command as the fix is a dead end."""
+    bare = _diagnose(inst, monkeypatch, capsys, SOCK_DENIED, in_group=True, have=())
+    assert "newgrp" not in bare and "sg docker" not in bare
+    assert "log out and back in" in bare
+
+    with_newgrp = _diagnose(inst, monkeypatch, capsys, SOCK_DENIED, in_group=True, have=("newgrp",))
+    assert "newgrp docker" in with_newgrp
+
+    with_sg = _diagnose(inst, monkeypatch, capsys, SOCK_DENIED, in_group=True, have=("sg",))
+    assert "sg docker -c bash" in with_sg
 
 
 def test_a_daemon_that_is_actually_down_still_says_so(inst, monkeypatch, capsys):

@@ -1,0 +1,495 @@
+{
+  "instance": {
+    "default": {
+      "bgp_id": 65000,
+      "vrf": {
+        "VRF1": {
+          "cluster_id": "1.1.1.1",
+          "neighbor": {
+            "2.2.2.2": {
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27417,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  },
+                  "sent": {
+                    "keepalives": 30174,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "2.2.2.2",
+                  "foreign_port": "50426",
+                  "local_host": "1.1.1.1",
+                  "local_port": "179",
+                  "mss": 1240
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            },
+            "2001:2:2:2::2": {
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27417,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  },
+                  "sent": {
+                    "keepalives": 30184,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "2001:2:2:2::2",
+                  "foreign_port": "179",
+                  "local_host": "2001:1:1:1::1",
+                  "local_port": "32057",
+                  "mss": 1220
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            },
+            "2001:3:3:3::3": {
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "graceful_restart": "received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27426,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 3
+                  },
+                  "sent": {
+                    "keepalives": 30166,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "2001:3:3:3::3",
+                  "foreign_port": "20838",
+                  "local_host": "2001:1:1:1::1",
+                  "local_port": "179",
+                  "mss": 1440
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            },
+            "3.3.3.3": {
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "graceful_restart": "received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27427,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 3
+                  },
+                  "sent": {
+                    "keepalives": 30185,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "3.3.3.3",
+                  "foreign_port": "179",
+                  "local_host": "1.1.1.1",
+                  "local_port": "43893",
+                  "mss": 1460
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            }
+          }
+        },
+        "default": {
+          "cluster_id": "1.1.1.1",
+          "neighbor": {
+            "2.2.2.2": {
+              "address_family": {
+                "ipv4 unicast": {
+                  "bgp_table_version": 4,
+                  "path": {
+                    "memory_usage": 408,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 744,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 4,
+                  "total_memory": 2492
+                },
+                "vpnv4 unicast": {
+                  "bgp_table_version": 4,
+                  "path": {
+                    "memory_usage": 408,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 768,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 4,
+                  "total_memory": 2564
+                }
+              },
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27417,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  },
+                  "sent": {
+                    "keepalives": 30186,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "2.2.2.2",
+                  "foreign_port": "25026",
+                  "local_host": "1.1.1.1",
+                  "local_port": "179",
+                  "mss": 1240
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            },
+            "2001:2:2:2::2": {
+              "address_family": {
+                "ipv6 unicast": {
+                  "bgp_table_version": 5,
+                  "path": {
+                    "memory_usage": 456,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 816,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 5,
+                  "total_memory": 2612
+                },
+                "vpnv6 unicast": {
+                  "bgp_table_version": 5,
+                  "path": {
+                    "memory_usage": 468,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 840,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 5,
+                  "total_memory": 2696
+                }
+              },
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27417,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  },
+                  "sent": {
+                    "keepalives": 30188,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "2001:2:2:2::2",
+                  "foreign_port": "52223",
+                  "local_host": "2001:1:1:1::1",
+                  "local_port": "179",
+                  "mss": 1220
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            },
+            "2001:3:3:3::3": {
+              "address_family": {
+                "ipv6 unicast": {
+                  "bgp_table_version": 5,
+                  "path": {
+                    "memory_usage": 456,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 816,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 5,
+                  "total_memory": 2612
+                },
+                "vpnv6 unicast": {
+                  "bgp_table_version": 5,
+                  "path": {
+                    "memory_usage": 468,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 840,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 5,
+                  "total_memory": 2696
+                }
+              },
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "graceful_restart": "received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27427,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  },
+                  "sent": {
+                    "keepalives": 30178,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "2001:3:3:3::3",
+                  "foreign_port": "47133",
+                  "local_host": "2001:1:1:1::1",
+                  "local_port": "179",
+                  "mss": 1440
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            },
+            "3.3.3.3": {
+              "address_family": {
+                "ipv4 unicast": {
+                  "bgp_table_version": 4,
+                  "path": {
+                    "memory_usage": 408,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 744,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 4,
+                  "total_memory": 2492
+                },
+                "vpnv4 unicast": {
+                  "bgp_table_version": 4,
+                  "path": {
+                    "memory_usage": 408,
+                    "total_entries": 3
+                  },
+                  "prefixes": {
+                    "memory_usage": 768,
+                    "total_entries": 3
+                  },
+                  "routing_table_version": 4,
+                  "total_memory": 2564
+                }
+              },
+              "bgp_negotiated_capabilities": {
+                "enhanced_refresh": "advertised",
+                "four_octets_asn": "advertised and received",
+                "graceful_restart": "received",
+                "route_refresh": "advertised and received(new)",
+                "stateful_switchover": "NO for session 1"
+              },
+              "bgp_negotiated_keepalive_timers": {
+                "hold_time": 180,
+                "keepalive_interval": 60
+              },
+              "bgp_neighbor_counters": {
+                "messages": {
+                  "received": {
+                    "keepalives": 27427,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  },
+                  "sent": {
+                    "keepalives": 30162,
+                    "notifications": 0,
+                    "opens": 1,
+                    "updates": 2
+                  }
+                }
+              },
+              "bgp_session_transport": {
+                "connection": {
+                  "last_reset": "never",
+                  "state": "Established"
+                },
+                "transport": {
+                  "foreign_host": "3.3.3.3",
+                  "foreign_port": "179",
+                  "local_host": "1.1.1.1",
+                  "local_port": "11084",
+                  "mss": 1460
+                }
+              },
+              "bgp_version": 4,
+              "remote_as": 65000,
+              "session_state": "Established",
+              "shutdown": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

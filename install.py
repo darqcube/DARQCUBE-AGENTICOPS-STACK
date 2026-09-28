@@ -497,12 +497,20 @@ def docker_unreachable(err: str) -> None:
     if "permission denied" in low and "docker.sock" in low:
         user = getpass.getuser()
         if _in_docker_group(user):
-            bad(f"{user} is in the docker group but this login session predates it, so "
-                f"the group is not in effect. Fix: log out and back in, or run: newgrp docker")
+            bad(f"{user} is in the docker group, but this login session started before "
+                f"that and carries the old group list. Fix: log out and back in.")
         else:
             bad(f"the docker daemon is running, but {user} is not allowed to reach "
-                f"/var/run/docker.sock. Fix: sudo usermod -aG docker $USER, "
-                f"then log out and back in (or run: newgrp docker)")
+                f"/var/run/docker.sock. Fix: sudo usermod -aG docker {user} — "
+                f"then log out and back in.")
+        # newgrp/sg come from the shadow utils, which minimal and container images
+        # do not always ship. Only offer them if they are actually here, so the
+        # advice never names a command this host does not have.
+        shortcut = next((c for c in ("newgrp", "sg") if shutil.which(c)), None)
+        if shortcut == "newgrp":
+            info("to avoid reconnecting: newgrp docker")
+        elif shortcut == "sg":
+            info("to avoid reconnecting: sg docker -c bash")
         info("do not install as root — .env and the Docker volumes would end up root-owned")
         return
 

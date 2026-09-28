@@ -61,40 +61,83 @@ CHECKS = {
 
 # --- public API ------------------------------------------------------------
 
-def run_rules(platform: str, rows: list[dict]) -> dict:
-    """Run every applicable rule against a device's parsed state."""
-    interfaces = normalise.normalise_interfaces(platform, rows)
+def run_rules(platform: str, rows: list[dict], pyats_features: dict | None = None,
+              pyats_error: str | None = None) -> dict:
+    """Run every applicable rule against a device.
 
-    results, failed = [], 0
+    Two sources, one result:
+
+      source: interfaces   TextFSM rows, normalised — every platform
+      source: pyats        Genie data — only platforms with a `pyats:` block
+                           in platforms.yml, and only features they declare
+
+    A pyATS rule a platform cannot support is reported as SKIPPED with the
+    reason. Not passed — that would claim a check ran — and not failed, which
+    would blame a device for a gap in Genie's coverage.
+    """
+    from automation.pyats import checks as pyats_checks
+
+    interfaces = normalise.normalise_interfaces(platform, rows)
+    pyats_features = pyats_features or {}
+
+    results, failed, skipped = [], 0, 0
     for rule in load_rules():
         applies = rule.get("applies_to", "all")
         if applies != "all" and platform not in applies:
             continue
 
-        check = CHECKS.get(rule["check"])
-        if not check:
-            results.append({
-                "rule": rule["name"], "status": "error",
-                "detail": f"unknown check '{rule['check']}' — add it to CHECKS in engine.py",
-            })
-            failed += 1
-            continue
+        source = rule.get("source", "interfaces")
+        base = {
+            "rule": rule["name"],
+            "source": source,
+            "severity": rule.get("severity", "error"),
+            "description": rule.get("description", "").strip(),
+        }
 
-        failures = check(interfaces, rule)
+        if source == "pyats":
+            feature = rule.get("feature")
+            check = pyats_checks.CHECKS.get(rule["check"])
+            if not check:
+                results.append({**base, "status": "error",
+                                "detail": f"unknown check '{rule['check']}' — add it to "
+                                          f"CHECKS in automation/pyats/checks.py"})
+                failed += 1
+                continue
+            if pyats_error:
+                # The session itself failed — say so on every pyATS rule
+                # rather than letting them look skipped for a coverage reason.
+                results.append({**base, "status": "error", "detail": pyats_error})
+                failed += 1
+                continue
+            if feature not in pyats_features:
+                results.append({**base, "status": "skipped",
+                                "detail": f"no pyATS '{feature}' support declared for "
+                                          f"{platform} in platforms.yml"})
+                skipped += 1
+                continue
+            failures = check(pyats_features[feature], rule)
+        else:
+            check = CHECKS.get(rule["check"])
+            if not check:
+                results.append({**base, "status": "error",
+                                "detail": f"unknown check '{rule['check']}' — add it to "
+                                          f"CHECKS in engine.py"})
+                failed += 1
+                continue
+            failures = check(interfaces, rule)
+
         if failures:
             failed += 1
-        results.append({
-            "rule": rule["name"],
-            "severity": rule.get("severity", "error"),
-            "status": "fail" if failures else "pass",
-            "description": rule.get("description", "").strip(),
-            "failures": failures,
-        })
+        results.append({**base, "status": "fail" if failures else "pass", "failures": failures})
 
+    engines = ["textfsm"] + (["pyats"] if pyats_features else [])
     return {
         "platform": platform,
+        "engines": engines,
         "interfaces_checked": len(interfaces),
-        "rules_run": len(results),
+        "pyats_features": sorted(pyats_features),
+        "rules_run": len(results) - skipped,
+        "rules_skipped": skipped,
         "rules_failed": failed,
         "passed": failed == 0,
         "results": results,

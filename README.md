@@ -14,7 +14,7 @@ It does four things:
 - **Infrahub holds what should exist** — every metric and log line is labelled
   from it, so they line up on the same device.
 - **Automation gets and puts** configuration and state — Nornir, Netmiko,
-  TextFSM, TTP, with vendor-neutral assurance checks.
+  TextFSM, TTP and pyATS/Genie, with assurance checks across every vendor.
 - **MCP servers expose all of it** to an AI platform, if you want one.
 
 ## Works with or without AI
@@ -55,7 +55,7 @@ flowchart LR
       GF["Grafana"]
     end
     subgraph AUT["⚙️ automation"]
-      AU["Nornir · Netmiko<br/>TextFSM · TTP"]
+      AU["Nornir · Netmiko<br/>TextFSM · TTP · pyATS"]
     end
     subgraph MCPG["🔌 mcp"]
       MS["6 servers"]
@@ -132,16 +132,22 @@ On a fresh Ubuntu Server, prepare the host once:
 ```bash
 sudo apt update && sudo apt install -y git make jq python3-venv curl
 curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker "$USER" && newgrp docker
+sudo usermod -aG docker "$USER"
 ```
 
-Then:
+Then **log out and back in**. Group membership is read at login, so the current
+session cannot see it — `install.py` will report the socket as unreachable until
+you reconnect. (`newgrp docker` opens a new shell with the group applied without
+reconnecting, but minimal and container images do not always ship it.)
+
+Then install:
 
 ```bash
 git clone <this repo> && cd DARQCUBE-AGENTICOPS-STACK
 sudo python3 install.py --fix-sysctl          # UDP buffers, once per host
 cp site.example.yml site.yml && chmod 600 site.yml
-$EDITOR site.yml                              # ten fields describing this deployment
+ls -l site.yml                                # confirm the copy landed
+${EDITOR:-nano} site.yml                      # ten fields describing this deployment
 python3 install.py
 ```
 
@@ -196,16 +202,16 @@ something already using the usual ones —
 
 ## Supported devices
 
-| Platform | Metrics | Flow | Config & state | Assurance |
-|---|---|---|---|---|
-| **Cisco IOS-XE** | SNMP or gNMI | ✅ | Netmiko `cisco_xe` | ✅ |
-| **Huawei VRP** | SNMP | ✅ | Netmiko `huawei_vrp` | ✅ |
-| **MikroTik RouterOS** | SNMP | ✅ | Netmiko `mikrotik_routeros` | ✅ |
+| Platform | Metrics | Flow | Config & state | Interface assurance | BGP assurance |
+|---|---|---|---|---|---|
+| **Cisco IOS-XE** | SNMP or gNMI | ✅ | Netmiko `cisco_xe` | TextFSM | pyATS `learn("bgp")` |
+| **Huawei VRP** | SNMP | ✅ | Netmiko `huawei_vrp` | TextFSM | pyATS `display bgp peer` |
+| **MikroTik RouterOS** | SNMP | ✅ | Netmiko `mikrotik_routeros` | TextFSM | — not supported |
 
-**Every vendor takes the same code path.** All three produce the same metric
-names — `cpu_usage`, `interface_oper_status`, `memory_used_percent` — despite
-three different MIBs, and the same assurance rules run against all three
-despite three different CLI formats.
+All three produce the same metric names — `cpu_usage`,
+`interface_oper_status`, `memory_used_percent` — despite three different MIBs,
+and the same interface rules run against all three despite three different CLI
+formats.
 
 Device-side configuration: [docs/devices/](docs/devices/).
 
@@ -217,17 +223,21 @@ Device-side configuration: [docs/devices/](docs/devices/).
 | tabular parsing | **TextFSM** + ntc-templates | `show` output → rows |
 | config parsing | **TTP** | running-config → structure |
 | normalising | `assurance/normalise.py` | three vendors' rows → one shape |
+| structured state | **pyATS / Genie** | `learn()` models and parsers, where Genie supports the platform |
 | assurance | `assurance/rules.yml` | declarative checks, YAML-editable |
 | comparison | **DeepDiff** | pre/post snapshots → what actually changed |
 
-> **One code path, not one per vendor.** The normaliser is what makes this
-> work: Cisco reports `status`/`proto`, Huawei `phy`/`protocol`, MikroTik
-> single-letter flags. All three become `{interface, admin_up, oper_up}`, so a
-> single `rules.yml` covers the fleet and adding a check is a YAML edit.
+> **Two engines, and pyATS is additive.** TextFSM covers interface state on
+> every platform through one normaliser. pyATS adds Genie-backed checks where
+> Genie genuinely returns data — Cisco fully, Huawei for BGP only (Genie's hvrp
+> library is BGP parsers; it has no interface models). A platform is never
+> assured by pyATS alone, and a check a platform cannot support comes back
+> **skipped**, never as a pass. What each platform gets is declared in
+> `platforms.yml` under `pyats:`.
 
 ```bash
 make state DEV=mt-01          # parsed operational state
-make check DEV=mt-01          # assurance rules — same rules on every vendor
+make check DEV=mt-01          # assurance — TextFSM everywhere, pyATS where supported
 make snapshot DEV=cr1         # comparable state, for pre/post comparison
 make config-get DEV=cr1       # running config
 make config-parsed DEV=cr1    # running config, parsed with TTP

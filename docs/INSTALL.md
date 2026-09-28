@@ -26,7 +26,8 @@ Then Docker, with the Compose v2 plugin:
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker "$USER"
-newgrp docker            # or log out and back in
+# then log out and back in — group membership is read at login
+# (newgrp docker does it without reconnecting, where that command exists)
 docker compose version   # must be 2.20 or newer — compose.yaml uses `include:`
 ```
 
@@ -50,7 +51,7 @@ sudo python3 install.py --fix-sysctl
 ```bash
 git clone <this repo> && cd DARQCUBE-AGENTICOPS-STACK
 cp site.example.yml site.yml && chmod 600 site.yml
-$EDITOR site.yml                  # the ten values below
+${EDITOR:-nano} site.yml          # the ten values below
 python3 install.py
 ```
 
@@ -165,14 +166,14 @@ is doing, or to do it piecemeal.
 
 # 2. configure
 ./scripts/gen-secrets.sh          # .env with generated secrets
-$EDITOR .env                      # fill in the five values above
+${EDITOR:-nano} .env              # fill in the five values above
 
 # 3 + 4. build and start
 make up                           # build + up -d --wait
 
 # 5. initialise
 make schema                       # load the Infrahub schema
-$EDITOR source-of-truth/devices/devices.yml   # your devices
+${EDITOR:-nano} source-of-truth/devices/devices.yml   # your devices
 make seed                         # devices.yml -> Infrahub
 make render                       # Infrahub -> Telegraf and Logstash
 
