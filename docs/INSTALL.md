@@ -232,7 +232,7 @@ make ps                 # what is running
 make logs SVC=grafana   # follow one service
 make restart SVC=telegraf   # restart one service after a config edit
 make down               # stop, keep all data
-make clean              # stop and DELETE all data (asks first)
+make clean              # stop and DELETE all data and fetched configs (asks first)
 ```
 
 If something is missing: [how-to/troubleshooting.md](how-to/troubleshooting.md).

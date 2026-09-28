@@ -170,5 +170,5 @@ control that stops every caller is a read-only device account.
 
 ```bash
 make down                  # keeps all data
-make clean                 # DELETES all volumes — asks first
+make clean                 # DELETES all volumes and rendered config — asks first
 ```

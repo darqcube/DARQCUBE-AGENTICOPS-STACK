@@ -163,9 +163,8 @@ action.
 ## 7. Ending the engagement
 
 ```bash
-make clean                    # stops everything and deletes all volumes
+make clean                    # stops everything; deletes volumes, rendered and fetched configs
 rm -f site.yml .env           # the credentials
-rm -rf automation/configs/*   # fetched running configs
 ```
 
 Then have the customer disable the device account you created. Leaving a

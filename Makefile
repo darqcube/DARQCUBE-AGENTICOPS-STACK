@@ -100,6 +100,17 @@ verify: ## Run exactly what docs/INSTALL.md tells you to verify
 
 # --- housekeeping --------------------------------------------------------
 
-clean: ## Stop the stack and DELETE ALL DATA (volumes included)
-	@read -p "Delete all volumes — metrics, logs, Infrahub graph? [y/N] " ok; \
-	 [[ $$ok == "y" ]] && $(COMPOSE) down -v || echo "cancelled"
+# Clears the two folders a container writes back into the repo as well as the
+# Docker volumes. They are bind mounts, so `down -v` does not touch them — and
+# leaving them meant the previous install's rendered config kept driving
+# Telegraf and Logstash, and fetched running configs (credentials included)
+# outlived the reset. Files are root-owned, but deleting them needs only write
+# access to the folder, which is yours. .gitkeep stays so the folders exist.
+CLEAN_DIRS := observability/telegraf/generated automation/configs
+
+clean: ## Stop the stack and DELETE ALL DATA — volumes, rendered config, fetched configs
+	@read -p "Delete all volumes, rendered config and fetched device configs? [y/N] " ok; \
+	 if [[ $$ok != "y" ]]; then echo "cancelled"; exit 0; fi; \
+	 $(COMPOSE) down -v || { echo "!! docker compose down failed — nothing else removed" >&2; exit 1; }; \
+	 find $(CLEAN_DIRS) -type f ! -name .gitkeep -delete && \
+	 echo "clean: volumes, rendered config and fetched configs removed"

@@ -222,3 +222,40 @@ def test_the_apt_line_matches_the_prerequisites_table():
             f"{doc} installs {set(other.group(1).split())}, "
             f"prerequisites page says {packages}"
         )
+
+
+def test_architecture_volume_section_matches_compose():
+    """docs/architecture.md lists every named volume and every bind mount by
+    name. Prose like that drifts the moment a service gains a volume, so both
+    directions are checked: nothing in compose is undocumented, and nothing
+    documented has disappeared from compose."""
+    arch = (ROOT / "docs/architecture.md").read_text()
+    section = arch[arch.index("## Volumes and storage"):arch.index("## Two deliberate limits")]
+
+    named, binds = set(), set()
+    for path in (ROOT / "compose").glob("*.yaml"):
+        doc = yaml.safe_load(path.read_text()) or {}
+        named |= set((doc.get("volumes") or {}).keys())
+        for spec in (doc.get("services") or {}).values():
+            for m in spec.get("volumes", []) or []:
+                src = m.split(":")[0]
+                if src.startswith("../"):
+                    binds.add(src[3:].rstrip("/"))
+
+    # Checked against TABLE ROWS, not the section as a whole: a volume can be
+    # mentioned in prose ("back up loki-data") while missing from its table,
+    # and the first version of this test passed in exactly that case.
+    rows = {r.rstrip("/") for r in re.findall(r"^\|\s*`([^`]+)`\s*\|", section, re.M)}
+
+    for v in named:
+        assert v in rows, f"named volume {v} is in compose but has no table row"
+    for b in binds:
+        # automation/ is mounted whole; its row documents automation/configs/,
+        # the only part the container writes.
+        assert any(r == b or r.startswith(b + "/") for r in rows), (
+            f"bind mount {b} is in compose but has no table row"
+        )
+
+    documented = {r for r in rows if re.fullmatch(r"[a-z0-9-]+-(?:data|logs|storage|config)", r)}
+    stale = documented - named
+    assert not stale, f"documented volumes no longer in compose: {stale}"

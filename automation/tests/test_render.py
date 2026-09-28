@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import types
 from pathlib import Path
@@ -250,3 +251,57 @@ def test_the_output_directories_exist_in_a_fresh_clone():
         pytest.skip("not a git checkout")
     for keep in ("observability/telegraf/generated/.gitkeep", "automation/configs/.gitkeep"):
         assert keep in tracked.splitlines(), f"{keep} is not committed"
+
+
+# --- make clean -------------------------------------------------------------
+# `down -v` removes named volumes only. The two folders a container writes
+# into the repo are bind mounts, so `make clean` has to empty them itself —
+# otherwise the last install's rendered config keeps driving the collectors.
+
+WRITTEN = ("observability/telegraf/generated", "automation/configs")
+
+
+def _clean_sandbox(tmp_path):
+    (tmp_path / "Makefile").write_text((ROOT / "Makefile").read_text())
+    for d in WRITTEN:
+        (tmp_path / d).mkdir(parents=True)
+        (tmp_path / d / ".gitkeep").touch()
+        (tmp_path / d / "leftover.json").write_text("{}")
+    return tmp_path
+
+
+def _make_clean(cwd, answer, compose="true"):
+    import subprocess
+    return subprocess.run(["make", "-s", "clean", f"COMPOSE={compose}"], cwd=cwd,
+                          input=answer, capture_output=True, text=True)
+
+
+def test_make_clean_empties_both_written_folders_but_keeps_gitkeep(tmp_path):
+    cwd = _clean_sandbox(tmp_path)
+    r = _make_clean(cwd, "y\n")
+    assert r.returncode == 0, r.stderr
+    for d in WRITTEN:
+        assert sorted(p.name for p in (cwd / d).iterdir()) == [".gitkeep"], d
+
+
+def test_make_clean_declined_deletes_nothing(tmp_path):
+    cwd = _clean_sandbox(tmp_path)
+    r = _make_clean(cwd, "n\n")
+    assert "cancelled" in r.stdout
+    for d in WRITTEN:
+        assert (cwd / d / "leftover.json").exists(), d
+
+
+def test_make_clean_deletes_nothing_if_compose_down_fails(tmp_path):
+    cwd = _clean_sandbox(tmp_path)
+    r = _make_clean(cwd, "y\n", compose="false")
+    assert r.returncode != 0
+    for d in WRITTEN:
+        assert (cwd / d / "leftover.json").exists(), d
+
+
+def test_make_clean_targets_the_directories_compose_writes_to():
+    """CLEAN_DIRS must name the same folders compose bind-mounts read-write."""
+    make = (ROOT / "Makefile").read_text()
+    clean_dirs = set(re.search(r"^CLEAN_DIRS := (.+)$", make, re.M).group(1).split())
+    assert clean_dirs == set(WRITTEN)
