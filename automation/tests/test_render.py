@@ -191,3 +191,62 @@ def test_no_schema_description_hits_the_128_char_limit():
 
     walk(schema)
     assert not too_long, f"descriptions >=128 chars: {too_long}"
+
+
+# --- where the output lives, and who can read it --------------------------
+# Found by cloning fresh from GitHub. The renderer wrote into a Docker NAMED
+# volume, while test_wiring.py, verify.sh and seven docs all read the host
+# directory observability/telegraf/generated/ — which nothing ever wrote to.
+# A perfect install would have failed its own step 6 verification.
+
+def test_all_three_containers_share_the_documented_host_directory():
+    """infrahub-server writes, Telegraf and Logstash read — the same HOST path
+    the docs, tests and verify.sh describe, not a named volume none can see."""
+    services = {}
+    for path in (ROOT / "compose").glob("*.yaml"):
+        services.update((yaml.safe_load(path.read_text()) or {}).get("services", {}) or {})
+
+    def mounts_for(svc, target):
+        for spec in services[svc].get("volumes", []):
+            src, _, rest = spec.partition(":")
+            if rest.split(":")[0] == target:
+                return src
+        return None
+
+    expected = "../observability/telegraf/generated"
+    assert mounts_for("infrahub-server", "/generated") == expected
+    assert mounts_for("telegraf", "/etc/telegraf/telegraf.d/generated") == expected
+    assert mounts_for("logstash", "/usr/share/logstash/lookup") == expected
+
+
+def test_rendered_files_are_world_readable_even_under_a_strict_umask(monkeypatch, tmp_path):
+    """The renderer runs as root; Logstash reads as uid 1000. Under a 077 umask
+    a plain open() gives 0600, which uid 1000 cannot read on Linux — every log
+    line would then arrive labelled `unknown`, with no error anywhere. Verified
+    on a real Linux filesystem; macOS bind mounts do not enforce it, which is
+    why this is a unit test and not left to a dev box to notice."""
+    import os
+    import stat
+
+    old = os.umask(0o077)
+    try:
+        mod = load_renderer(monkeypatch, THREE, tmp_path)
+        assert mod.main() == 0
+    finally:
+        os.umask(old)
+
+    for f in tmp_path.iterdir():
+        mode = stat.S_IMODE(f.stat().st_mode)
+        assert mode & stat.S_IROTH, f"{f.name} is {oct(mode)} — not readable by Logstash (uid 1000)"
+
+
+def test_the_output_directories_exist_in_a_fresh_clone():
+    """Both are gitignored except a .gitkeep. Without it the directory is
+    absent after `git clone`, and `make config-get` tees into a path that does
+    not exist yet."""
+    import subprocess
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout
+    if not tracked:
+        pytest.skip("not a git checkout")
+    for keep in ("observability/telegraf/generated/.gitkeep", "automation/configs/.gitkeep"):
+        assert keep in tracked.splitlines(), f"{keep} is not committed"

@@ -47,6 +47,17 @@ HEADER = (
 )
 
 
+def _readable(path: str) -> None:
+    """World-readable, explicitly.
+
+    This runs as root inside infrahub-server, but Logstash reads the identity
+    table as uid 1000. If a restrictive umask left the file 0600, Logstash's
+    translate filter would fail to load it and every log line would arrive
+    labelled `unknown` — with nothing reporting why.
+    """
+    os.chmod(path, 0o644)
+
+
 def target_of(dev) -> str:
     """The address to poll. Strips any /prefix an IPHost attribute carries."""
     ip = str(getattr(dev.management_ip, "value", "") or "").strip()
@@ -178,6 +189,7 @@ def main() -> int:
         path = os.path.join(OUT_DIR, filename)
         with open(path, "w") as fh:
             fh.write(HEADER + body)
+        _readable(path)
         written.append(filename)
 
     def agents(targets: list[str]) -> str:
@@ -237,6 +249,7 @@ def main() -> int:
     write_json = os.path.join(OUT_DIR, "devices.json")
     with open(write_json, "w") as fh:
         json.dump(identity, fh, indent=2, sort_keys=True)
+    _readable(write_json)
     written.append("devices.json")
 
     # Logstash's translate filter wants a flat key -> value mapping, so the
@@ -244,6 +257,7 @@ def main() -> int:
     flat = {k: f"{v['device']}|{v['site']}|{v['role']}|{v['platform']}" for k, v in identity.items()}
     with open(os.path.join(OUT_DIR, "devices.yml"), "w") as fh:
         yaml.safe_dump(flat, fh, default_flow_style=False, sort_keys=True)
+    _readable(os.path.join(OUT_DIR, "devices.yml"))
     written.append("devices.yml")
 
     # --- report -----------------------------------------------------------

@@ -6,7 +6,7 @@
 #   Logstash  syslog (514)                                            -> Loki
 #
 # Telegraf and Logstash both read the identity table that render-inventory.py
-# writes into the shared `telegraf-generated` volume. That is what makes a
+# writes into observability/telegraf/generated/ on the host. That is what makes a
 # metric and a log line arrive with the same device/site/role labels.
 # ---------------------------------------------------------------------------
 
@@ -169,7 +169,7 @@ services:
       - ../observability/telegraf/conf.d:/etc/telegraf/telegraf.d/static:ro
       # render-inventory.py output — the per-platform SNMP/gNMI configs and
       # the device identity table used by processors.lookup.
-      - telegraf-generated:/etc/telegraf/telegraf.d/generated:ro
+      - ../observability/telegraf/generated:/etc/telegraf/telegraf.d/generated:ro
     ports:
       - "${NETFLOW_PORT:-2055}:2055/udp"   # NetFlow v5 / v9
       - "${IPFIX_PORT:-4739}:4739/udp"     # IPFIX
@@ -196,7 +196,7 @@ services:
       - ../observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
       - ../observability/logstash/patterns:/usr/share/logstash/patterns:ro
       # Same identity table Telegraf uses, read by the translate filter.
-      - telegraf-generated:/usr/share/logstash/lookup:ro
+      - ../observability/telegraf/generated:/usr/share/logstash/lookup:ro
     ports:
       - "${SYSLOG_PORT:-514}:514/udp"
     depends_on:

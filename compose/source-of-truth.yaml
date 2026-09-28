@@ -172,7 +172,11 @@ services:
       - ../source-of-truth/devices:/devices:ro
       - ../source-of-truth/schema:/schema:ro
       - ../platforms.yml:/platforms.yml:ro
-      - telegraf-generated:/generated
+      # A HOST directory, not a named volume: every doc, test and verify.sh
+      # reads observability/telegraf/generated/ on the host. With a named
+      # volume the renderer wrote somewhere none of them could see, and a
+      # perfectly good install failed its own verification.
+      - ../observability/telegraf/generated:/generated
     ports:
       - "${INFRAHUB_PORT:-8000}:8000"
     depends_on:
@@ -225,7 +229,3 @@ volumes:
   task-db-data:
   task-manager-data:
   infrahub-storage:
-  # Shared with the observability group: render-inventory.py writes here,
-  # Telegraf and Logstash read from it. On one VM this replaces the HTTP
-  # transport a multi-VM deployment would need.
-  telegraf-generated:

@@ -64,6 +64,7 @@ render: ## Infrahub -> Telegraf + Logstash configs. Run after any device change.
 # --- devices: get and put ------------------------------------------------
 
 config-get: ## Fetch a running config:  make config-get DEV=cr1
+	@mkdir -p automation/configs
 	@curl -sf localhost:$(AUTOMATION_PORT)/device/$(DEV)/config | tee automation/configs/$(DEV).cfg
 
 config-put: ## Push config lines:  make config-put DEV=cr1 FILE=change.txt
