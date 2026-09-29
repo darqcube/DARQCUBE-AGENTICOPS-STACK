@@ -316,9 +316,19 @@ def main() -> int:
 
     # `make seed BRANCH=x` stages the change on an Infrahub branch for review.
     # Created on first use, so a batch needs no separate UI step before it.
-    if BRANCH not in client.branch.all():
+    branches = client.branch.all()
+    if BRANCH not in branches:
         client.branch.create(branch_name=BRANCH, description="Staged by make seed")
         print(f"created Infrahub branch '{BRANCH}'")
+    else:
+        # A merged branch is read-only: the first save would fail with a
+        # GraphQL traceback. Refuse before writing, and say what to do.
+        status = getattr(branches[BRANCH].status, "value", branches[BRANCH].status)
+        if str(status).upper() != "OPEN":
+            return report([
+                f"Infrahub branch '{BRANCH}' is {str(status).lower()} and read-only — "
+                f"each change needs a new branch, e.g.: make seed BRANCH={BRANCH}-2"
+            ])
 
     kinds = {kind for _, kind in SECTIONS}
     try:

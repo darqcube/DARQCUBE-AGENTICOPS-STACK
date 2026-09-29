@@ -211,7 +211,7 @@ branch instead of a person. All commands run on the VM, in the repo folder.
 6. **Onboard in batches of ~50.** Confirm each batch appears in Prometheus and
    Loki before the next. A wrong community string on 50 devices is a short
    investigation; on 400 it is not.
-7. **Change and retire through the same loop:** edit YAML →
+7. **Change and retire through the same loop** — with a **new** branch name each time: a merged Infrahub branch is read-only, and seed refuses it. Edit YAML →
    `make seed BRANCH=…` → merge → `make render`.
 
 `make seed` with no `BRANCH` writes to `main` directly — fine for a lab, not

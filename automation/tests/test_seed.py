@@ -190,3 +190,37 @@ def test_duplicate_name_across_files_is_rejected(seed, tmp_path):
 def test_unknown_top_level_key_is_rejected(seed, tmp_path):
     errors = check(seed, tmp_path, {"sites": [SITE], "device": [DEVICE]})
     assert any("unknown top-level key 'device'" in e for e in errors)
+
+
+class _Branch:
+    def __init__(self, status):
+        self.status = types.SimpleNamespace(value=status)
+
+
+class _Client:
+    """Enough of InfrahubClientSync for main() to reach the branch check."""
+
+    def __init__(self, branches):
+        self.created = []
+        self.branch = types.SimpleNamespace(
+            all=lambda: branches,
+            create=lambda branch_name, description="": self.created.append(branch_name),
+        )
+
+
+def test_merged_branch_is_refused_before_any_write(seed, monkeypatch, tmp_path, capsys):
+    """Infrahub makes a merged branch read-only. Reusing its name used to
+    fail on the first save with a GraphQL traceback."""
+    (tmp_path / "devices.yml").write_text(yaml.safe_dump({"sites": [SITE], "devices": [DEVICE]}))
+    client = _Client({"main": _Branch("OPEN"), "cs1-snmp": _Branch("MERGED")})
+    monkeypatch.setattr(seed, "InfrahubClientSync", lambda **kw: client)
+    monkeypatch.setattr(seed, "DEVICES_DIR", str(tmp_path))
+    monkeypatch.setattr(seed, "TOKEN", "test")
+    monkeypatch.setattr(seed, "BRANCH", "cs1-snmp")
+    monkeypatch.setattr(seed, "PLATFORMS_FILE", str(ROOT / "platforms.yml"))
+
+    assert seed.main() == 1
+    err = capsys.readouterr().err
+    assert "merged and read-only" in err
+    assert "BRANCH=cs1-snmp-2" in err
+    assert client.created == []
