@@ -71,16 +71,16 @@ Logstash re-reads the device table within 60 seconds. No restart needed.
 
 ```bash
 # In the source of truth
-curl -s localhost:${INFRAHUB_PORT:-8000}/graphql \
+curl -sS localhost:${INFRAHUB_PORT:-8000}/graphql \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"{NetworkDevice(name__value:\"cr2\"){edges{node{name{value}}}}}"}'
 
 # Being polled (allow one SNMP interval)
-curl -s "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=device_uptime{device=\"cr2\"}"
+curl -sS "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=device_uptime{device=\"cr2\"}"
 
 # Sending logs (generate one on the device first)
-curl -sG localhost:${LOKI_PORT:-3100}/loki/api/v1/query_range \
+curl -sSG localhost:${LOKI_PORT:-3100}/loki/api/v1/query_range \
   --data-urlencode 'query={device="cr2"}'
 
 # Reachable for automation

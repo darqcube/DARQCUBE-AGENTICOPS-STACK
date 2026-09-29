@@ -106,7 +106,7 @@ Templates are keyed `<platform>-<kind>.txt`, so adding `ios_xe-acls.txt` makes
 this work with no code change:
 
 ```bash
-curl -s "localhost:${AUTOMATION_PORT}/device/cr1/config/structured?kind=acls"
+curl -sS "localhost:${AUTOMATION_PORT}/device/cr1/config/structured?kind=acls"
 ```
 
 Add the same `kind` for every platform you support, or the endpoint works for

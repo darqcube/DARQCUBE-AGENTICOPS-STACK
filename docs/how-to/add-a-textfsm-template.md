@@ -28,7 +28,7 @@ The `Command` column uses `[[...]]` for optional abbreviations, so
 Never write a template against remembered syntax.
 
 ```bash
-curl -s "localhost:${AUTOMATION_PORT:-8100}/device/mt-01/state?raw=1" \
+curl -sS "localhost:${AUTOMATION_PORT:-8100}/device/mt-01/state?raw=1" \
   | .venv/bin/python -c "import json,sys; print(json.load(sys.stdin)['raw'])" \
   > automation/textfsm/samples/routeros-interface-print-terse.txt
 ```

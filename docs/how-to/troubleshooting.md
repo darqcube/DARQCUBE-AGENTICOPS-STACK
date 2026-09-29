@@ -19,7 +19,7 @@ Work down the chain — each step rules out one link.
 
 ```bash
 # 1. Is it in the source of truth, and active?
-curl -s localhost:${INFRAHUB_PORT:-8000}/graphql \
+curl -sS localhost:${INFRAHUB_PORT:-8000}/graphql \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"{NetworkDevice(name__value:\"cr1\"){edges{node{name{value} status{value}}}}}"}'
@@ -32,7 +32,7 @@ docker compose exec telegraf nc -zvu 10.0.0.11 161
 docker compose logs telegraf | grep -i 10.0.0.11
 
 # 4. Is Prometheus scraping Telegraf at all?
-curl -s "localhost:${PROMETHEUS_PORT:-9090}/api/v1/targets" \
+curl -sS "localhost:${PROMETHEUS_PORT:-9090}/api/v1/targets" \
   | .venv/bin/python -c "import json,sys; [print(t['labels']['job'], t['health']) for t in json.load(sys.stdin)['data']['activeTargets']]"
 ```
 
@@ -81,7 +81,7 @@ the output and write a template:
 [add-a-textfsm-template.md](add-a-textfsm-template.md).
 
 ```bash
-curl -s "localhost:${AUTOMATION_PORT:-8100}/device/mt-01/state?raw=1"
+curl -sS "localhost:${AUTOMATION_PORT:-8100}/device/mt-01/state?raw=1"
 ```
 
 ## Memory shows an absurd percentage
@@ -91,7 +91,7 @@ percentage, Cisco bytes, MikroTik allocation units — and the recording rule
 converts based on that field.
 
 ```bash
-curl -s "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=memory_used" \
+curl -sS "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=memory_used" \
   | grep -o 'memory_kind":"[a-z_]*'
 ```
 
@@ -115,10 +115,10 @@ a firewall between them.
 
 ```bash
 # Is the rule loaded?
-curl -s localhost:${PROMETHEUS_PORT:-9090}/api/v1/rules | grep -o '"name":"[^"]*"' | head
+curl -sS localhost:${PROMETHEUS_PORT:-9090}/api/v1/rules | grep -o '"name":"[^"]*"' | head
 
 # Does the expression return anything right now?
-curl -s --data-urlencode 'query=interface_oper_status == 2 and interface_admin_status == 1' \
+curl -sS --data-urlencode 'query=interface_oper_status == 2 and interface_admin_status == 1' \
   localhost:${PROMETHEUS_PORT:-9090}/api/v1/query
 ```
 

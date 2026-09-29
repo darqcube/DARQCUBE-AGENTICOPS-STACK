@@ -154,8 +154,8 @@ against anything, reporting "no change" when nothing was actually checked.
 
 ```bash
 source .env
-curl -s "localhost:${AUTOMATION_PORT}/healthz"
-curl -s "localhost:${AUTOMATION_PORT}/devices" | .venv/bin/python -m json.tool
+curl -sS "localhost:${AUTOMATION_PORT}/healthz"
+curl -sS "localhost:${AUTOMATION_PORT}/devices" | .venv/bin/python -m json.tool
 make state DEV=<device>
 make test-templates
 ```

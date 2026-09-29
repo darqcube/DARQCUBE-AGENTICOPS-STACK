@@ -82,7 +82,7 @@ for p in 9001 9002 9003 9004 9005 9006; do
   docker compose exec -T automation curl -sf "http://mcp-prometheus:$p/healthz" 2>/dev/null
 done
 
-docker compose exec automation curl -s \
+docker compose exec automation curl -sS \
   -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
   -H 'Accept: application/json, text/event-stream' \
   -X POST http://mcp-netmiko:9005/mcp \

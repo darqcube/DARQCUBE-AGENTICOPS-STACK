@@ -74,7 +74,7 @@ creates a new time series per value and will fill the TSDB.
 make render
 docker compose restart telegraf            # only needed if you edited conf.d/
 sleep 40
-curl -s "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=interface_in_discards"
+curl -sS "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=interface_in_discards"
 ```
 
 If it returns an empty result, check Telegraf actually loaded the config:

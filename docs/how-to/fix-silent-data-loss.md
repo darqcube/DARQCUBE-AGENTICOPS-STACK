@@ -107,7 +107,7 @@ Telegraf logs **one line** when this happens and then carries on.
 
 ```bash
 # What one interval actually produces
-curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query?query=prometheus_tsdb_head_series"
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=prometheus_tsdb_head_series"
 ```
 
 Then in `observability/telegraf/telegraf.conf`:

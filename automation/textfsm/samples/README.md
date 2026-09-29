@@ -23,5 +23,5 @@ device does.
 Capture one with:
 
     make state DEV=<name>                     # parsed
-    curl -s localhost:${AUTOMATION_PORT}/device/<name>/state?raw=1 \
+    curl -sS localhost:${AUTOMATION_PORT}/device/<name>/state?raw=1 \
       > automation/textfsm/samples/<platform>__<command>.txt

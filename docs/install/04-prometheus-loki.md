@@ -40,9 +40,9 @@ curl -X POST localhost:${PROMETHEUS_PORT}/-/reload
 
 ```bash
 source .env
-curl -s "localhost:${PROMETHEUS_PORT}/api/v1/targets" \
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/targets" \
   | .venv/bin/python -c "import json,sys;[print(t['labels']['job'],t['health']) for t in json.load(sys.stdin)['data']['activeTargets']]"
-curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query?query=up"
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=up"
 ```
 
 ### Problems
@@ -93,9 +93,9 @@ The message body stays searchable as content:
 
 ```bash
 source .env
-curl -s "localhost:${LOKI_PORT}/ready"
-curl -s "localhost:${LOKI_PORT}/loki/api/v1/labels"           # expect device, site, role
-curl -sG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={site="hq"}'
+curl -sS "localhost:${LOKI_PORT}/ready"
+curl -sS "localhost:${LOKI_PORT}/loki/api/v1/labels"           # expect device, site, role
+curl -sSG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={site="hq"}'
 ```
 
 `device` appearing in the label list proves the whole syslog path works — the

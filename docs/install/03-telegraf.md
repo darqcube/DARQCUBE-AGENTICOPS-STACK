@@ -55,7 +55,7 @@ written into a volume by another container. Editing `conf.d/` needs a restart.
 ```bash
 source .env
 docker compose logs telegraf | grep -E 'Loaded inputs|E!'
-curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query?query=count by (platform)(device_uptime)"
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=count by (platform)(device_uptime)"
 ```
 
 ## Problems

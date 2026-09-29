@@ -145,8 +145,8 @@ make seed && make render
 ```bash
 source .env
 docker compose exec telegraf nc -zvu 10.0.0.31 161
-curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query?query=cpu_usage{device=\"mt-01\"}"
-curl -sG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={device="mt-01"}'
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=cpu_usage{device=\"mt-01\"}"
+curl -sSG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={device="mt-01"}'
 make state DEV=mt-01
 ```
 

@@ -144,7 +144,7 @@ it.
 source .env
 
 # Active series — the number that matters
-curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query?query=prometheus_tsdb_head_series"
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=prometheus_tsdb_head_series"
 
 # Is Telegraf keeping up?
 docker compose logs telegraf | grep -iE 'buffer overflow|did not complete'
@@ -153,7 +153,7 @@ docker compose logs telegraf | grep -iE 'buffer overflow|did not complete'
 netstat -su | grep -iE 'receive buffer|packet receive errors'
 
 # Loki stream count
-curl -s "localhost:${LOKI_PORT}/loki/api/v1/labels"
+curl -sS "localhost:${LOKI_PORT}/loki/api/v1/labels"
 ```
 
 Three of those returning nothing interesting is what healthy looks like.

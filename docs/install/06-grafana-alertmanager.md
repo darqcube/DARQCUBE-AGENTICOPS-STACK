@@ -27,8 +27,8 @@ file — [../how-to/change-dashboards.md](../how-to/change-dashboards.md).
 
 ```bash
 source .env
-curl -s "localhost:${GRAFANA_PORT}/api/health"
-curl -s -u "admin:${GRAFANA_ADMIN_PASSWORD}" "localhost:${GRAFANA_PORT}/api/datasources" \
+curl -sS "localhost:${GRAFANA_PORT}/api/health"
+curl -sS -u "admin:${GRAFANA_ADMIN_PASSWORD}" "localhost:${GRAFANA_PORT}/api/datasources" \
   | .venv/bin/python -c "import json,sys;[print(d['name'],d['uid']) for d in json.load(sys.stdin)]"
 ```
 
@@ -36,7 +36,7 @@ Datasource *health* is the check that matters — a datasource can exist and not
 connect:
 
 ```bash
-curl -s -u "admin:${GRAFANA_ADMIN_PASSWORD}" \
+curl -sS -u "admin:${GRAFANA_ADMIN_PASSWORD}" \
   "localhost:${GRAFANA_PORT}/api/datasources/uid/darqcube-prometheus/health"
 ```
 
@@ -80,8 +80,8 @@ get the cause, not a hundred symptoms.
 
 ```bash
 source .env
-curl -s "localhost:${ALERTMANAGER_PORT}/-/ready"
-curl -s "localhost:${ALERTMANAGER_PORT}/api/v2/alerts"
+curl -sS "localhost:${ALERTMANAGER_PORT}/-/ready"
+curl -sS "localhost:${ALERTMANAGER_PORT}/api/v2/alerts"
 docker compose logs config-init          # says where alerts will be delivered
 ```
 

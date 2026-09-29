@@ -68,7 +68,7 @@ docker compose exec logstash logstash --config.test_and_exit
 
 # End to end
 logger -n <vm-ip> -P ${SYSLOG_PORT} -p local7.info "test from $(hostname)"
-curl -sG localhost:${LOKI_PORT}/loki/api/v1/query_range --data-urlencode 'query={device="unparsed"}'
+curl -sSG localhost:${LOKI_PORT}/loki/api/v1/query_range --data-urlencode 'query={device="unparsed"}'
 ```
 
 ## Problems

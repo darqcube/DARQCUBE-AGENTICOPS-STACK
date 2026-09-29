@@ -101,7 +101,7 @@ docker compose up -d --force-recreate mcp-netmiko
 Confirm which you have:
 
 ```bash
-docker compose exec automation curl -s \
+docker compose exec automation curl -sS \
   -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
   -H 'Accept: application/json, text/event-stream' \
   -X POST http://mcp-netmiko:9005/mcp \
@@ -206,7 +206,7 @@ for it in `mcp/servers/<server>.py` rather than a general one.
 ## Check the surface
 
 ```bash
-docker compose exec automation curl -s \
+docker compose exec automation curl -sS \
   -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
   -H 'Accept: application/json, text/event-stream' \
   -X POST http://mcp-prometheus:9002/mcp \

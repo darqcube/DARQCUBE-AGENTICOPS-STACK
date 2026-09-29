@@ -178,8 +178,7 @@ UI: `http://<host>:${INFRAHUB_PORT}`, login `admin` / `infrahub` (see
    destination `main` → review → **Merge**.
 8. **Render.** `make render`. Telegraf picks it up within 30 s, Logstash within
    60 s.
-9. **Verify.** As in [add-a-device.md — step 4](../how-to/add-a-device.md#4-check-it-worked):
-   the GraphQL query, a Prometheus series, a Loki line, `make state DEV=<name>`.
+9. **Verify.** Section 6, end to end.
 
 To retire a device, set `status` to `decommissioned` rather than deleting it —
 polling stops and history is kept.
@@ -208,8 +207,8 @@ branch instead of a person. All commands run on the VM, in the repo folder.
    One failure writes nothing, and every failure is listed at once.
 4. **Review and merge** the branch as a Proposed Change (section 4, steps 6–7).
 5. **Render once**, after the merge — not per device.
-6. **Onboard in batches of ~50.** Confirm each batch appears in Prometheus and
-   Loki before the next. A wrong community string on 50 devices is a short
+6. **Onboard in batches of ~50.** Confirm each batch with section 6 before the
+   next. A wrong community string on 50 devices is a short
    investigation; on 400 it is not.
 7. **Change and retire through the same loop** — with a **new** branch name each time: a merged Infrahub branch is read-only, and seed refuses it. Edit YAML →
    `make seed BRANCH=…` → merge → `make render`.
@@ -221,6 +220,106 @@ for production.
 object files, and Git repository sync. They work, but `make seed` stays the
 primary path: it checks platforms against `platforms.yml`, and the renderer
 and this stack's tests are built around it.
+
+## 6. Verify end to end
+
+After the devices themselves are configured — SNMPv3 user, syslog destination,
+SSH account; see [devices/](../devices/) — check each stage in order. A stage
+can only work if the one before it does, so the first failure is the one to
+fix. Run on the VM, in the repo folder; `<host>` is the VM's address or name.
+
+### 1. Infrahub holds the inventory
+
+```bash
+curl -sS localhost:${INFRAHUB_PORT}/graphql \
+  -H "X-INFRAHUB-KEY: ${INFRAHUB_ADMIN_TOKEN}" -H "Content-Type: application/json" \
+  -d '{"query":"{NetworkDevice{count} NetworkSite{count} BuiltinTag{count}}"}'
+```
+
+The counts match what you added — on `main`, not only on a branch.
+
+### 2. Render produced the collector config
+
+```bash
+make render
+ls observability/telegraf/generated/
+```
+
+The summary lists every platform and security level with the device counts you
+expect, e.g. `snmp  ios_xe  auth_priv  10 device(s)`. Devices with
+`snmp_security: auth_no_priv` get their own `snmp-*-authnopriv.conf` files.
+Any `!! warnings` name a device that was skipped, and why.
+
+### 3. Telegraf polls without errors
+
+```bash
+make logs SVC=telegraf
+```
+
+No repeated `E!` lines for your devices. A timeout or authentication error on
+one device means its SNMPv3 user does not match `SNMPV3_USER`, `SNMPV3_AUTH`
+and `SNMPV3_PRIV`, or it is configured at a different security level than its
+`snmp_security` — the agent drops the request and Telegraf only sees a timeout.
+
+### 4. Metrics in Prometheus
+
+`http://<host>:${PROMETHEUS_PORT}`:
+
+| Query | Expect |
+|---|---|
+| `count by (device) (device_uptime)` | every device |
+| `count by (device) (interface_oper_status)` | every device |
+| `device_uptime{device="<name>"}` | carries the `site` and `role` from Infrahub |
+| `cpu_usage{device="<name>"}` | a value on real hardware; often empty on emulators such as Cisco IOL |
+
+### 5. Dashboards in Grafana
+
+`http://<host>:${GRAFANA_PORT}`, login `GRAFANA_ADMIN_USER` /
+`GRAFANA_ADMIN_PASSWORD`. The interface panels — status, traffic, errors — show
+your devices.
+
+### 6. Logs in Loki
+
+Generate a log line on a device (on Cisco, `conf t` then `end` produces
+`%SYS-5-CONFIG_I`), then in Grafana → **Explore** → **Loki**:
+`{device="<name>"}`. The line arrives within seconds, with `site` and `role`.
+
+- `device="unknown"` — the device's hostname does not equal its Infrahub name.
+- Nothing — the device is not sending, or cannot reach the VM on
+  `SYSLOG_PORT`/udp. If its management interface is in a VRF, the logging host
+  must name that VRF, or the device routes syslog through its global table.
+
+### 7. Automation over SSH
+
+```bash
+make state DEV=<name>          # parsed interface state (TextFSM)
+make check DEV=<name>          # assurance rules
+make config-get DEV=<name>     # running config
+```
+
+Each returns data, not a connection or login error. Login is `DEVICE_USER` /
+`DEVICE_PASSWORD`.
+
+### 8. The stack's own checks
+
+```bash
+make verify
+make test
+```
+
+`make test` passes, and `test_loki_carries_the_device_label` **passes rather
+than skips** — it passes only once a log line has made the whole trip from
+device to Logstash to the Infrahub identity table to Loki.
+
+### When a stage fails
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Missing from stage 2 | not on `main`, or `status` is not `active` | merge its branch, then `make render` |
+| In stage 2, missing from stage 4 | SNMP mismatch on the device | stage 3 logs; the device's SNMPv3 user and security level |
+| `device_*` metrics per interface, no `interface_*` | a stale render from before the metric-name fix | `git pull && make render` |
+| New `.conf` files but no new devices polled | Telegraf did not load the new files | `make restart SVC=telegraf` |
+| Logs `unknown` or missing | hostname mismatch, or syslog not reaching the VM | stage 6 |
 
 ## Related
 
