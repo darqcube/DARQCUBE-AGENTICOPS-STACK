@@ -907,9 +907,12 @@ def initialise(args) -> None:
             if result.returncode == 0:
                 last = [l for l in result.stdout.strip().splitlines() if l.strip()]
                 ok(f"{name}: {last[-1][:90] if last else 'done'}")
+            elif name == "render" and "no active devices" in result.stderr:
+                # A fresh install has no inventory — the repo ships only
+                # examples, which are never seeded. Nothing to render is the
+                # expected state until the operator adds their devices.
+                ok("render: skipped — no devices yet (see Next, below)")
             else:
-                # Seeding the shipped example devices is expected to be
-                # replaced, so a render with nothing to do is not a failure.
                 detail = (result.stderr or result.stdout).strip().splitlines()
                 bad(f"{name} failed: {detail[-1][:120] if detail else '?'}")
         except subprocess.TimeoutExpired:
@@ -969,7 +972,8 @@ def report(args) -> None:
     IPFIX          {host}:{env.get('IPFIX_PORT', '4739')}/udp
 
   {C['b']}Next{C['x']}
-    1. Add your devices to source-of-truth/devices/devices.yml
+    1. cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+       and replace the examples with your sites and devices
     2. make seed && make render
     3. Configure the devices themselves — docs/devices/
     4. make test-devices

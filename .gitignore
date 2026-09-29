@@ -28,3 +28,8 @@ sites/*.yml
 !sites/example.yml
 
 /net-commander
+
+# Your inventory — per deployment, like site.yml. Only the examples are tracked;
+# `make seed` reads source-of-truth/devices/*.yml and never the examples/ folder.
+source-of-truth/devices/*.yml
+source-of-truth/devices/*.yaml

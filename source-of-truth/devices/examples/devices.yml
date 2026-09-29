@@ -1,7 +1,12 @@
 # ---------------------------------------------------------------------------
-# Your network devices. This is the file you edit to add a device.
+# EXAMPLE network devices. Never seeded from here — copy it first:
 #
-#   make seed      apply this file to Infrahub (idempotent)
+#   cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+#
+# The copies are yours: gitignored, so `git pull` never touches them and they
+# cannot be committed by accident. Edit them, then:
+#
+#   make seed      apply source-of-truth/devices/*.yml to Infrahub (idempotent)
 #   make render    push the result into Telegraf and Logstash
 #
 # Both are needed: seed updates the source of truth, render updates the
@@ -32,7 +37,7 @@
 # This file is the whole record: a field left out is reset to its default on
 # the next seed, even if it was set in the Infrahub UI.
 #
-# The three below are EXAMPLES. Replace them with your real devices.
+# The three below are made up. Replace them with your real devices.
 # ---------------------------------------------------------------------------
 devices:
   - name: cr1

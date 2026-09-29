@@ -59,7 +59,7 @@ devices=$(curl -sf --max-time 10 "http://localhost:${INFRAHUB_PORT}/graphql" \
 if [[ -z "${devices:-}" ]]; then
   bad "cannot query Infrahub — is the schema loaded? (make schema)"
 elif [[ "$devices" -eq 0 ]]; then
-  warn "Infrahub has no devices — run: make seed"
+  warn "Infrahub has no devices — add them in the UI, or copy source-of-truth/devices/examples/ and run: make seed"
 else
   ok "$devices device(s) in the source of truth"
 fi

@@ -47,6 +47,9 @@ split is deliberate; don't merge them.
 - **One credential pair** — `DEVICE_USER` / `DEVICE_PASSWORD` — for Nornir and Netmiko. Don't
   add per-tool variants; they drift apart and then nobody knows which one is real.
 - **Device credentials never go in Infrahub.** `.env` only.
+- **The inventory is per deployment, never in the repo.** `source-of-truth/devices/*.yml` is
+  gitignored like `site.yml`; only `devices/examples/` is tracked, and `make seed` never reads it.
+  Don't put a real site, device or lab name in docs, tests or examples.
 - **Adding a vendor is six edits**: `platforms.yml`, a Logstash grok file, a TextFSM template (if
   `ntc-templates` has none), a normaliser in `automation/assurance/normalise.py`, the `platform`
   dropdown in the Infrahub schema, and an onboarding doc. All six, or the vendor is

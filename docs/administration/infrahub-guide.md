@@ -3,9 +3,25 @@
 How sites, devices and their classification get into Infrahub. The UI is for
 learning and small changes; YAML plus `make seed` is for a production fleet of
 up to 400 devices. Both write the same schema, and everyday work — a device, a
-site, a tag, even a new field — is a YAML edit, never a code change.
+site, a tag, even a new field — is a data edit, never a code change.
 
 ## 1. Before you start
+
+### Your inventory never goes in the repo
+
+This repository is shared. What it ships is the same for everyone: code, the
+schema, and made-up examples. What *you* add is per deployment and stays on
+your VM:
+
+| Tracked in git — the same for everyone | Yours — gitignored |
+|---|---|
+| `source-of-truth/schema/darqcube.yml` | `.env`, `site.yml` |
+| `source-of-truth/devices/examples/*.yml` | `source-of-truth/devices/*.yml` |
+
+`make seed` reads `source-of-truth/devices/*.yml` and **never** the `examples/`
+folder, so a fresh install starts with an empty Infrahub rather than made-up
+devices the collectors would then poll. Because your files are gitignored,
+`git pull` never conflicts with them and `git add .` cannot publish them.
 
 ### "Branch" means two things
 
@@ -24,23 +40,18 @@ That is the review gate.
 `make seed` treats the YAML as the **whole record**: a field left out is reset
 to its default, and a device's tags become exactly the list given. A value you
 changed in the UI is overwritten by the next seed if that device is in the
-YAML. Choose one owner per environment:
+YAML. Use either — but give each device one owner:
 
-| Environment | Owner | Why |
-|---|---|---|
-| lab / demo | the UI | learning Infrahub is the point |
-| production | the YAML | reviewable, and `make schema && make seed` rebuilds Infrahub from the repo if `neo4j-data` is lost |
-
-The shipped `source-of-truth/devices/devices.yml` holds three **example**
-devices, one of them named `cr1`. If you create the lab's `cr1` in the UI and
-then run `make seed`, the example overwrites it. Replace or delete the
-examples before seeding.
+| Owner | Good for |
+|---|---|
+| the UI | learning Infrahub, a lab, a handful of devices |
+| the YAML | a production fleet — reviewable, repeatable, and `make seed` rebuilds Infrahub if `neo4j-data` is lost. Keep a backup of the files: they are not in git |
 
 ### The device name is a join key
 
 `name` must equal the device's configured hostname exactly. It joins a syslog
-line to a metric to an Infrahub record. For containerlab, the node name
-(`cr1`, `b-north`) is the hostname.
+line to a metric to an Infrahub record. If they differ, logs arrive labelled
+`unknown` and nothing reports it.
 
 ## 2. The schema
 
@@ -66,7 +77,7 @@ Defined in `source-of-truth/schema/darqcube.yml`, loaded with `make schema`.
 | `management_ip` | IPHost | one of `management_ip` / `management_host` is required |
 | `management_host` | Text | DNS name; **used instead of** `management_ip` when set |
 | `environment` | Dropdown | `production`, `staging`, `lab`, `demo` — default `production` |
-| `tags` | → Tag, many | free-form, e.g. `containerlab`, `pci`, a customer name |
+| `tags` | → Tag, many | free-form, e.g. `pci`, `lab`, a customer name |
 | `status` | Dropdown | `active` (default), `provisioning`, `maintenance`, `decommissioned` |
 | `telemetry_mode` | Dropdown | `snmp` (default), `gnmi` |
 | `flow_enabled` | Boolean | default `false` |
@@ -79,9 +90,11 @@ metrics and logs automatically. `environment`, `region`, `site_type` and `tags`
 are **not** labels: Loki labels stay `device, site, role, severity`.
 
 **Polling by DNS name.** When `management_host` is set, Telegraf polls it and
-automation SSHes to it. Set `management_ip` as well if the device exports
-NetFlow/IPFIX: flow records arrive from the device's IP address, and the
-renderer uses that IP to label them.
+automation SSHes to it. Use it when the stack reaches devices by name — or
+when the name is reachable and the IP is not, as in some container labs. Set
+`management_ip` as well if the device exports NetFlow/IPFIX: flow records
+arrive from the device's IP address, and the renderer uses that IP to label
+them.
 
 ### Adding a field
 
@@ -93,31 +106,55 @@ renderer uses that IP to label them.
 No code changes: `seed.py` reads its field list from the loaded schema. A key
 the schema does not know fails the seed with the list of valid fields, so a
 typo such as `enviroment:` is never silently dropped. New dropdown values —
-another role, another environment — are step 1 and 2 only.
+another role, another environment — are steps 1 and 2 only.
 
 A field only changes *behaviour* if code reads it. Storing `environment` needs
 nothing; "no alerts for `demo` devices" is an alert-rule change.
 
-## 3. Reference mapping — the `nbp-wan` containerlab
+## 3. Worked example
 
-| Site | `site_type` | Devices | Role |
-|---|---|---|---|
-| `nbp-hq` | `hq` | cr1, cr2, cr3, dr1 | `core-wan` |
-| | | cs1 | `core-dc` |
-| | | ir1 | `internet-edge` |
-| `nbp-branch-north` | `branch` | b-north | `branch-wan` |
-| `nbp-branch-central` | `branch` | b-central | `branch-wan` |
-| `nbp-branch-south` | `branch` | b-south | `branch-wan` |
-| `telco` | `pop` | telco1, telco2 | `wan` — simulated provider network |
+Two sites, three devices, one tag — in `source-of-truth/devices/sites.yml`:
 
-All eleven: `platform: ios_xe`, `environment: demo`, tags `containerlab` and
-`nbp-wan`, `management_host: clab-nbp-wan-clab-<node>.orb.local`.
+```yaml
+tags:
+  - name: lab
+    description: Not customer-facing
 
-List the running lab and each node's OrbStack name:
+sites:
+  - name: site-a
+    site_type: hq
+    region: north
+  - name: site-b
+    site_type: branch
+    region: north
+```
 
-```bash
-docker ps --filter label=containerlab --format '{{.Names}}'
-# FQDN = <container-name>.orb.local, e.g. clab-nbp-wan-clab-cr1.orb.local
+and `source-of-truth/devices/devices.yml`:
+
+```yaml
+devices:
+  - name: core-01
+    site: site-a
+    role: core-wan
+    platform: ios_xe
+    management_ip: 10.0.0.11
+    environment: demo
+    tags: [lab]
+
+  - name: edge-01
+    site: site-a
+    role: internet-edge
+    platform: ios_xe
+    management_host: edge-01.example.net   # polled and SSHed by name
+    environment: demo
+    tags: [lab]
+
+  - name: branch-01
+    site: site-b
+    role: branch-wan
+    platform: routeros
+    management_ip: 10.0.1.1
+    environment: demo
 ```
 
 ## 4. Manual process — the Infrahub UI
@@ -128,37 +165,36 @@ UI: `http://<host>:${INFRAHUB_PORT}`, login `admin` / `infrahub` (see
 1. **Load the schema.** `make schema`. In the UI, open **Schema** and confirm
    `site_type` and `region` on Network Site, and `environment`,
    `management_host` and `tags` on Network Device.
-2. **Create an Infrahub branch.** Branch selector (top left) → **+** → name it
-   `onboard-nbp-wan`. Stay on it for every step below.
-3. **Create tags.** Object Management → **Tag** → `containerlab`, `nbp-wan`.
-4. **Create sites.** Network Site → one per row of the mapping, with
-   `site_type` set.
+2. **Create an Infrahub branch.** Branch selector (top left) → **+** → e.g.
+   `onboard-site-a`. Stay on it for every step below.
+3. **Create tags.** Object Management → **Tag**.
+4. **Create sites.** Network Site → one per site, with `site_type` set.
 5. **Create devices.** Network Device → one form each. Site is a picker; tags
    are a multi-select.
 6. **Review.** Open the branch → **Data** diff. Every object you created is
    listed; nothing is on `main` yet.
-7. **Propose and merge.** **Proposed Changes** → new, source
-   `onboard-nbp-wan`, destination `main` → review → **Merge**.
+7. **Propose and merge.** **Proposed Changes** → new, source your branch,
+   destination `main` → review → **Merge**.
 8. **Render.** `make render`. Telegraf picks it up within 30 s, Logstash within
    60 s.
 9. **Verify.** As in [add-a-device.md — step 4](../how-to/add-a-device.md#4-check-it-worked):
-   the GraphQL query, a Prometheus series, a Loki line, `make state DEV=cr1`.
+   the GraphQL query, a Prometheus series, a Loki line, `make state DEV=<name>`.
 
 To retire a device, set `status` to `decommissioned` rather than deleting it —
 polling stops and history is kept.
 
-## 5. Automated process — ~400 devices
+## 5. YAML process — up to ~400 devices
 
 The same branch and Proposed Change flow as section 4; `make seed` fills the
-branch instead of a person.
+branch instead of a person. All commands run on the VM, in the repo folder.
 
-1. **Start from an export.** A CSV or spreadsheet from the CMDB or IPAM with
-   `name, site, role, platform, address, environment, tags`. For containerlab,
-   `containerlab inspect --format json` is the export.
-2. **Write the YAML.** Every `*.yml` in `source-of-truth/devices/` is read, and
-   each may hold `tags:`, `sites:` and `devices:`. Past ~50 devices, use one
-   file per region or site — `devices-north.yml`, `devices-south.yml` — so a
-   review shows one batch.
+1. **Create your files** — once per install:
+   `cp source-of-truth/devices/examples/*.yml source-of-truth/devices/`
+2. **Write the inventory.** Replace the examples with your own. Every `*.yml`
+   in `source-of-truth/devices/` is read, and each may hold `tags:`, `sites:`
+   and `devices:`. Past ~50 devices, use one file per region or site —
+   `devices-north.yml`, `devices-south.yml` — so a batch is easy to review.
+   From a CMDB or IPAM export, generate these files rather than typing them.
 3. **Seed onto a branch.** `make seed BRANCH=onboard-batch-01`. The Infrahub
    branch is created if it does not exist. Before anything is written, every
    record in every file is checked:

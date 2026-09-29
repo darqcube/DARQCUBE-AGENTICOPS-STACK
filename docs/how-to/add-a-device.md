@@ -16,7 +16,16 @@ reports the mismatch.
 
 ## 2. Add it to the source of truth
 
-Edit `source-of-truth/devices/devices.yml`:
+Edit `source-of-truth/devices/devices.yml`. It is your own file — gitignored,
+so it never conflicts with `git pull` and cannot be committed by accident. On
+a fresh install it does not exist yet; start from the examples:
+
+```bash
+cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+```
+
+Or skip the file entirely and add the device in the Infrahub UI — but not
+both: `make seed` overwrites any device that is also in the YAML.
 
 ```yaml
 devices:

@@ -82,29 +82,58 @@ SITE = {"name": "hq", "site_type": "hq"}
 DEVICE = {"name": "cr1", "site": "hq", "role": "core", "platform": "ios_xe", "management_ip": "10.0.0.11"}
 
 
-def test_checked_in_examples_are_valid(seed):
-    sections, errors = seed.load_records(ROOT / "source-of-truth/devices")
+EXAMPLES = ROOT / "source-of-truth/devices/examples"
+
+
+def test_shipped_examples_are_valid(seed):
+    """Someone's first inventory is a copy of these."""
+    sections, errors = seed.load_records(EXAMPLES)
     assert not errors
+    assert sections["devices"], "examples/ has no devices"
     assert seed.validate(sections, views_from_schema_file(), known_from(sections, seed), PLATFORMS) == []
 
 
-def test_containerlab_mapping_from_the_admin_guide_is_valid(seed, tmp_path):
-    """The lab in docs/administration/infrahub-guide.md, as YAML."""
-    sites = [
-        {"name": "nbp-hq", "site_type": "hq"},
-        {"name": "nbp-branch-north", "site_type": "branch"},
-        {"name": "telco", "site_type": "pop"},
-    ]
-    roles = {"cr1": "core-wan", "cs1": "core-dc", "ir1": "internet-edge", "b-north": "branch-wan", "telco1": "wan"}
-    site_of = {"b-north": "nbp-branch-north", "telco1": "telco"}
-    devices = [
-        {"name": n, "site": site_of.get(n, "nbp-hq"), "role": r, "platform": "ios_xe",
-         "management_host": f"clab-nbp-wan-clab-{n}.orb.local", "environment": "demo",
-         "tags": ["containerlab", "nbp-wan"]}
-        for n, r in roles.items()
-    ]
-    tags = [{"name": "containerlab"}, {"name": "nbp-wan"}]
-    assert check(seed, tmp_path, {"tags": tags, "sites": sites, "devices": devices}) == []
+def test_examples_are_never_seeded(seed):
+    """Seeding the examples gave every fresh install three made-up devices,
+    polled at addresses that do not exist."""
+    assert seed.inventory_files(EXAMPLES.parent) == sorted(EXAMPLES.parent.glob("*.y*ml"))
+    assert not any(EXAMPLES in p.parents for p in seed.inventory_files(EXAMPLES.parent))
+
+
+def test_inventory_is_gitignored_but_examples_are_not():
+    """The inventory is per deployment. Tracked, `git pull` conflicts with a
+    local edit and `git add .` publishes someone's network."""
+    import subprocess
+
+    def ignored(path):
+        return subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT).returncode == 0
+
+    if subprocess.run(["git", "rev-parse"], cwd=ROOT, capture_output=True).returncode:
+        pytest.skip("not a git checkout")
+    assert ignored("source-of-truth/devices/devices.yml")
+    assert ignored("source-of-truth/devices/devices-north.yaml")
+    assert not ignored("source-of-truth/devices/examples/devices.yml")
+
+
+def test_no_device_files_is_not_an_error(seed, monkeypatch, tmp_path, capsys):
+    """A fresh clone has none. install.py runs seed; it must not fail there."""
+    monkeypatch.setattr(seed, "DEVICES_DIR", str(tmp_path))
+    monkeypatch.setattr(seed, "TOKEN", "test")
+    assert seed.main() == 0
+    assert "nothing to seed" in capsys.readouterr().out
+
+
+def test_worked_example_in_the_admin_guide_is_valid(seed, tmp_path):
+    """The YAML in the guide's worked example, validated against the schema."""
+    import re
+
+    guide = (ROOT / "docs/administration/infrahub-guide.md").read_text()
+    section = guide.split("## 3. Worked example", 1)[1].split("\n## ", 1)[0]
+    blocks = re.findall(r"```yaml\n(.*?)```", section, re.S)
+    assert len(blocks) == 2
+    docs = [yaml.safe_load(b) for b in blocks]
+    assert check(seed, tmp_path, *docs) == []
+    assert any("management_host" in d for d in docs[1]["devices"])
 
 
 def test_unknown_field_is_an_error_not_silently_dropped(seed, tmp_path):
@@ -146,7 +175,7 @@ def test_fqdn_alone_is_enough(seed, tmp_path):
 
 
 def test_bad_values_are_caught_before_any_write(seed, tmp_path):
-    bad = {**DEVICE, "management_ip": "cr1.lab", "flow_enabled": "yes", "tags": "nbp-wan"}
+    bad = {**DEVICE, "management_ip": "cr1.lab", "flow_enabled": "yes", "tags": "lab"}
     errors = check(seed, tmp_path, {"sites": [SITE], "devices": [bad]})
     assert any("is not an IP address" in e for e in errors)
     assert any("flow_enabled" in e for e in errors)

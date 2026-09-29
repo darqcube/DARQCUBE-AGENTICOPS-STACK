@@ -173,7 +173,8 @@ make up                           # build + up -d --wait
 
 # 5. initialise
 make schema                       # load the Infrahub schema
-${EDITOR:-nano} source-of-truth/devices/devices.yml   # your devices
+cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+${EDITOR:-nano} source-of-truth/devices/devices.yml   # your devices (gitignored)
 make seed                         # devices.yml -> Infrahub
 make render                       # Infrahub -> Telegraf and Logstash
 

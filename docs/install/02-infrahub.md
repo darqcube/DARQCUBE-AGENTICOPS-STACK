@@ -31,12 +31,11 @@ Only `infrahub-server` is published.
 | Where | What |
 |---|---|
 | `source-of-truth/schema/darqcube.yml` | the data model |
-| `source-of-truth/devices/sites.yml` | your sites |
-| `source-of-truth/devices/devices.yml` | your devices |
+| `source-of-truth/devices/*.yml` | your sites, tags and devices — gitignored, per install. Start from `source-of-truth/devices/examples/` |
 | `.env` → `INFRAHUB_PORT` | published port (default 18000) |
 | `.env` → `INFRAHUB_ADMIN_TOKEN` | API token, also the initial admin token |
 | `.env` → `NEO4J_PASSWORD`, `RABBITMQ_PASSWORD`, `POSTGRES_PASSWORD`, `INFRAHUB_SECRET_KEY` | backing services |
-| `.env` → `INFRAHUB_BRANCH` | which branch is read (default `main`) |
+| `make seed BRANCH=x` | seed onto an Infrahub branch for review; render and automation always read `main` |
 
 ## How to change it
 
@@ -45,7 +44,7 @@ Add a vendor → [../how-to/add-a-platform.md](../how-to/add-a-platform.md).
 
 ```bash
 make schema    # load the schema after editing darqcube.yml
-make seed      # apply devices.yml / sites.yml  (idempotent — also updates)
+make seed      # apply source-of-truth/devices/*.yml  (idempotent — also updates)
 make render    # push to the collectors
 ```
 

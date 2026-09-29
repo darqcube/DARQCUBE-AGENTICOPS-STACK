@@ -1,8 +1,13 @@
-# Sites and tags. Edit this file and run `make seed` — it is idempotent, so
-# re-running updates existing sites rather than duplicating them.
+# EXAMPLE sites and tags. Never seeded from here — copy it first:
 #
-# Any *.yml in this folder is read, so a large fleet can be split into one file
-# per region or site. A name may be defined only once across all of them.
+#   cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+#
+# then edit the copy and run `make seed`. It is idempotent, so re-running
+# updates existing sites rather than duplicating them.
+#
+# Every *.yml in source-of-truth/devices/ is read, so a large fleet can be
+# split into one file per region or site. A name may be defined only once
+# across all of them.
 #
 # SITE FIELDS (the full list is whatever source-of-truth/schema/darqcube.yml says)
 #   name         short identifier — becomes the `site` metric and log label
@@ -14,8 +19,8 @@
 # may only use a tag listed here (or already created in Infrahub), so a typo
 # fails `make seed` instead of quietly creating a second tag.
 tags: []
-#  - name: containerlab
-#    description: Runs in a containerlab topology
+#  - name: pci
+#    description: In scope for PCI audit
 
 sites:
   - name: hq

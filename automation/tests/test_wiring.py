@@ -43,8 +43,7 @@ def test_grafana_datasources_connect(env, http, compose_ps):
         assert health.get("status") == "OK", f"{source['name']}: {health.get('message')}"
 
 
-def test_infrahub_has_devices(env, http, compose_ps):
-    """Nothing downstream works until the source of truth is seeded."""
+def infrahub_device_count(env) -> int:
     import urllib.request
 
     req = urllib.request.Request(
@@ -57,13 +56,28 @@ def test_infrahub_has_devices(env, http, compose_ps):
     )
     with urllib.request.urlopen(req, timeout=15) as response:
         body = json.loads(response.read())
-    count = body["data"]["NetworkDevice"]["count"]
-    assert count > 0, "Infrahub has no devices — run `make seed`"
+    return body["data"]["NetworkDevice"]["count"]
 
 
-def test_rendered_inventory_matches_the_source_of_truth(compose_ps):
+def test_infrahub_has_devices(env, http, compose_ps):
+    """Nothing downstream works until the source of truth is seeded.
+
+    A fresh install legitimately has none: the repo ships only examples, which
+    are never seeded. So an empty Infrahub is a skip — unless inventory files
+    exist, in which case the seed did not do its job.
+    """
+    inventory = list((ROOT / "source-of-truth/devices").glob("*.y*ml"))
+    count = infrahub_device_count(env)
+    if count == 0 and not inventory:
+        pytest.skip("no devices yet — add them in the Infrahub UI or source-of-truth/devices/")
+    assert count > 0, f"{len(inventory)} inventory file(s) but Infrahub has no devices — run `make seed`"
+
+
+def test_rendered_inventory_matches_the_source_of_truth(env, compose_ps):
     """`make render` is the step people forget: a device can exist in Infrahub
     and be polled by nothing."""
+    if infrahub_device_count(env) == 0:
+        pytest.skip("no devices in Infrahub — nothing to render yet")
     generated = ROOT / "observability/telegraf/generated/devices.json"
     if not generated.exists():
         pytest.fail("nothing rendered — run `make render`")

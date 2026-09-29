@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Apply source-of-truth/devices/*.yml to Infrahub.
 
+Those files are the deployment's own inventory and are gitignored; the repo
+ships only source-of-truth/devices/examples/, which is never read.
+
 Idempotent: re-running updates existing nodes instead of duplicating them, so
 this is the normal way to change a device, not just to create one.
 
@@ -72,6 +75,17 @@ def load(path: str | Path) -> dict:
 
 # --- reading the YAML ------------------------------------------------------
 
+def inventory_files(directory: str | Path) -> list[Path]:
+    """The deployment's own *.yml, top level only.
+
+    Top level only is what keeps examples/ out: the shipped examples must
+    never be seeded, or every fresh install starts with made-up devices that
+    the collectors then poll.
+    """
+    directory = Path(directory)
+    return sorted(directory.glob("*.yml")) + sorted(directory.glob("*.yaml"))
+
+
 def load_records(directory: str | Path) -> tuple[dict[str, list], list[str]]:
     """Every record in every *.yml under `directory`, grouped by section.
 
@@ -83,11 +97,7 @@ def load_records(directory: str | Path) -> tuple[dict[str, list], list[str]]:
     seen: dict[tuple[str, str], str] = {}
     errors: list[str] = []
 
-    files = sorted(Path(directory).glob("*.yml")) + sorted(Path(directory).glob("*.yaml"))
-    if not files:
-        errors.append(f"no *.yml files in {directory}")
-
-    for path in files:
+    for path in inventory_files(directory):
         doc = load(path)
         if not isinstance(doc, dict):
             errors.append(f"{path.name}: expected top-level keys {', '.join(sections)}")
@@ -289,6 +299,13 @@ def main() -> int:
     if not TOKEN:
         print("!! INFRAHUB_API_TOKEN not set", file=sys.stderr)
         return 2
+
+    # A fresh clone has no inventory — the repo ships only examples/. That is
+    # the normal first-install state, not a failure.
+    if not inventory_files(DEVICES_DIR):
+        print("no device files yet — nothing to seed. Start from the examples:")
+        print("    cp source-of-truth/devices/examples/*.yml source-of-truth/devices/")
+        return 0
 
     sections, errors = load_records(DEVICES_DIR)
     if errors:

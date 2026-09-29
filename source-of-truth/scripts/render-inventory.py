@@ -136,7 +136,9 @@ def main() -> int:
 
     if not devices:
         print("!! no active devices in Infrahub — nothing to render.", file=sys.stderr)
-        print("   Add them to source-of-truth/devices/devices.yml, then: make seed", file=sys.stderr)
+        print("   Add them in the Infrahub UI, or in source-of-truth/devices/*.yml then: make seed",
+              file=sys.stderr)
+        print("   (start from source-of-truth/devices/examples/)", file=sys.stderr)
         return 1
 
     os.makedirs(OUT_DIR, exist_ok=True)
