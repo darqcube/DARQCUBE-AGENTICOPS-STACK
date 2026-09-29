@@ -37,7 +37,7 @@ check_http "Prometheus"   "http://localhost:${PROMETHEUS_PORT}/-/ready"
 check_http "Loki"         "http://localhost:${LOKI_PORT}/ready"
 check_http "Alertmanager" "http://localhost:${ALERTMANAGER_PORT}/-/ready"
 check_http "Grafana"      "http://localhost:${GRAFANA_PORT}/api/health" '"database"'
-check_http "Infrahub"     "http://localhost:${INFRAHUB_PORT}/api/schema/summary"
+check_http "Infrahub"     "http://localhost:${INFRAHUB_PORT}/api/config"
 if [[ "${COMPOSE_PROFILES:-}" == *automation* ]]; then
   check_http "Automation" "http://localhost:${AUTOMATION_PORT}/healthz" '"ok"'
 fi

@@ -9,11 +9,23 @@ SOT     := $(COMPOSE) exec -T infrahub-server
 AUTO    := $(COMPOSE) exec -T automation
 AUTOMATION_PORT ?= 8100
 
-# Load .env so recipes can use its values directly (e.g. $(INFRAHUB_ADMIN_TOKEN)).
+# Load .env so recipes can use its values directly (e.g. $(AUTOMATION_PORT)).
+#
+# Deliberately NOT exported. Make strips an inline `# comment` but keeps the
+# whitespace before it, so `GRAFANA_PORT=13000   # standard: 3000` becomes
+# "13000   ". Exported, that padded value overrides Compose's own (correct)
+# reading of .env and `docker compose up` fails with `invalid hostPort`.
+# Compose and the scripts each read .env themselves; recipes $(strip) what
+# they use.
 ifneq (,$(wildcard .env))
 include .env
-export
 endif
+AUTOMATION_PORT := $(strip $(AUTOMATION_PORT))
+
+# install.py puts the test suite's dependencies in .venv, not on the host
+# PATH (Ubuntu's system Python refuses pip installs). Fall back to a PATH
+# pytest for anyone who set up their own environment.
+PYTEST := $(if $(wildcard .venv/bin/pytest),.venv/bin/pytest,pytest)
 
 .PHONY: install help preflight up down restart ps logs schema seed render \
         config-get config-put state check snapshot config-parsed \
@@ -87,13 +99,13 @@ config-parsed: ## Running config parsed with TTP:  make config-parsed DEV=cr1
 # --- tests ---------------------------------------------------------------
 
 test-templates: ## TextFSM templates vs captured samples. No stack, no devices.
-	pytest automation/tests/test_templates.py -v
+	$(PYTEST) automation/tests/test_templates.py -v
 
 test: ## Stack tests: containers running, services answering, components wired
-	pytest automation/tests -v -m "not devices"
+	$(PYTEST) automation/tests -v -m "not devices"
 
 test-devices: ## Tests that need real network devices
-	pytest automation/tests/test_devices.py -v -m devices
+	$(PYTEST) automation/tests/test_devices.py -v -m devices
 
 verify: ## Run exactly what docs/INSTALL.md tells you to verify
 	@./scripts/verify.sh

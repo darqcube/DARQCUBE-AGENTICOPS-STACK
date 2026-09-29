@@ -154,10 +154,14 @@ services:
     labels:
       com.darqcube.group: source-of-truth
       com.darqcube.role: api
+    # Paths track the Infrahub version: 1.10 moved the gunicorn config and the
+    # logger class from infrahub/api + infrahub.server into infrahub/serve.
+    # A stale path makes the server restart-loop and everything downstream
+    # (schema, seed, render, then Telegraf and Logstash) fails with it.
     command:
       - gunicorn
-      - --config=backend/infrahub/api/gunicorn_config.py
-      - --logger-class=infrahub.server.GunicornLogger
+      - --config=backend/infrahub/serve/gunicorn_config.py
+      - --logger-class=infrahub.serve.log.GunicornLogger
       - infrahub.server:app
     environment:
       <<: *infrahub-env
@@ -185,7 +189,11 @@ services:
       rabbitmq: { condition: service_healthy }
       task-manager: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/schema/summary').status==200 else 1)\""]
+      # /api/config, not /api/schema/summary: with anonymous access off, 1.10
+      # answers the schema endpoint 401, the server never turns healthy, and
+      # infrahub-worker (which waits on it) never starts — so `make schema`
+      # hangs with nothing to run its migration.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/config').status==200 else 1)\""]
       interval: 15s
       timeout: 10s
       retries: 20

@@ -30,7 +30,9 @@ def test_grafana_database_is_ok(env, http, compose_ps):
 
 
 def test_infrahub_answers(env, http, compose_ps):
-    http(f"http://localhost:{env['INFRAHUB_PORT']}/api/schema/summary", retries=3)
+    # /api/config answers without a token; /api/schema/summary is 401 when
+    # anonymous access is off, which this stack always sets.
+    http(f"http://localhost:{env['INFRAHUB_PORT']}/api/config", retries=3)
 
 
 def test_automation_api_answers(env, http, compose_ps):
