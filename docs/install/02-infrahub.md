@@ -59,7 +59,8 @@ curl -s "localhost:${INFRAHUB_PORT}/graphql" \
   -d '{"query":"{NetworkDevice{edges{node{name{value} platform{value}}}}}"}'
 ```
 
-UI: `http://<vm-ip>:${INFRAHUB_PORT}`, login `admin` / your admin token.
+UI: `http://<vm-ip>:${INFRAHUB_PORT}`, login `admin` / `infrahub` (Infrahub's default — change it after first login).
+The admin token is for the API, not the UI.
 
 ## Problems
 

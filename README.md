@@ -249,6 +249,7 @@ make config-put DEV=cr1 FILE=change.txt   # push, and report what changed
 | I want to… | Where |
 |---|---|
 | Add a device | `source-of-truth/devices/devices.yml` → [guide](docs/how-to/add-a-device.md) |
+| Manage sites and devices in Infrahub (UI or bulk) | Infrahub UI or `source-of-truth/devices/` → [guide](docs/administration/infrahub-guide.md) |
 | Support a new vendor | `platforms.yml` → [guide](docs/how-to/add-a-platform.md) |
 | Add or change an alert | `observability/prometheus/rules/alerts.yml` → [guide](docs/how-to/change-alerts.md) |
 | Add or change an assurance check | `automation/assurance/rules.yml` → [guide](docs/how-to/change-assurance-rules.md) |

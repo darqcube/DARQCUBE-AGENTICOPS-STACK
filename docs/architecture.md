@@ -107,6 +107,35 @@ flowchart LR
 Ports shown are the standard values. The published host ports are configurable —
 see [how-to/change-ports.md](how-to/change-ports.md).
 
+## Web UIs and APIs
+
+Open `http://<host>:<port>`, where `<host>` is the VM's address or DNS name —
+on OrbStack, `<machine-name>.orb.local`. `.env.example` ships **non-standard**
+ports so the stack can sit beside other services; your `.env` is the
+authority.
+
+| Tool | URL path | `.env` variable | Shipped | Standard | Login |
+|---|---|---|---|---|---|
+| **Grafana** | `/` | `GRAFANA_PORT` | 13000 | 3000 | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` |
+| **Infrahub** | `/` · GraphQL at `/graphql` | `INFRAHUB_PORT` | 18000 | 8000 | UI: `admin` / `infrahub` · API: header `X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN` |
+| **Prometheus** | `/` | `PROMETHEUS_PORT` | 19090 | 9090 | none |
+| **Alertmanager** | `/` | `ALERTMANAGER_PORT` | 19093 | 9093 | none |
+| **Automation API** | `/docs` (Swagger) | `AUTOMATION_PORT` | 18100 | 8100 | **none** — can push config |
+| **Loki** | no UI — use Grafana → **Explore** | `LOKI_PORT` | 13100 | 3100 | none |
+| **MCP servers** | not published — Compose network only | — | — | — | — |
+
+Infrahub's UI password is Infrahub's own default; this stack does not set one.
+Change it after first login. `INFRAHUB_ADMIN_TOKEN` is an API token, not a UI
+password.
+
+Everything except Grafana and Infrahub is unauthenticated. Anyone who can reach
+`AUTOMATION_PORT` can push configuration to every device, whatever
+`MCP_ALLOW_WRITE` says. Keep these ports on a management network.
+
+Device-facing listeners are not UIs, but for reference: syslog
+`SYSLOG_PORT` (shipped 1514/udp, standard 514), NetFlow `NETFLOW_PORT`
+(12055/udp, 2055), IPFIX `IPFIX_PORT` (14739/udp, 4739).
+
 ## Component interdependency
 
 A different question: **what breaks when something is down.** Arrows point from
