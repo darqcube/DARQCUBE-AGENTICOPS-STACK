@@ -14,10 +14,23 @@
 #                    arrive unlabelled and nothing correlates.
 #   site             must exist in sites.yml
 #   role             core | distribution | access | wan | edge | firewall
+#                    | core-wan | core-dc | internet-edge | branch-wan
 #   platform         ios_xe | vrp | routeros   (see platforms.yml)
 #   management_ip    what the stack polls and SSHes to
+#   management_host  optional DNS name; used INSTEAD of management_ip when set.
+#                    One of the two is required.
+#   environment      production (default) | staging | lab | demo
+#   tags             optional list; each must exist under `tags:` in sites.yml
 #   telemetry_mode   snmp (default) | gnmi — ios_xe only for gnmi
 #   flow_enabled     true if the device exports NetFlow/IPFIX
+#   status           active (default) | provisioning | maintenance | decommissioned
+#
+# The allowed fields come from source-of-truth/schema/darqcube.yml. A field
+# added there is accepted here after `make schema` — no code change. A field
+# NOT in the schema fails `make seed`, so a typo cannot be silently dropped.
+#
+# This file is the whole record: a field left out is reset to its default on
+# the next seed, even if it was set in the Infrahub UI.
 #
 # The three below are EXAMPLES. Replace them with your real devices.
 # ---------------------------------------------------------------------------

@@ -249,3 +249,28 @@ def test_a_device_lock_is_reused_not_recreated():
     """A fresh lock per call would lock nothing at all."""
     assert tasks.device_lock("cr1") is tasks.device_lock("cr1")
     assert tasks.device_lock("cr1") is not tasks.device_lock("cr2")
+
+
+# --- where automation connects ----------------------------------------------
+
+class _Val:
+    def __init__(self, value):
+        self.value = value
+
+
+class _Node:
+    def __init__(self, ip=None, host=None):
+        self.management_ip = _Val(ip)
+        self.management_host = _Val(host)
+
+
+@pytest.mark.parametrize("node, expected", [
+    (_Node(ip="10.0.0.11/24"), "10.0.0.11"),
+    (_Node(ip="10.0.0.11", host="cr1.lab.example"), "cr1.lab.example"),
+    (_Node(host="cr1.lab.example"), "cr1.lab.example"),
+    (_Node(), ""),
+])
+def test_management_address_matches_the_renderer(node, expected):
+    """SSH goes where the collectors poll: the DNS name when set, else the IP
+    without its prefix — and an empty management_ip must not raise."""
+    assert tasks.management_address(node) == expected

@@ -110,6 +110,20 @@ def invalidate_inventory() -> None:
         _cache["at"] = 0.0
 
 
+def management_address(node) -> str:
+    """Where to SSH: management_host when set, else management_ip.
+
+    Same rule as render-inventory.py's target_of(), so the collectors and
+    automation always reach a device at the same address. management_ip is an
+    IPHost and may carry a prefix; connecting to "10.0.0.1/24" fails with a
+    name-resolution error rather than anything obvious.
+    """
+    def value(attr):
+        return str(getattr(getattr(node, attr, None), "value", None) or "").strip()
+
+    return value("management_host") or value("management_ip").split("/")[0]
+
+
 def _build_nornir():
     """Build a Nornir instance from the live Infrahub inventory.
 
@@ -117,6 +131,11 @@ def _build_nornir():
     relationship peers it never fetched into the SDK store, so a mapping like
     "site.name" yields None and slugify() raises TypeError before a single host
     loads. Grouping is done here, after init, instead.
+
+    `hostname` is not a schema_mapping either: the address is management_host
+    when set, else management_ip, and a mapping can name only one attribute.
+    It would also break on an empty management_ip — the plugin converts IPHost
+    with `value.ip`, and None raises AttributeError, failing the whole load.
     """
     nr = InitNornir(
         runner={"plugin": "threaded", "options": {"num_workers": CONCURRENCY}},
@@ -128,7 +147,6 @@ def _build_nornir():
                 "branch": BRANCH,
                 "host_node": {"kind": "NetworkDevice"},
                 "schema_mappings": [
-                    {"name": "hostname", "mapping": "management_ip.value"},
                     {"name": "platform", "mapping": "platform.value"},
                 ],
             },
@@ -138,9 +156,7 @@ def _build_nornir():
 
     plats = platforms()
     for host in nr.inventory.hosts.values():
-        # management_ip is an IPHost and may carry a prefix; polling "10.0.0.1/24"
-        # would fail with a name-resolution error rather than anything obvious.
-        host.hostname = str(host.hostname or "").split("/")[0]
+        host.hostname = management_address(host.data.get("InfrahubNode"))
         infrahub_platform = host.platform
         host.data["infrahub_platform"] = infrahub_platform
         # Infrahub's platform dropdown -> the netmiko device_type.

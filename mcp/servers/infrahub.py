@@ -18,10 +18,23 @@ _DEVICE_FIELDS = """
   role { value }
   platform { value }
   management_ip { value }
+  management_host { value }
+  environment { value }
   status { value }
   telemetry_mode { value }
-  site { node { name { value } } }
+  site { node { name { value } site_type { value } region { value } } }
+  tags { edges { node { name { value } } } }
 """
+
+
+def _devices(edges: list) -> list[dict]:
+    """Device nodes, with tags as a plain list of names rather than edges."""
+    devices = []
+    for edge in edges:
+        node = edge["node"]
+        node["tags"] = [t["node"]["name"] for t in (node.get("tags") or {}).get("edges", [])]
+        devices.append(node)
+    return devices
 
 
 def _query(gql: str, variables: dict | None = None):
@@ -35,10 +48,11 @@ def _query(gql: str, variables: dict | None = None):
 def list_devices() -> dict:
     """List every network device in the source of truth.
 
-    Returns each device's name, role, platform, management IP, status and site.
+    Returns each device's name, role, platform, management address, environment,
+    status, site and tags.
     """
     data = _query("{ NetworkDevice { edges { node { %s } } } }" % _DEVICE_FIELDS)
-    devices = [e["node"] for e in data["NetworkDevice"]["edges"]]
+    devices = _devices(data["NetworkDevice"]["edges"])
     return {"count": len(devices), "devices": devices}
 
 
@@ -58,7 +72,7 @@ def get_device(device: str) -> dict:
     edges = data["NetworkDevice"]["edges"]
     if not edges:
         return {"found": False, "device": device, "error": "not in the source of truth"}
-    return {"found": True, **edges[0]["node"]}
+    return {"found": True, **_devices(edges)[0]}
 
 
 @mcp.tool()
@@ -74,5 +88,5 @@ def get_site_devices(site: str) -> dict:
         % _DEVICE_FIELDS,
         {"s": site},
     )
-    devices = [e["node"] for e in data["NetworkDevice"]["edges"]]
+    devices = _devices(data["NetworkDevice"]["edges"])
     return {"site": site, "count": len(devices), "devices": devices}

@@ -67,8 +67,13 @@ logs: ## Follow logs, optionally for one service:  make logs SVC=logstash
 schema: ## Load the Infrahub schema (source-of-truth/schema/)
 	@./source-of-truth/scripts/load-schema.sh
 
-seed: ## Apply source-of-truth/devices/*.yml to Infrahub (idempotent)
-	$(SOT) python /scripts/seed.py
+# Seed onto an Infrahub branch for review:  make seed BRANCH=onboard-batch-01
+# Only seed takes it: render and automation read main, so nothing staged on a
+# branch is polled or connected to until the Proposed Change is merged.
+BRANCH ?= main
+
+seed: ## Apply source-of-truth/devices/*.yml to Infrahub. BRANCH=x stages it for review
+	$(COMPOSE) exec -T -e INFRAHUB_BRANCH=$(strip $(BRANCH)) infrahub-server python /scripts/seed.py
 
 render: ## Infrahub -> Telegraf + Logstash configs. Run after any device change.
 	$(SOT) python /scripts/render-inventory.py

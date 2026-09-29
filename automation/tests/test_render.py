@@ -37,10 +37,11 @@ class Rel:
 class Device:
     """Stands in for an infrahub_sdk InfrahubNode."""
 
-    def __init__(self, name, platform, ip, site, role, mode="snmp"):
+    def __init__(self, name, platform, ip, site, role, mode="snmp", host=None):
         self.name = Attr(name)
         self.platform = Attr(platform)
         self.management_ip = Attr(ip)
+        self.management_host = Attr(host)
         self.role = Attr(role)
         self.telemetry_mode = Attr(mode)
         self.site = Rel(site)
@@ -124,6 +125,33 @@ def test_identity_table_keyed_by_both_ip_and_name(monkeypatch, tmp_path):
     assert identity["cr1"]["device"] == "cr1"
     assert identity["cr1"]["site"] == "hq"
     assert identity["mt-01"]["role"] == "wan"
+
+
+def test_management_host_is_polled_instead_of_the_ip(monkeypatch, tmp_path):
+    devices = [Device("cr1", "ios_xe", "10.0.0.11", "hq", "core-wan", host="cr1.lab.example")]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    mod.main()
+    body = (tmp_path / "snmp-interfaces.conf").read_text()
+    assert '"udp://cr1.lab.example:161"' in body
+    assert "10.0.0.11" not in body
+
+
+def test_polled_by_name_still_resolves_flows_by_ip(monkeypatch, tmp_path):
+    """SNMP metrics key on the agent (the DNS name); flow records key on the
+    exporter's source address. Both must find the same identity."""
+    devices = [Device("cr1", "ios_xe", "10.0.0.11/24", "hq", "core-wan", host="cr1.lab.example")]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    mod.main()
+    identity = json.loads((tmp_path / "devices.json").read_text())
+    assert identity["cr1.lab.example"]["device"] == "cr1"
+    assert identity["10.0.0.11"]["device"] == "cr1"
+
+
+def test_device_with_only_a_management_host(monkeypatch, tmp_path):
+    devices = [Device("cr1", "ios_xe", None, "hq", "core-wan", host="cr1.lab.example")]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    assert mod.main() == 0
+    assert '"udp://cr1.lab.example:161"' in (tmp_path / "snmp-interfaces.conf").read_text()
 
 
 def test_memory_kind_reaches_the_config(monkeypatch, tmp_path):

@@ -58,10 +58,16 @@ def _readable(path: str) -> None:
     os.chmod(path, 0o644)
 
 
-def target_of(dev) -> str:
-    """The address to poll. Strips any /prefix an IPHost attribute carries."""
-    ip = str(getattr(dev.management_ip, "value", "") or "").strip()
+def ip_of(dev) -> str:
+    """management_ip without the /prefix an IPHost attribute may carry."""
+    ip = str(getattr(getattr(dev, "management_ip", None), "value", "") or "").strip()
     return ip.split("/")[0]
+
+
+def target_of(dev) -> str:
+    """The address to poll: management_host when set, else management_ip."""
+    host = str(getattr(getattr(dev, "management_host", None), "value", "") or "").strip()
+    return host or ip_of(dev)
 
 
 def fetch_devices(client):
@@ -160,15 +166,19 @@ def main() -> int:
             warnings.append(f"{name}: platform '{platform}' has no entry in platforms.yml — skipped")
             continue
         if not target:
-            warnings.append(f"{name}: no management_ip — skipped")
+            warnings.append(f"{name}: no management_ip or management_host — skipped")
             continue
 
-        # The identity table is keyed by BOTH the poll target and the device
-        # name, because Telegraf matches on the agent's IP while Logstash
-        # matches on the hostname a syslog line carries.
+        # The identity table is keyed by the poll target AND the device name,
+        # because Telegraf's SNMP metrics match on the agent address while
+        # Logstash matches on the hostname a syslog line carries. When the
+        # target is a DNS name, the IP is a key too: flow records match on
+        # the exporter's source address, which is never a name.
         record = {"device": name, "site": site, "role": role, "platform": platform}
         identity[target] = record
         identity[name] = record
+        if ip_of(dev):
+            identity[ip_of(dev)] = record
 
         if mode == "gnmi":
             if not platforms[platform].get("gnmi"):

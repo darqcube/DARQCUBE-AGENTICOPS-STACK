@@ -13,6 +13,10 @@
 #    A required attribute with no default makes every EXISTING node
 #    non-compliant the moment the field lands.
 #
+# `make seed` reads its field list from this schema, so a new attribute or
+# relationship is accepted from source-of-truth/devices/*.yml with no code
+# change: edit here, `make schema`, then set the value in the YAML.
+#
 # Device credentials are deliberately NOT modelled here. They live in .env.
 # ---------------------------------------------------------------------------
 version: "1.0"
@@ -35,6 +39,20 @@ nodes:
       - name: description
         kind: Text
         optional: true
+      - name: site_type
+        kind: Dropdown
+        default_value: branch
+        description: What kind of location this is. A branch office is a site_type, not an Infrahub branch.
+        choices:
+          - name: hq
+          - name: branch
+          - name: datacenter
+          - name: pop
+          - name: lab
+      - name: region
+        kind: Text
+        optional: true
+        description: Free-text grouping, e.g. north. Used for onboarding batches and views, not as a label.
     relationships:
       - name: devices
         peer: NetworkDevice
@@ -67,6 +85,10 @@ nodes:
           - name: wan
           - name: edge
           - name: firewall
+          - name: core-wan
+          - name: core-dc
+          - name: internet-edge
+          - name: branch-wan
 
       - name: platform
         kind: Dropdown
@@ -81,7 +103,23 @@ nodes:
 
       - name: management_ip
         kind: IPHost
-        description: Address the stack polls and connects to.
+        optional: true
+        description: Address the stack polls and connects to, unless management_host is set.
+
+      - name: management_host
+        kind: Text
+        optional: true
+        description: DNS name to poll and connect to. Wins over management_ip. One of the two is required.
+
+      - name: environment
+        kind: Dropdown
+        default_value: production
+        description: Deployment environment. A dropdown, not a tag, so a typo is rejected.
+        choices:
+          - name: production
+          - name: staging
+          - name: lab
+          - name: demo
 
       - name: status
         kind: Dropdown
@@ -116,3 +154,9 @@ nodes:
         optional: false
         cardinality: one
         kind: Attribute
+      - name: tags
+        peer: BuiltinTag
+        optional: true
+        cardinality: many
+        kind: Attribute
+        description: Free-form grouping for people browsing. Never a metric or log label.

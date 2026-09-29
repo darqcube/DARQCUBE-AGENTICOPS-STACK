@@ -23,12 +23,19 @@ devices:
   - name: cr2                      # == the device's hostname / sysname / identity
     site: hq                       # must exist in sites.yml
     role: core                     # core | distribution | access | wan | edge | firewall
+                                   # | core-wan | core-dc | internet-edge | branch-wan
     platform: ios_xe               # ios_xe | vrp | routeros  (see platforms.yml)
     management_ip: 10.0.0.12
+    # management_host: cr2.example.net   # optional DNS name, used instead of the IP
+    environment: production        # production (default) | staging | lab | demo
     telemetry_mode: snmp           # snmp (default) | gnmi — gnmi is ios_xe only
     flow_enabled: true             # does it export NetFlow/IPFIX?
     description: Second core router
 ```
+
+Every field is defined by the schema, not by the seed script — see
+[administration/infrahub-guide.md](../administration/infrahub-guide.md) for the
+full list, tags, and how to add a field.
 
 Adding a site first, if you need one — `source-of-truth/devices/sites.yml`:
 

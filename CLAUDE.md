@@ -145,6 +145,8 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Infrahub compose | Prefect is embedded in the Infrahub image — no separate Prefect image |
 | Infrahub API | every attribute comes wrapped as `{"value": x}` — flatten before returning it to a model |
 | Infrahub SDK | `prefetch_relationships=True` or `node.site.peer` raises `NodeNotFoundError` |
+| Seeding | `seed.py` reads its field list from the **loaded schema** and rejects unknown keys. Never add a hardcoded field list back — the old one silently dropped every field it did not name, so `make seed` reported success while Infrahub never got the value |
+| Device address | `management_host` (DNS) wins over `management_ip`; `target_of()` in the renderer and `management_address()` in `tasks.py` must agree. The identity table also keys the IP, because flow records arrive from the source address, never a name |
 | Nornir | omit `group_mappings` in the Infrahub inventory plugin — it resolves peers it never fetched, so `slugify()` raises `TypeError` before any host loads |
 | Telegraf | `--watch-config poll`, never inotify — inotify is unreliable across a volume mount |
 | Loki | labels are `device, site, role, severity` **only**. Message body and Cisco mnemonics stay fields — promoting a mnemonic to a label multiplies stream count by the number of message types |
