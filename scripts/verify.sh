@@ -54,6 +54,7 @@ fi
 
 devices=$(curl -sf --max-time 10 "http://localhost:${INFRAHUB_PORT}/graphql" \
   -H "X-INFRAHUB-KEY: ${INFRAHUB_ADMIN_TOKEN:-}" \
+  -H "Content-Type: application/json" \
   -d '{"query":"{NetworkDevice{count}}"}' 2>/dev/null | grep -o '"count":[0-9]*' | cut -d: -f2)
 if [[ -z "${devices:-}" ]]; then
   bad "cannot query Infrahub — is the schema loaded? (make schema)"

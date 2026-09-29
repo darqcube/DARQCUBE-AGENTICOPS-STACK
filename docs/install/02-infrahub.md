@@ -55,6 +55,7 @@ make render    # push to the collectors
 source .env
 curl -s "localhost:${INFRAHUB_PORT}/graphql" \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"query":"{NetworkDevice{edges{node{name{value} platform{value}}}}}"}'
 ```
 

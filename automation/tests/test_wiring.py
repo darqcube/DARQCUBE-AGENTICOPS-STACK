@@ -81,7 +81,8 @@ def test_loki_carries_the_device_label(env, http, compose_ps):
     Infrahub-rendered identity table. One assertion covers the whole syslog
     path end to end.
     """
-    labels = http(f"http://localhost:{env['LOKI_PORT']}/loki/api/v1/labels", retries=3)["data"]
+    # Loki omits "data" entirely, rather than sending [], until it has a stream.
+    labels = http(f"http://localhost:{env['LOKI_PORT']}/loki/api/v1/labels", retries=3).get("data", [])
     if not labels:
         pytest.skip("Loki has received no logs yet")
     assert "device" in labels, (

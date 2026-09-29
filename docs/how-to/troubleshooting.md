@@ -21,6 +21,7 @@ Work down the chain — each step rules out one link.
 # 1. Is it in the source of truth, and active?
 curl -s localhost:${INFRAHUB_PORT:-8000}/graphql \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"query":"{NetworkDevice(name__value:\"cr1\"){edges{node{name{value} status{value}}}}}"}'
 
 # 2. Did it reach the collector config?   (did you run `make render`?)

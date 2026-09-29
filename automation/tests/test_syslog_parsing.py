@@ -44,6 +44,11 @@ def parsed(tmp_path_factory):
 
     work = tmp_path_factory.mktemp("ls")
     (work / "pipeline").mkdir()
+    # pytest makes its temp dirs 0700. Logstash runs as uid 1000, so on any
+    # host whose user is not uid 1000 it cannot open devices.yml and the
+    # pipeline refuses to start. Open the dirs up; the files default to 0644.
+    for d in (work, work / "pipeline"):
+        d.chmod(0o755)
 
     # Reuse the production filter block verbatim; only input and output are
     # swapped, so a test can never pass against a pipeline the stack doesn't use.
@@ -81,7 +86,10 @@ def parsed(tmp_path_factory):
         for line in result.stdout.splitlines()
         if line.startswith("{")
     ]
-    assert events, f"logstash produced no events:\n{result.stderr[-2000:]}"
+    # Logstash logs to stdout, so its errors are there, not in stderr.
+    assert events, (
+        f"logstash produced no events:\n{(result.stdout + result.stderr)[-2000:]}"
+    )
     return {e.get("device"): e for e in events}
 
 

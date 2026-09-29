@@ -174,7 +174,11 @@ services:
       - "${NETFLOW_PORT:-2055}:2055/udp"   # NetFlow v5 / v9
       - "${IPFIX_PORT:-4739}:4739/udp"     # IPFIX
     healthcheck:
-      test: ["CMD-SHELL", "telegraf --config /etc/telegraf/telegraf.conf --test --test-wait 1 >/dev/null 2>&1 || exit 1"]
+      # Probe the running agent's own output, not `telegraf --test`: that
+      # starts a second agent (which missed telegraf.d/ and so found "no
+      # inputs"), and it polls every device — one unreachable router would
+      # mark the collector unhealthy.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9273/metrics || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 5

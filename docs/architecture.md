@@ -333,6 +333,7 @@ host, then restart or reload the service.
 | `source-of-truth/schema/` | `infrahub-server` | `/schema` |
 | `source-of-truth/devices/` | `infrahub-server` | `/devices` |
 | `source-of-truth/scripts/` | `infrahub-server` | `/scripts` — seed and render run here |
+| `observability/telegraf/profiles/` | `infrahub-server` | `/profiles` — SNMP templates the renderer expands per shard |
 | `observability/prometheus/` | `prometheus` | config and rules |
 | `observability/loki/` | `loki` | `loki.yml` |
 | `observability/grafana/provisioning/` | `grafana` | datasources and dashboards |

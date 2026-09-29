@@ -57,6 +57,7 @@ Logstash re-reads the device table within 60 seconds. No restart needed.
 # In the source of truth
 curl -s localhost:${INFRAHUB_PORT:-8000}/graphql \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"query":"{NetworkDevice(name__value:\"cr2\"){edges{node{name{value}}}}}"}'
 
 # Being polled (allow one SNMP interval)
