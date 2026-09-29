@@ -152,3 +152,31 @@ def test_high_cardinality_fields_never_become_labels():
     allowed = {"device", "site", "role", "severity", "platform"}
     declared = set(line.split("[")[1].split("]")[0].replace('"', "").replace(" ", "").split(","))
     assert declared == allowed, f"Loki label set changed: {declared}"
+
+
+# --- the line Loki stores ----------------------------------------------------
+# Loki keeps one field as the log line. It used to be `msg` alone, so the
+# mnemonic was neither a label nor in the line: `|= "CONFIG_I"` matched nothing
+# although the event had arrived. The line now carries it, in vendor notation.
+
+def test_cisco_line_keeps_the_mnemonic(parsed):
+    assert parsed["cr1"]["line"] == "%SSH-5-SSH2_SESSION: SSH2 Session request from 10.0.0.5"
+
+
+def test_huawei_line_keeps_the_mnemonic(parsed):
+    assert parsed["sw-hw-01"]["line"].startswith("IFNET/4/LINK_STATE: ")
+    assert "GE0/0/1" in parsed["sw-hw-01"]["line"]
+
+
+def test_mikrotik_line_keeps_the_topics(parsed):
+    assert parsed["mt-01"]["line"].startswith("system,info: user admin logged in")
+
+
+def test_unparsed_line_is_stored_as_is(parsed):
+    assert parsed["unparsed"]["line"] == "this line matches nothing in particular"
+
+
+def test_loki_stores_the_rebuilt_line():
+    """Pointing message_field back at `msg` silently drops every mnemonic."""
+    text = PIPELINE.read_text()
+    assert 'message_field => "line"' in text

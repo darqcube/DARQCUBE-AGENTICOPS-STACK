@@ -47,9 +47,8 @@ split is deliberate; don't merge them.
 - **One credential pair** — `DEVICE_USER` / `DEVICE_PASSWORD` — for Nornir and Netmiko. Don't
   add per-tool variants; they drift apart and then nobody knows which one is real.
 - **Device credentials never go in Infrahub.** `.env` only.
-- **The inventory is per deployment, never in the repo.** `source-of-truth/devices/*.yml` is
-  gitignored like `site.yml`; only `devices/examples/` is tracked, and `make seed` never reads it.
-  Don't put a real site, device or lab name in docs, tests or examples.
+- **The inventory is per deployment, never in the repo** — gitignored like `site.yml`; `make seed`
+  never reads `devices/examples/`. No real site, device or lab names in docs, tests or examples.
 - **Adding a vendor is six edits**: `platforms.yml`, a Logstash grok file, a TextFSM template (if
   `ntc-templates` has none), a normaliser in `automation/assurance/normalise.py`, the `platform`
   dropdown in the Infrahub schema, and an onboarding doc. All six, or the vendor is
@@ -148,15 +147,15 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Infrahub compose | Prefect is embedded in the Infrahub image — no separate Prefect image |
 | Infrahub API | every attribute comes wrapped as `{"value": x}` — flatten before returning it to a model |
 | Infrahub SDK | `prefetch_relationships=True` or `node.site.peer` raises `NodeNotFoundError` |
-| Seeding | `seed.py` reads its field list from the **loaded schema** and rejects unknown keys. Never add a hardcoded field list back — the old one silently dropped every field it did not name, so `make seed` reported success while Infrahub never got the value |
-| Device address | `management_host` (DNS) wins over `management_ip`; `target_of()` in the renderer and `management_address()` in `tasks.py` must agree. The identity table also keys the IP, because flow records arrive from the source address, never a name |
+| Seeding | `seed.py` is schema-driven: never give it a field list, and an unknown key must fail — silently dropping it reports success while Infrahub never gets the value |
+| Device address | `management_host` wins over `management_ip`; the renderer and Nornir must agree on which one they use |
 | Nornir | omit `group_mappings` in the Infrahub inventory plugin — it resolves peers it never fetched, so `slugify()` raises `TypeError` before any host loads |
 | Telegraf | `--watch-config poll`, never inotify — inotify is unreliable across a volume mount |
-| Loki | labels are `device, site, role, severity` **only**. Message body and Cisco mnemonics stay fields — promoting a mnemonic to a label multiplies stream count by the number of message types |
+| Loki | labels are `device, site, role, severity` **only**. Message body and Cisco mnemonics stay fields — promoting a mnemonic to a label multiplies stream count by the number of message types. The mnemonic must stay in the stored log line, or it is not searchable at all |
 | Prometheus | never let per-flow IPs or ports become labels; the flow config drops them on purpose |
 | TextFSM | an empty parse must **raise** — `[]` and "device has nothing to report" are indistinguishable, so a missing template silently returns a wrong answer |
 | Cisco syslog | IOS does **not** emit conformant RFC3164 (counter and hostname come before the timestamp). A strict parser drops every line silently |
-| SNMP security | Telegraf takes one `sec_level` per `[[inputs.snmp]]`, so the renderer writes separate inputs per device `snmp_security` (`SECURITY` in `render-inventory.py`; the templates carry `__SECURITY__`). `auth_no_priv` is per device for images that cannot encrypt — never a fleet-wide fallback |
+| SNMP security | set per device (`snmp_security`). Never lower the fleet's level to accommodate one device that cannot encrypt |
 | MikroTik SNMP | no vendor CPU MIB — uses HOST-RESOURCES-MIB `hrProcessorLoad` |
 | UDP buffers | the most consequential host setting. syslog and flow are UDP: an undersized `net.core.rmem_max` drops datagrams with **no error anywhere**, and the application's larger request is clamped without complaint. Only `netstat -su` shows it |
 | install.py | stdlib only — it runs before pip has been used. A test asserts no third-party imports |

@@ -95,6 +95,14 @@ The message body and mnemonics stay searchable as content:
 {device="cr1"} |= "LINK_STATE"
 ```
 
+That works only because the pipeline's **Line** stage puts the mnemonic back
+into the stored log line — Loki keeps nothing else. A pattern that captures
+`facility`, `severity_code` and `mnemonic` gets Cisco notation
+(`%FAC-5-MNEMONIC: msg`) with no further work; one that captures `topics` gets
+`topics: msg`; anything else is stored as bare `msg`. If the vendor writes its
+mnemonic differently, as Huawei does, add a branch to that stage and a
+`line` assertion to `automation/tests/test_syslog_parsing.py`.
+
 ## Severity
 
 Cisco and Huawei carry severity in the message body (`%SSH-5-...`). RouterOS

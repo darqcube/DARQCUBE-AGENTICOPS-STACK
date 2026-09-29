@@ -64,7 +64,7 @@ that cannot succeed:
 | 2 | configure | creates `.env`, generates the secrets, prompts for the five values only you know |
 | 3 | build | builds the Logstash and automation images |
 | 4 | start | `docker compose up -d --wait` — blocks until every container is healthy |
-| 5 | initialise | loads the Infrahub schema, seeds devices, renders the collector configs |
+| 5 | initialise | loads the Infrahub schema; seeds and renders any devices you have added — none on a fresh clone, which ships only examples |
 | 6 | verify | creates a venv and runs pytest against the running stack |
 | 7 | report | where everything is, and what to point your devices at |
 
@@ -201,6 +201,11 @@ is the key that joins a log line to a metric to an Infrahub record.
 ```bash
 make test-devices     # once devices are configured
 ```
+
+Adding sites and devices — in the Infrahub UI or in YAML, reviewed on an
+Infrahub branch before it reaches the collectors — and checking every stage
+end to end: [administration/infrahub-guide.md](administration/infrahub-guide.md).
+The web UIs and their ports: [architecture.md](architecture.md#web-uis-and-apis).
 
 ---
 

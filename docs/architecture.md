@@ -211,6 +211,33 @@ That is the whole reason a Grafana panel, a PromQL alert and a LogQL query line
 up on the same device. Without it you have three tools that each know a device
 by a different name.
 
+### How a change reaches the collectors
+
+```mermaid
+flowchart LR
+  E["UI edit, or<br/>make seed BRANCH=x"] --> B["Infrahub branch<br/><i>isolated</i>"]
+  B --> P["Proposed Change<br/><i>review the diff</i>"]
+  P --> M["main"]
+  M --> R["make render"]
+  R --> C["Telegraf · Logstash<br/>automation"]
+```
+
+Render and automation read only `main`, and only `active` devices. A device
+staged on an unmerged branch is never polled or connected to, which makes the
+merge the review gate. `make seed` validates every record against the loaded
+schema before writing anything, so the YAML cannot carry a field Infrahub does
+not know.
+
+What render writes for each device is decided by three of its attributes:
+
+| Attribute | Decides |
+|---|---|
+| `management_host` / `management_ip` | the address polled and SSHed to — the DNS name when set. The identity table also keys the IP, because flow records arrive from a source address, never a name |
+| `telemetry_mode` | SNMP or gNMI — never both |
+| `snmp_security` | which SNMP input polls it. Telegraf takes one security level per input, so authNoPriv devices (images that cannot encrypt) get separate inputs rather than lowering the fleet |
+
+Step by step: [administration/infrahub-guide.md](administration/infrahub-guide.md).
+
 ## Ingest ownership
 
 Each feed has exactly one owner. No feed is collected twice.
@@ -340,13 +367,17 @@ and deleted by `make clean`.
 
 **`neo4j-data` is only irreplaceable if Infrahub was edited through its UI.**
 Everything that arrived through `source-of-truth/devices/*.yml` rebuilds with
-`make schema && make seed`. That is the strongest argument for making every
-device change through the YAML: the repo, not the volume, stays the source of
-truth for the source of truth.
+`make schema && make seed` — which is the argument for making production
+device changes through the YAML.
 
-**What to back up**, in order: `neo4j-data` and `task-db-data` if Infrahub has
-been edited directly; `prometheus-data` and `loki-data` if history matters.
-Everything else regenerates.
+Those files are **not in the repo**: they are each deployment's own inventory,
+gitignored like `.env` and `site.yml`, and exist only on the VM. So the YAML is
+the source of truth for the source of truth only if it is backed up.
+
+**What to back up**, in order: `.env`, `site.yml` and
+`source-of-truth/devices/*.yml` — small, and the only copy; `neo4j-data` and
+`task-db-data` if Infrahub has been edited directly; `prometheus-data` and
+`loki-data` if history matters. Everything else regenerates.
 
 ### Bind mounts — the configuration
 

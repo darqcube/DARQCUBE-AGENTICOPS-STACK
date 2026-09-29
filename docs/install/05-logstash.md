@@ -28,7 +28,7 @@ docker compose build logstash
 | `observability/logstash/samples/syslog-samples.txt` | test fixtures |
 | `.env` → `SYSLOG_PORT` | listening port (default 1514) |
 
-## The pipeline, in five stages
+## The pipeline, in six stages
 
 1. **Input** — UDP on 514 inside the container.
 2. **Parse** — vendor patterns in order, catch-all last.
@@ -37,7 +37,13 @@ docker compose build logstash
 4. **Enrich** — `translate` against `generated/devices.yml`, matching on
    hostname with a source-IP fallback. Re-read every 60s, so `make render`
    propagates without a restart.
-5. **Output** — to Loki, with a fixed label list.
+5. **Line** — rebuilds the stored log line in vendor notation, mnemonic
+   included: `%SYS-5-CONFIG_I: …`, `IFNET/4/LINK_STATE: …`, `system,info: …`.
+   Loki keeps only this line plus the labels; anything in neither is gone.
+6. **Output** — to Loki, with a fixed label list.
+
+The pipeline is not reloaded automatically — after changing it,
+`make restart SVC=logstash`.
 
 ## Unparseable lines are kept
 
@@ -77,6 +83,8 @@ curl -sSG localhost:${LOKI_PORT}/loki/api/v1/query_range --data-urlencode 'query
 |---|---|
 | Everything tagged `_grokparsefailure` | the vendor's format has no pattern |
 | Logs arrive labelled `unknown` | the device's hostname ≠ its Infrahub `name` |
+| Logs arrive, but `\|= "CONFIG_I"` finds nothing | the stored line lacks the mnemonic — stage 5 missing, or the output's `message_field` points at `msg` |
+| A device's logs never arrive | its management interface is in a VRF and the logging host does not name it, so syslog leaves through the global table |
 | A vendor silently falls through | grok word boundaries. `NONNEGINT` is `\b[0-9]+\b` and `WORD` is `\b\w+\b`; in Huawei's `%%01IFNET` there is no boundary between `1` and `I`, so neither matches. Use explicit classes like `(?<x>[0-9]+)`. |
 | No logs at all | check the device points at the VM's routable IP and the right port |
 | Slow start | normal — the JVM takes ~60s |

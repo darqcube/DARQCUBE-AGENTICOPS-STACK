@@ -282,7 +282,8 @@ your devices.
 
 Generate a log line on a device (on Cisco, `conf t` then `end` produces
 `%SYS-5-CONFIG_I`), then in Grafana → **Explore** → **Loki**:
-`{device="<name>"}`. The line arrives within seconds, with `site` and `role`.
+`{device="<name>"}`. The line arrives within seconds, with `site` and `role`,
+and keeps its mnemonic — so `{device="<name>"} |= "CONFIG_I"` finds it.
 
 - `device="unknown"` — the device's hostname does not equal its Infrahub name.
 - Nothing — the device is not sending, or cannot reach the VM on
