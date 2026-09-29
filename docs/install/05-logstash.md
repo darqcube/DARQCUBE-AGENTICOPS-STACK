@@ -2,7 +2,7 @@
 
 ## What it does here
 
-Owns the syslog path end to end: receives on UDP, parses three vendor formats,
+Owns the syslog path end to end: receives on UDP and TCP (same port), parses three vendor formats,
 enriches each line with `device`/`site`/`role` from the Infrahub-rendered table,
 and ships to Loki.
 
@@ -30,7 +30,9 @@ docker compose build logstash
 
 ## The pipeline, in six stages
 
-1. **Input** — UDP on 514 inside the container.
+1. **Input** — UDP and TCP on 514 inside the container. TCP is read one
+   message per line, which is how IOS frames it; a device switches transport
+   with no stack change.
 2. **Parse** — vendor patterns in order, catch-all last.
 3. **Severity** — from the message body where the vendor provides it (Cisco,
    Huawei), otherwise derived from the PRI (MikroTik).
@@ -85,6 +87,7 @@ curl -sSG localhost:${LOKI_PORT}/loki/api/v1/query_range --data-urlencode 'query
 | Logs arrive labelled `unknown` | the device's hostname ≠ its Infrahub `name` |
 | Logs arrive, but `\|= "CONFIG_I"` finds nothing | the stored line lacks the mnemonic — stage 5 missing, or the output's `message_field` points at `msg` |
 | A device's logs never arrive | its management interface is in a VRF and the logging host does not name it, so syslog leaves through the global table |
+| Some lines of a burst missing, no error anywhere | UDP loss on the path — switch the device to TCP. To find where: send a counted burst from the VM and from the device's network, and compare the Logstash container's `Udp: InDatagrams` before and after |
 | A vendor silently falls through | grok word boundaries. `NONNEGINT` is `\b[0-9]+\b` and `WORD` is `\b\w+\b`; in Huawei's `%%01IFNET` there is no boundary between `1` and `I`, so neither matches. Use explicit classes like `(?<x>[0-9]+)`. |
 | No logs at all | check the device points at the VM's routable IP and the right port |
 | Slow start | normal — the JVM takes ~60s |

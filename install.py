@@ -967,7 +967,7 @@ def report(args) -> None:
     Automation API http://{host}:{env.get('AUTOMATION_PORT', '8100')}/docs
 
   {C['b']}Point your devices at{C['x']}
-    syslog         {host}:{env.get('SYSLOG_PORT', '514')}/udp
+    syslog         {host}:{env.get('SYSLOG_PORT', '514')}/udp or /tcp  (tcp: no silent loss)
     NetFlow        {host}:{env.get('NETFLOW_PORT', '2055')}/udp
     IPFIX          {host}:{env.get('IPFIX_PORT', '4739')}/udp
 

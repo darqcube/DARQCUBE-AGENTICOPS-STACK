@@ -13,7 +13,7 @@ Four feeds, and a device needs all four to be fully visible:
 | Feed | Direction | Port | Gives the stack |
 |---|---|---|---|
 | **SNMPv3** | stack polls the device | UDP 161 | CPU, memory, interfaces |
-| **Syslog** | device pushes to the stack | UDP `${SYSLOG_PORT}` | events |
+| **Syslog** | device pushes to the stack | TCP or UDP `${SYSLOG_PORT}` | events |
 | **NetFlow / IPFIX** | device pushes to the stack | UDP `${NETFLOW_PORT}` | traffic volume |
 | **SSH** | stack connects to the device | TCP 22 | config and state, get and put |
 
@@ -43,7 +43,7 @@ the stack stops touching it.
 
 | From | To | Port | For |
 |---|---|---|---|
-| device | Logstash | UDP `${SYSLOG_PORT}` | syslog |
+| device | Logstash | TCP or UDP `${SYSLOG_PORT}` | syslog — TCP where the device supports it |
 | device | Telegraf | UDP `${NETFLOW_PORT}` | NetFlow |
 | device | Telegraf | UDP `${IPFIX_PORT}` | IPFIX |
 

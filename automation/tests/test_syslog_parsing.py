@@ -12,6 +12,7 @@ running stack and no devices.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -180,3 +181,43 @@ def test_loki_stores_the_rebuilt_line():
     """Pointing message_field back at `msg` silently drops every mnemonic."""
     text = PIPELINE.read_text()
     assert 'message_field => "line"' in text
+
+
+# --- transport ----------------------------------------------------------------
+# UDP loses a datagram silently anywhere on the path; bursts go first. TCP is
+# offered on the same port so a device can switch without any stack change.
+
+def test_syslog_is_received_on_udp_and_tcp_on_the_same_port():
+    text = PIPELINE.read_text()
+    inputs = text[text.index("input {"):text.index("filter {")]
+    assert re.search(r"udp\s*\{[^}]*port => 514", inputs, re.S)
+    assert re.search(r"tcp\s*\{[^}]*port => 514", inputs, re.S)
+    # IOS frames syslog over TCP as one message per line (captured from a real
+    # device); octet-counted framing would need a different codec.
+    assert re.search(r"tcp\s*\{[^}]*codec => line", inputs, re.S)
+
+
+def test_compose_publishes_syslog_on_both_transports():
+    import yaml
+
+    svc = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]["logstash"]
+    assert "${SYSLOG_PORT:-514}:514/udp" in svc["ports"]
+    assert "${SYSLOG_PORT:-514}:514/tcp" in svc["ports"]
+
+
+def test_source_ip_fallback_covers_tcp():
+    """The TCP input keeps the sender only in @metadata; without the copy the
+    by-IP fallback silently never matches for TCP senders."""
+    text = PIPELINE.read_text()
+    assert '"[@metadata][input][tcp][source][ip]" => "[host][ip]"' in text
+
+
+def test_ip_fallback_can_overwrite_the_failed_name_lookup():
+    """The name lookup writes its fallback "" to [sot] first; translate never
+    replaces an existing target unless told to. Without override the by-IP
+    match was discarded and the fallback never worked, on either transport —
+    verified against the real image with a hostname absent from the table."""
+    text = PIPELINE.read_text()
+    by_ip = text[text.index('source => "[host][ip]"'):]
+    by_ip = by_ip[:by_ip.index("}")]
+    assert "override => true" in by_ip

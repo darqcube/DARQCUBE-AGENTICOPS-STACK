@@ -287,7 +287,8 @@ and keeps its mnemonic — so `{device="<name>"} |= "CONFIG_I"` finds it.
 
 - `device="unknown"` — the device's hostname does not equal its Infrahub name.
 - Nothing — the device is not sending, or cannot reach the VM on
-  `SYSLOG_PORT`/udp. If its management interface is in a VRF, the logging host
+  `SYSLOG_PORT` (TCP or UDP — prefer TCP, which cannot silently lose a line).
+  If its management interface is in a VRF, the logging host
   must name that VRF, or the device routes syslog through its global table.
 
 ### 7. Automation over SSH

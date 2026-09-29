@@ -202,7 +202,10 @@ services:
       # Same identity table Telegraf uses, read by the translate filter.
       - ../observability/telegraf/generated:/usr/share/logstash/lookup:ro
     ports:
+      # Syslog on both transports, same port: UDP for any device, TCP where a
+      # lost line matters — TCP retransmits, UDP drops silently.
       - "${SYSLOG_PORT:-514}:514/udp"
+      - "${SYSLOG_PORT:-514}:514/tcp"
     depends_on:
       loki: { condition: service_healthy }
     healthcheck:

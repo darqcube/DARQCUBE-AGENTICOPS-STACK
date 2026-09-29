@@ -67,7 +67,7 @@ running. Device-facing ports are the ones that matter:
 
 | Port | Proto | Direction | For |
 |---|---|---|---|
-| 1514 | UDP | device → VM | syslog |
+| 1514 | TCP + UDP | device → VM | syslog |
 | 12055 / 14739 | UDP | device → VM | NetFlow / IPFIX |
 | 161 | UDP | VM → device | SNMP poll |
 | 22 | TCP | VM → device | SSH |

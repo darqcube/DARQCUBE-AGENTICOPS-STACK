@@ -133,7 +133,7 @@ Everything except Grafana and Infrahub is unauthenticated. Anyone who can reach
 `MCP_ALLOW_WRITE` says. Keep these ports on a management network.
 
 Device-facing listeners are not UIs, but for reference: syslog
-`SYSLOG_PORT` (shipped 1514/udp, standard 514), NetFlow `NETFLOW_PORT`
+`SYSLOG_PORT` (shipped 1514, standard 514 — TCP and UDP), NetFlow `NETFLOW_PORT`
 (12055/udp, 2055), IPFIX `IPFIX_PORT` (14739/udp, 4739).
 
 ## Component interdependency
@@ -247,7 +247,7 @@ Each feed has exactly one owner. No feed is collected twice.
 | Metrics | SNMPv3 / UDP 161 | stack pulls | **Telegraf** | Prometheus |
 | Streaming telemetry | gNMI / TCP 57400 | stack pulls | **Telegraf** | Prometheus |
 | Flow records | NetFlow, IPFIX / UDP | device pushes | **Telegraf** | Prometheus |
-| Events | Syslog / UDP 514 | device pushes | **Logstash** | Loki |
+| Events | Syslog / TCP or UDP 514 | device pushes | **Logstash** | Loki |
 | Config & state | SSH / TCP 22 | stack pulls + puts | **Nornir · Netmiko · TextFSM · TTP · pyATS** | files + API |
 
 Telegraf never listens for syslog; Logstash never polls a device.

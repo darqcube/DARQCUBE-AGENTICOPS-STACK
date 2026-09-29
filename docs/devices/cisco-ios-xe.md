@@ -72,9 +72,19 @@ Telegraf reports only a timeout.
 ```
 service timestamps log datetime msec show-timezone
 logging origin-id hostname               ! makes the syslog hostname == the device name
-logging host <SYSLOG_COLLECTOR_IP> transport udp port 1514
+logging host <SYSLOG_COLLECTOR_IP> transport tcp port 1514
 logging trap informational
 ```
+
+**TCP or UDP.** The stack listens on both, on the same port. Prefer TCP: UDP
+has no retransmit, so a datagram lost anywhere on the path is gone with no
+error on either side — and bursts, such as the 3–4 lines of one login, are what
+get lost. Over TCP the device retransmits. IOS sends one message per line in the
+same format either way, so nothing else changes. For UDP, use `transport udp`.
+
+If the management interface is in a VRF, name it —
+`logging host <SYSLOG_COLLECTOR_IP> vrf <MGMT_VRF> transport tcp port 1514` —
+or syslog leaves through the global routing table and is silently lost.
 
 > **IOS does not emit conformant RFC3164.** The real wire format is
 > `<189>264: cr1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: <text>` — a
@@ -137,7 +147,7 @@ conf t
  snmp-server user darqcube DARQCUBE v3 auth sha <AUTH_PASS> priv aes 128 <PRIV_PASS>
  service timestamps log datetime msec show-timezone
  logging origin-id hostname
- logging host <SYSLOG_COLLECTOR_IP> transport udp port 1514
+ logging host <SYSLOG_COLLECTOR_IP> transport tcp port 1514
  logging trap informational
  clock timezone UTC 0 0
  ntp server <NTP_IP>

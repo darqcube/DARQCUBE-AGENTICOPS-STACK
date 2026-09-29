@@ -23,7 +23,7 @@ the boundary.
 |---|---|---|
 | VM → device mgmt subnet | UDP 161 | SNMP polling |
 | VM → device mgmt subnet | TCP 22 | SSH — config and state |
-| device mgmt subnet → VM | UDP 514 (or 1514) | syslog |
+| device mgmt subnet → VM | TCP + UDP 514 (or 1514) | syslog |
 | device mgmt subnet → VM | UDP 2055 (or 12055) | NetFlow |
 | device mgmt subnet → VM | UDP 4739 (or 14739) | IPFIX |
 
@@ -97,6 +97,7 @@ them:
 
 ```yaml
       - "${SYSLOG_PORT:-514}:514/udp"        # unchanged
+      - "${SYSLOG_PORT:-514}:514/tcp"        # unchanged
       - "${NETFLOW_PORT:-2055}:2055/udp"     # unchanged
 ```
 
@@ -111,6 +112,7 @@ sudo ufw allow from 10.20.0.0/24 to any port 22 proto tcp
 sudo ufw allow from 10.20.0.0/24 to any port 3000 proto tcp   # Grafana
 sudo ufw allow from 10.20.0.0/24 to any port 8000 proto tcp   # Infrahub
 sudo ufw allow to any port 514 proto udp                      # syslog, from devices
+sudo ufw allow to any port 514 proto tcp                      # syslog over TCP
 sudo ufw allow to any port 2055 proto udp                     # NetFlow
 sudo ufw allow to any port 4739 proto udp                      # IPFIX
 sudo ufw enable
