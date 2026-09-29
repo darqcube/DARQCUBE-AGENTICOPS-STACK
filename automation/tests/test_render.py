@@ -382,3 +382,26 @@ def test_make_clean_targets_the_directories_compose_writes_to():
     make = (ROOT / "Makefile").read_text()
     clean_dirs = set(re.search(r"^CLEAN_DIRS := (.+)$", make, re.M).group(1).split())
     assert clean_dirs == set(WRITTEN)
+
+
+def test_snmp_templates_never_use_name_override():
+    """name_override renames every metric an input emits, tables included:
+    interface_oper_status arrived as device_oper_status, so every interface
+    alert and dashboard panel matched nothing. Verified against a real device
+    with Telegraf 1.34 — `name` renames only the top-level fields."""
+    for tmpl in (ROOT / "observability/telegraf/profiles").glob("*.tmpl"):
+        assert not re.search(r"^\s*name_override\s*=", tmpl.read_text(), re.M), tmpl.name
+
+
+def test_metric_names_the_rules_and_dashboards_use_are_produced():
+    """Every interface_<field> the alert rules and dashboards query must be a
+    field of the `interface` table, or it silently returns nothing."""
+    tmpl = (ROOT / "observability/telegraf/profiles/_interfaces.conf.tmpl").read_text()
+    table = tmpl.split('name = "interface"', 1)[1]
+    fields = set(re.findall(r'^\s+name = "([a-z_]+)"', table, re.M))
+    used = set()
+    for path in [*(ROOT / "observability/prometheus").rglob("*.yml"),
+                 *(ROOT / "observability/grafana").rglob("*.json")]:
+        used |= set(re.findall(r"\binterface_([a-z_]+)", path.read_text()))
+    assert used, "no interface_* metric referenced — test is not looking in the right place"
+    assert used <= fields, f"queried but never produced: {sorted(used - fields)}"

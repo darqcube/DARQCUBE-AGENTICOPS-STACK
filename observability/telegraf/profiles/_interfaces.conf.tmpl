@@ -23,7 +23,12 @@ __SECURITY__
   timeout = "10s"
   retries = 1
   agent_host_tag = "agent_host"
-  name_override = "device"                    # -> device_uptime
+  # `name`, NOT `name_override`: name_override renames EVERY metric from this
+  # input, tables included, so interface_oper_status became device_oper_status
+  # and every interface alert and panel silently matched nothing. `name`
+  # applies to the top-level fields only -> device_uptime; the table below
+  # keeps its own name -> interface_*.
+  name = "device"
 
   # sysName is collected so a device that is reachable but MISSING from
   # Infrahub still arrives with something identifying. processors.lookup
