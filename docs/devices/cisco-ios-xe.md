@@ -134,19 +134,27 @@ Keep the clock in UTC: the stack's logs, metrics and dashboards all are, and
 Logstash trusts a syslog timestamp only when it names its zone. A synchronised
 clock also drops the leading `*` from every log line.
 
-With a management VRF and NTP by name — a pool such as `0.<cc>.pool.ntp.org` —
-DNS and NTP must both use the VRF, or neither resolves nor reaches the server:
+With a management VRF, NTP must use it or it never reaches the server. Use
+**static server IPs** — resolve a pool zone near the site once, and pick servers
+that answer:
 
 ```
-ip domain lookup
-ip name-server vrf <MGMT_VRF> <DNS_IP>
-ntp server vrf <MGMT_VRF> 0.<cc>.pool.ntp.org
-ntp server vrf <MGMT_VRF> 1.<cc>.pool.ntp.org
-line con 0
- transport preferred none                ! with lookup on, a typo would try DNS
-line vty 0 4
- transport preferred none
+ntp server vrf <MGMT_VRF> <NTP_IP_1> prefer
+ntp server vrf <MGMT_VRF> <NTP_IP_2>
+ntp server vrf <MGMT_VRF> <NTP_IP_3>
+ntp server vrf <MGMT_VRF> <NTP_IP_4>
 ```
+
+```bash
+# on any host: resolve the zone, then keep the servers that reply
+for n in 0 1 2 3; do dig +short $n.<cc>.pool.ntp.org; done | sort -u
+```
+
+Configuring NTP by name instead needs `ip domain lookup` plus a name server in
+the VRF, and `ip domain lookup` has side effects: `show tcp brief` and similar
+commands stall resolving every address, and a mistyped command is tried as a
+hostname. Static IPs avoid both. The cost is that pool servers change over
+time — re-check them now and then, and keep four so one going away is harmless.
 
 `show ntp associations` lists the servers within a minute; `show ntp status`
 reports `Clock is synchronized` after a few polls — typically 5–15 minutes.
