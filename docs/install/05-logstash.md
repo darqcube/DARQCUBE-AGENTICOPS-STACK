@@ -28,21 +28,26 @@ docker compose build logstash
 | `observability/logstash/samples/syslog-samples.txt` | test fixtures |
 | `.env` → `SYSLOG_PORT` | listening port (default 1514) |
 
-## The pipeline, in six stages
+## The pipeline, in seven stages
 
 1. **Input** — UDP and TCP on 514 inside the container. TCP is read one
    message per line, which is how IOS frames it; a device switches transport
    with no stack change.
 2. **Parse** — vendor patterns in order, catch-all last.
-3. **Severity** — from the message body where the vendor provides it (Cisco,
+3. **Event time** — the device's own timestamp becomes the line's time in
+   Loki when it names its zone (Cisco `UTC`, Huawei `+05:00`) and lies within
+   30 min before / 5 min after arrival; otherwise arrival time is kept and the
+   line tagged `clock_skew`. A line delivered late — TCP retransmitting, a
+   device buffering — is filed when it happened, not when it arrived.
+4. **Severity** — from the message body where the vendor provides it (Cisco,
    Huawei), otherwise derived from the PRI (MikroTik).
-4. **Enrich** — `translate` against `generated/devices.yml`, matching on
+5. **Enrich** — `translate` against `generated/devices.yml`, matching on
    hostname with a source-IP fallback. Re-read every 60s, so `make render`
    propagates without a restart.
-5. **Line** — rebuilds the stored log line in vendor notation, mnemonic
+6. **Line** — rebuilds the stored log line in vendor notation, mnemonic
    included: `%SYS-5-CONFIG_I: …`, `IFNET/4/LINK_STATE: …`, `system,info: …`.
    Loki keeps only this line plus the labels; anything in neither is gone.
-6. **Output** — to Loki, with a fixed label list.
+7. **Output** — to Loki, with a fixed label list.
 
 The pipeline is not reloaded automatically — after changing it,
 `make restart SVC=logstash`.
@@ -85,9 +90,10 @@ curl -sSG localhost:${LOKI_PORT}/loki/api/v1/query_range --data-urlencode 'query
 |---|---|
 | Everything tagged `_grokparsefailure` | the vendor's format has no pattern |
 | Logs arrive labelled `unknown` | the device's hostname ≠ its Infrahub `name` |
-| Logs arrive, but `\|= "CONFIG_I"` finds nothing | the stored line lacks the mnemonic — stage 5 missing, or the output's `message_field` points at `msg` |
+| Logs arrive, but `\|= "CONFIG_I"` finds nothing | the stored line lacks the mnemonic — stage 6 missing, or the output's `message_field` points at `msg` |
 | A device's logs never arrive | its management interface is in a VRF and the logging host does not name it, so syslog leaves through the global table |
 | Some lines of a burst missing, no error anywhere | UDP loss on the path — switch the device to TCP. To find where: send a counted burst from the VM and from the device's network, and compare the Logstash container's `Udp: InDatagrams` before and after |
 | A vendor silently falls through | grok word boundaries. `NONNEGINT` is `\b[0-9]+\b` and `WORD` is `\b\w+\b`; in Huawei's `%%01IFNET` there is no boundary between `1` and `I`, so neither matches. Use explicit classes like `(?<x>[0-9]+)`. |
 | No logs at all | check the device points at the VM's routable IP and the right port |
+| Lines filed at arrival time, tagged `clock_skew` | the device clock is off by more than the window, or not UTC — configure NTP on the device |
 | Slow start | normal — the JVM takes ~60s |

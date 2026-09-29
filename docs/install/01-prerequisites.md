@@ -83,12 +83,27 @@ directions and often different firewall rules.
 
 ## Time
 
+The host clock must be NTP-synchronised. Use a pool zone near the site — the
+country zones at https://www.ntppool.org/zone list them:
+
 ```bash
-timedatectl set-ntp true
+sudo sed -i 's/^#\?NTP=.*/NTP=0.<cc>.pool.ntp.org 1.<cc>.pool.ntp.org 2.<cc>.pool.ntp.org 3.<cc>.pool.ntp.org/' \
+  /etc/systemd/timesyncd.conf
+sudo timedatectl set-ntp true && sudo systemctl restart systemd-timesyncd
+timedatectl                 # expect: System clock synchronized: yes
 ```
 
 Metrics and logs are correlated by timestamp. A VM with a drifting clock makes
 a dashboard look wrong in ways that are hard to attribute.
+
+The devices need NTP too, for a second reason: Logstash files a log line under
+the device's own timestamp when it is plausible (see
+[05-logstash.md](05-logstash.md)), and only a synchronised clock is.
+
+> **Container-based VMs** (OrbStack machines, LXC) cannot set the clock —
+> `systemd-timesyncd` refuses to start there by design, and the clock follows
+> the host. Check `timedatectl` still says `synchronized: yes`; configure NTP
+> on the host itself.
 
 ## Check
 

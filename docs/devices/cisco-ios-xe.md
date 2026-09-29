@@ -130,6 +130,27 @@ clock timezone UTC 0 0
 ntp server <NTP_IP>
 ```
 
+Keep the clock in UTC: the stack's logs, metrics and dashboards all are, and
+Logstash trusts a syslog timestamp only when it names its zone. A synchronised
+clock also drops the leading `*` from every log line.
+
+With a management VRF and NTP by name — a pool such as `0.<cc>.pool.ntp.org` —
+DNS and NTP must both use the VRF, or neither resolves nor reaches the server:
+
+```
+ip domain lookup
+ip name-server vrf <MGMT_VRF> <DNS_IP>
+ntp server vrf <MGMT_VRF> 0.<cc>.pool.ntp.org
+ntp server vrf <MGMT_VRF> 1.<cc>.pool.ntp.org
+line con 0
+ transport preferred none                ! with lookup on, a typo would try DNS
+line vty 0 4
+ transport preferred none
+```
+
+`show ntp associations` lists the servers within a minute; `show ntp status`
+reports `Clock is synchronized` after a few polls — typically 5–15 minutes.
+
 ## 6. One-shot block
 
 ```

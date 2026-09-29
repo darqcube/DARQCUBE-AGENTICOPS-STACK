@@ -37,6 +37,22 @@ def _image_exists() -> bool:
     return out.returncode == 0
 
 
+LATE_MIN, SKEW_MIN = 10, 120
+
+
+def cisco_at(host: str, minutes_ago: int) -> str:
+    """A Cisco line stamped `minutes_ago` before now, UTC — generated at run
+    time, because event-time handling is relative to arrival."""
+    import datetime as dt
+    t = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=minutes_ago)
+    stamp = t.strftime("%b %d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
+    return f"<189>7: {host}: {stamp} UTC: %SYS-5-CONFIG_I: Configured from console by admin on vty0\n"
+
+
+def generated_lines() -> str:
+    return cisco_at("late", LATE_MIN) + cisco_at("skewed", SKEW_MIN)
+
+
 @pytest.fixture(scope="module")
 def parsed(tmp_path_factory):
     """Run the real filter block over the samples, return events by device."""
@@ -66,6 +82,8 @@ def parsed(tmp_path_factory):
         "cr1: cr1|hq|core|ios_xe\n"
         "sw-hw-01: sw-hw-01|hq|access|vrp\n"
         "mt-01: mt-01|branch-01|wan|routeros\n"
+        "late: late|hq|core|ios_xe\n"
+        "skewed: skewed|hq|core|ios_xe\n"
     )
 
     result = subprocess.run(
@@ -77,7 +95,7 @@ def parsed(tmp_path_factory):
             "-e", "LS_JAVA_OPTS=-Xms512m -Xmx512m",
             IMAGE, "logstash",
         ],
-        input=SAMPLES.read_text(),
+        input=SAMPLES.read_text() + generated_lines(),
         capture_output=True,
         text=True,
         timeout=300,
@@ -97,7 +115,7 @@ def parsed(tmp_path_factory):
 def test_every_sample_produces_an_event(parsed):
     """Nothing is dropped — including the line nothing matches."""
     assert len(parsed) == len(
-        [l for l in SAMPLES.read_text().splitlines() if l.strip()]
+        [l for l in (SAMPLES.read_text() + generated_lines()).splitlines() if l.strip()]
     )
 
 
@@ -221,3 +239,40 @@ def test_ip_fallback_can_overwrite_the_failed_name_lookup():
     by_ip = text[text.index('source => "[host][ip]"'):]
     by_ip = by_ip[:by_ip.index("}")]
     assert "override => true" in by_ip
+
+
+# --- event time ----------------------------------------------------------------
+# Loki files a line under @timestamp. Arrival time misplaces a line that came in
+# late (TCP retransmits, device buffering); the device's own time is used when it
+# names its zone and is within 30 min before / 5 min after arrival.
+
+def _age_minutes(event) -> float:
+    import datetime as dt
+    ts = dt.datetime.fromisoformat(event["@timestamp"].replace("Z", "+00:00"))
+    return (dt.datetime.now(dt.timezone.utc) - ts).total_seconds() / 60
+
+
+def test_late_line_is_filed_at_the_device_time(parsed):
+    e = parsed["late"]
+    assert "clock_skew" not in e.get("tags", [])
+    assert abs(_age_minutes(e) - LATE_MIN) < 2, e["@timestamp"]
+
+
+def test_implausible_device_time_keeps_arrival_and_is_tagged(parsed):
+    """Two hours off is a wrong clock, not a late line — and Loki would reject
+    a line that old against a live stream."""
+    e = parsed["skewed"]
+    assert "clock_skew" in e["tags"]
+    assert _age_minutes(e) < 5
+
+
+def test_sample_from_months_ago_is_tagged_not_backdated(parsed):
+    assert "clock_skew" in parsed["cr1"]["tags"]
+    assert _age_minutes(parsed["cr1"]) < 5
+
+
+def test_zoneless_timestamp_keeps_arrival_time(parsed):
+    """RouterOS sends local time with no zone — never guessed at."""
+    e = parsed["mt-01"]
+    assert "clock_skew" not in e.get("tags", [])
+    assert _age_minutes(e) < 5
