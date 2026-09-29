@@ -139,6 +139,16 @@ nodes:
           - name: snmp
           - name: gnmi
 
+      - name: snmp_security
+        kind: Dropdown
+        default_value: auth_priv
+        description: SNMPv3 level. auth_no_priv only for images that cannot encrypt, e.g. Cisco L2 IOL.
+        choices:
+          - name: auth_priv
+            label: authPriv (SHA + AES)
+          - name: auth_no_priv
+            label: authNoPriv (SHA only)
+
       - name: flow_enabled
         kind: Boolean
         default_value: false

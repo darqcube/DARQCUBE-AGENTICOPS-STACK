@@ -38,9 +38,21 @@ snmp-server group DARQCUBE v3 auth read DARQCUBE
 snmp-server user darqcube DARQCUBE v3 auth sha <AUTH_PASS>
 ```
 
-The Telegraf profile in this stack is authPriv. Supporting a mixed fleet means
-sharding the SNMP config by security level — do not solve it by lowering the
-whole network.
+Then set the device's `snmp_security` to `auth_no_priv` — in the Infrahub UI or
+`devices.yml` — and `make render`. The renderer writes a separate authNoPriv
+input (`snmp-*-authnopriv.conf`) for such devices only; everything else stays
+authPriv. Do not solve it by lowering the whole network.
+
+Check what an image supports before configuring it — `?` lists the options
+without executing anything:
+
+```
+cs1(config)# snmp-server user x x v3 auth sha y priv ?
+% Unrecognized command                   ! no privacy on this image
+```
+
+A device polled at a level it is not configured for silently drops the request;
+Telegraf reports only a timeout.
 
 ### What is collected
 

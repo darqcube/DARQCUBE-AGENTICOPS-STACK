@@ -18,11 +18,9 @@
   agents = [__AGENTS__]
   version = 3
   sec_name = "${SNMPV3_USER}"
-  sec_level = "authPriv"
-  auth_protocol = "SHA"
-  auth_password = "${SNMPV3_AUTH}"
-  priv_protocol = "AES"
-  priv_password = "${SNMPV3_PRIV}"
+  # sec_level and credentials: filled in per security level by the renderer,
+  # which writes one input per level (a device's snmp_security in Infrahub).
+__SECURITY__
   interval = "${SNMP_INTERVAL}"
   timeout = "10s"
   retries = 1

@@ -27,6 +27,8 @@
 #   environment      production (default) | staging | lab | demo
 #   tags             optional list; each must exist under `tags:` in sites.yml
 #   telemetry_mode   snmp (default) | gnmi — ios_xe only for gnmi
+#   snmp_security    auth_priv (default) | auth_no_priv — only for images with no
+#                    SNMP privacy support (Cisco L2 IOL). Polled from separate inputs.
 #   flow_enabled     true if the device exports NetFlow/IPFIX
 #   status           active (default) | provisioning | maintenance | decommissioned
 #

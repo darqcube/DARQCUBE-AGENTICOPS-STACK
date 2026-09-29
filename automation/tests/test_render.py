@@ -37,11 +37,12 @@ class Rel:
 class Device:
     """Stands in for an infrahub_sdk InfrahubNode."""
 
-    def __init__(self, name, platform, ip, site, role, mode="snmp", host=None):
+    def __init__(self, name, platform, ip, site, role, mode="snmp", host=None, security=None):
         self.name = Attr(name)
         self.platform = Attr(platform)
         self.management_ip = Attr(ip)
         self.management_host = Attr(host)
+        self.snmp_security = Attr(security)
         self.role = Attr(role)
         self.telemetry_mode = Attr(mode)
         self.site = Rel(site)
@@ -152,6 +153,54 @@ def test_device_with_only_a_management_host(monkeypatch, tmp_path):
     mod = load_renderer(monkeypatch, devices, tmp_path)
     assert mod.main() == 0
     assert '"udp://cr1.lab.example:161"' in (tmp_path / "snmp-interfaces.conf").read_text()
+
+
+def test_default_security_is_auth_priv_with_no_placeholder_left(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    mod.main()
+    for conf in tmp_path.glob("*.conf"):
+        body = conf.read_text()
+        assert "__SECURITY__" not in body, conf.name
+        assert 'sec_level = "authPriv"' in body, conf.name
+        assert 'priv_password = "${SNMPV3_PRIV}"' in body, conf.name
+
+
+def test_auth_no_priv_device_gets_its_own_inputs(monkeypatch, tmp_path):
+    """Telegraf has one sec_level per input. A device that cannot encrypt must
+    be polled from a separate authNoPriv input — never by lowering the rest."""
+    devices = [
+        Device("cr1", "ios_xe", "10.0.0.11", "hq", "core-wan"),
+        Device("sw1", "ios_xe", "10.0.0.31", "hq", "core-dc", security="auth_no_priv"),
+    ]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    assert mod.main() == 0
+
+    produced = {p.name for p in tmp_path.glob("*.conf")}
+    assert produced == {
+        "snmp-interfaces.conf", "snmp-ios_xe.conf",
+        "snmp-interfaces-authnopriv.conf", "snmp-ios_xe-authnopriv.conf",
+    }
+    for name in ("snmp-interfaces.conf", "snmp-ios_xe.conf"):
+        body = (tmp_path / name).read_text()
+        assert '"udp://10.0.0.11:161"' in body and "10.0.0.31" not in body
+        assert 'sec_level = "authPriv"' in body
+    for name in ("snmp-interfaces-authnopriv.conf", "snmp-ios_xe-authnopriv.conf"):
+        body = (tmp_path / name).read_text()
+        assert '"udp://10.0.0.31:161"' in body and "10.0.0.11" not in body
+        assert 'sec_level = "authNoPriv"' in body
+        assert "priv_" not in body, "authNoPriv must not carry a privacy protocol or password"
+    # Same identity table either way — labels do not depend on the level.
+    assert json.loads((tmp_path / "devices.json").read_text())["sw1"]["role"] == "core-dc"
+
+
+def test_schema_security_levels_match_the_renderer(monkeypatch, tmp_path):
+    """A level in the schema the renderer cannot write would skip the device."""
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    schema = yaml.safe_load((ROOT / "source-of-truth/schema/darqcube.yml").read_text())
+    device = next(n for n in schema["nodes"] if n["name"] == "Device")
+    attr = next(a for a in device["attributes"] if a["name"] == "snmp_security")
+    assert {c["name"] for c in attr["choices"]} == set(mod.SECURITY)
+    assert attr["default_value"] == mod.DEFAULT_SECURITY
 
 
 def test_memory_kind_reaches_the_config(monkeypatch, tmp_path):

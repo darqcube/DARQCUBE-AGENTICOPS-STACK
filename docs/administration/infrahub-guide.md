@@ -80,6 +80,7 @@ Defined in `source-of-truth/schema/darqcube.yml`, loaded with `make schema`.
 | `tags` | → Tag, many | free-form, e.g. `pci`, `lab`, a customer name |
 | `status` | Dropdown | `active` (default), `provisioning`, `maintenance`, `decommissioned` |
 | `telemetry_mode` | Dropdown | `snmp` (default), `gnmi` |
+| `snmp_security` | Dropdown | `auth_priv` (default), `auth_no_priv` — only for images that cannot encrypt SNMP, e.g. Cisco L2 IOL |
 | `flow_enabled` | Boolean | default `false` |
 
 **Dropdown or tag?** If code or alerting may act on a value, it is a dropdown —

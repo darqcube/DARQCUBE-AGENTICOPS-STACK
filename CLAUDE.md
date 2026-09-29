@@ -156,6 +156,7 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Prometheus | never let per-flow IPs or ports become labels; the flow config drops them on purpose |
 | TextFSM | an empty parse must **raise** — `[]` and "device has nothing to report" are indistinguishable, so a missing template silently returns a wrong answer |
 | Cisco syslog | IOS does **not** emit conformant RFC3164 (counter and hostname come before the timestamp). A strict parser drops every line silently |
+| SNMP security | Telegraf takes one `sec_level` per `[[inputs.snmp]]`, so the renderer writes separate inputs per device `snmp_security` (`SECURITY` in `render-inventory.py`; the templates carry `__SECURITY__`). `auth_no_priv` is per device for images that cannot encrypt — never a fleet-wide fallback |
 | MikroTik SNMP | no vendor CPU MIB — uses HOST-RESOURCES-MIB `hrProcessorLoad` |
 | UDP buffers | the most consequential host setting. syslog and flow are UDP: an undersized `net.core.rmem_max` drops datagrams with **no error anywhere**, and the application's larger request is clamped without complaint. Only `netstat -su` shows it |
 | install.py | stdlib only — it runs before pip has been used. A test asserts no third-party imports |
