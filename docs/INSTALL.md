@@ -60,6 +60,10 @@ ${EDITOR:-nano} site.yml          # the ten values below
 python3 install.py
 ```
 
+Every command in this guide runs **from the repo folder**. A new login starts
+in your home directory, where `python3 install.py` fails with
+`can't open file '/home/<you>/install.py'` — `cd` into the repo first.
+
 That is the whole installation. It runs seven steps and stops at the first one
 that cannot succeed:
 
@@ -87,6 +91,10 @@ python3 install.py --step 6       # run one step on its own
 
 - **Ubuntu Linux** (22.04 or 24.04), 8 vCPU / 24 GB RAM / 200 GB disk for the
   full 400-device ceiling. A lab of a dozen devices runs happily on 4 / 16 / 80.
+  The preflight **warns** about less but carries on — and a VM below the minimum
+  fails part-way through the build (disk full) or at start (out of memory).
+  Resize it in the hypervisor first; growing the disk also needs a step inside
+  Ubuntu — [prerequisites](install/01-prerequisites.md#growing-the-disk).
 - **Docker Engine 24+** with the Compose v2.20+ plugin — `compose.yaml` uses
   `include:`. Install: `curl -fsSL https://get.docker.com | sh`
 - **Kernel UDP buffers.** Devices push syslog and flow over UDP, and an
@@ -211,6 +219,15 @@ Adding sites and devices — in the Infrahub UI or in YAML, reviewed on an
 Infrahub branch before it reaches the collectors — and checking every stage
 end to end: [administration/infrahub-guide.md](administration/infrahub-guide.md).
 The web UIs and their ports: [architecture.md](architecture.md#web-uis-and-apis).
+
+---
+
+## Other ways to run it
+
+| | |
+|---|---|
+| Containers on a Docker engine you already have — OrbStack, Docker Desktop — no VM, no `install.py` | [how-to/run-on-a-docker-engine.md](how-to/run-on-a-docker-engine.md) |
+| Rebuild an existing deployment on a new host, keeping its settings and inventory | [how-to/move-to-a-new-host.md](how-to/move-to-a-new-host.md) |
 
 ---
 

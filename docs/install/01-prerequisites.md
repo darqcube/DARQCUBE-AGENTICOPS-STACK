@@ -16,6 +16,26 @@ Rough metric sizing: 50 devices × 30 interfaces × 8 metrics at 30s polling is
 ~1.5 GB/day. The 15-day default retention is therefore ~20 GB. Raise
 `SNMP_INTERVAL` before raising the disk.
 
+The installer's preflight **warns** below these figures but does not stop. Below
+the minimum the install fails later and less clearly: the image builds fill the
+disk, or Infrahub, Neo4j and Logstash are killed for memory at start.
+
+### Growing the disk
+
+Enlarging the virtual disk in the hypervisor does not enlarge the filesystem.
+Ubuntu's installer also often gives the root volume only half of the disk. Check,
+then grow the partition, the LVM volume and the filesystem in place:
+
+```bash
+df -h /                    # what the filesystem has
+lsblk                      # what the disk has
+sudo growpart /dev/<disk> <n>                          # e.g. /dev/nvme0n1 3 — the partition holding LVM
+sudo pvresize /dev/<disk><partition>                   # e.g. /dev/nvme0n1p3
+sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv # -r grows the filesystem too
+```
+
+`growpart` is in `cloud-guest-utils`, present on Ubuntu Server.
+
 ## OS
 
 Any Linux with a current Docker. Tested on Ubuntu 24.04. macOS works for

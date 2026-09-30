@@ -22,6 +22,11 @@ venv/
 .idea/
 *.swp
 
+# Local compose override — lab networks and addresses. See
+# docs/how-to/run-on-a-docker-engine.md.
+compose.override.yaml
+compose.override.yml
+
 # Site file — contains credentials. Never commit.
 site.yml
 sites/*.yml

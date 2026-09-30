@@ -91,7 +91,11 @@ metrics and logs automatically. `environment`, `region`, `site_type` and `tags`
 are **not** labels: Loki labels stay `device, site, role, severity`.
 
 **Polling by DNS name.** When `management_host` is set, Telegraf polls it and
-automation SSHes to it. Use it when the stack reaches devices by name — or
+automation SSHes to it. The name is resolved **inside the containers**, not on
+the host: a name that answers `ping` on the VM can still fail there. Names ending
+in `.local` are the usual case — Ubuntu's resolver treats them as multicast DNS,
+and a host `ping` may only succeed because a search domain was appended. If in
+doubt, use `management_ip`. Use it when the stack reaches devices by name — or
 when the name is reachable and the IP is not, as in some container labs. Set
 `management_ip` as well if the device exports NetFlow/IPFIX: flow records
 arrive from the device's IP address, and the renderer uses that IP to label

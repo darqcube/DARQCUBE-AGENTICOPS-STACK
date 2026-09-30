@@ -61,6 +61,7 @@ Use the Makefile rather than inventing `docker compose` invocations.
 
 | Command | Does |
 |---|---|
+| `./scripts/prepare-ubuntu.sh` | fresh Ubuntu host: OS packages, Docker, docker group — before `install.py`, needs sudo |
 | `python3 install.py` | the whole install: preflight → configure → build → start → initialise → verify |
 | `python3 install.py --from FILE` | generate `.env` from a site file (defaults to `./site.yml`) |
 | `python3 install.py --check` | preflight only, changes nothing |

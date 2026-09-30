@@ -190,8 +190,23 @@ file is also the record of what you deployed.
 > 8 MiB the collectors ask for. The kernel clamps the request silently, so the
 > loss has no error and no log line. `--fix-sysctl` sets and persists it.
 
+Run every command **from the repo folder**. After logging out and back in you
+start in your home directory, where `python3 install.py` fails with
+`can't open file '/home/<you>/install.py'` — `cd DARQCUBE-AGENTICOPS-STACK` first.
+
+Size the VM before installing — [prerequisites](docs/install/01-prerequisites.md#sizing).
+The preflight warns about a small VM but does not stop; one below the minimum
+fails part-way through the build.
+
 Prefer to do it yourself? The same steps by hand, and what each one is for:
-[docs/INSTALL.md](docs/INSTALL.md#the-manual-way).
+[docs/INSTALL.md](docs/INSTALL.md#3-the-manual-way-if-you-prefer).
+
+Other routes:
+
+| | |
+|---|---|
+| Containers on a Docker engine you already have, no VM | [run-on-a-docker-engine.md](docs/how-to/run-on-a-docker-engine.md) |
+| Move an existing deployment to a new host | [move-to-a-new-host.md](docs/how-to/move-to-a-new-host.md) |
 
 ## What's in the box
 
@@ -284,8 +299,9 @@ seed` updates the source of truth, `make render` pushes it to the collectors.
 | | |
 |---|---|
 | [docs/INSTALL.md](docs/INSTALL.md) | install on a fresh VM — `install.py` or by hand |
+| [docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md) | sites and devices in Infrahub — UI or YAML — and verifying end to end |
 | [docs/scale.md](docs/scale.md) | the 400-device envelope and how to grow |
-| [docs/how-to/](docs/how-to/) | 16 task guides: add a device, change an alert, add a vendor… |
+| [docs/how-to/](docs/how-to/) | 18 task guides: add a device, change an alert, add a vendor… |
 | [docs/install/](docs/install/) | one page per component — config, ports, verify, problems |
 | [docs/devices/](docs/devices/) | device-side config per platform |
 | [docs/architecture.md](docs/architecture.md) | diagrams and the failure table |

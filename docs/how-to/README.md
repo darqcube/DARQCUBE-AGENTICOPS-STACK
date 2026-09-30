@@ -34,6 +34,8 @@ files and commands. If you are looking for *what a component is*, see
 | Add a whole new service to the stack | [add-a-service.md](add-a-service.md) |
 | Connect an AI platform | [connect-an-ai-platform.md](connect-an-ai-platform.md) |
 | Deploy at a customer site (PoC or small production) | [deploy-on-customer-premises.md](deploy-on-customer-premises.md) |
+| Move the deployment to a new host | [move-to-a-new-host.md](move-to-a-new-host.md) |
+| Run on an existing Docker engine, without a VM or `install.py` | [run-on-a-docker-engine.md](run-on-a-docker-engine.md) |
 | Work out why something is not working | [troubleshooting.md](troubleshooting.md) |
 | Find data loss that produces **no error at all** | [fix-silent-data-loss.md](fix-silent-data-loss.md) |
 
