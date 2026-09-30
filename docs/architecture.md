@@ -136,6 +136,85 @@ Device-facing listeners are not UIs, but for reference: syslog
 `SYSLOG_PORT` (shipped 1514, standard 514 — TCP and UDP), NetFlow `NETFLOW_PORT`
 (12055/udp, 2055), IPFIX `IPFIX_PORT` (14739/udp, 4739).
 
+## Four ways in
+
+The stack has one core — intent, and the data labelled from it — and four ways
+to use it. The two programmatic interfaces sit side by side: a Python script and
+an AI agent reach the same capabilities, one over HTTP and one over MCP.
+
+```mermaid
+flowchart LR
+  subgraph USE["Who uses it"]
+    direction TB
+    OP["👤 Operator"]
+    PY["🐍 Python scripts · CI · other tools"]
+    AG["🤖 AI platform"]
+  end
+
+  subgraph WAYS["Ways in"]
+    direction TB
+    UI["Infrahub UI · Grafana"]
+    API["REST · GraphQL · PromQL · LogQL"]
+    MCP["MCP tools<br/>bounded, read-only by default"]
+  end
+
+  subgraph CORE["The stack"]
+    direction TB
+    INT["📋 Network intent<br/>Infrahub"]
+    OBSV["📊 Observability<br/>metrics · flows · logs"]
+    AUTO["⚙️ Automation<br/>state · config · assurance"]
+  end
+
+  NET["Network devices<br/>any platform in platforms.yml"]
+
+  OP --> UI
+  PY --> API
+  AG --> MCP
+  UI --> INT
+  UI --> OBSV
+  API --> INT
+  API --> OBSV
+  API --> AUTO
+  MCP --> INT
+  MCP --> OBSV
+  MCP --> AUTO
+  INT -. "labels" .-> OBSV
+  INT -. "inventory" .-> AUTO
+  NET == "telemetry · logs" ==> OBSV
+  AUTO -. "SSH" .-> NET
+
+  classDef who    fill:#f1f5f9,stroke:#475569,stroke-width:1px,color:#1e293b
+  classDef way    fill:#ede9fe,stroke:#6d28d9,stroke-width:1.5px,color:#1e293b
+  classDef intent fill:#fef3c7,stroke:#b45309,stroke-width:2px,color:#1e293b
+  classDef obs    fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#1e293b
+  classDef auto   fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#1e293b
+  classDef dev    fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#1e293b
+
+  class OP,PY,AG who
+  class UI,API,MCP way
+  class INT intent
+  class OBSV obs
+  class AUTO auto
+  class NET dev
+
+  style USE  fill:#ffffff,stroke:#94a3b8,color:#1e293b
+  style WAYS fill:#faf5ff,stroke:#6d28d9,color:#1e293b
+  style CORE fill:#ffffff,stroke:#94a3b8,stroke-width:2px,color:#1e293b
+```
+
+| Use | Built on | Programmatic interface | For people |
+|---|---|---|---|
+| Network intent | Infrahub | GraphQL; YAML + `make seed` | Infrahub UI |
+| Observability | Telegraf, Logstash, Prometheus, Loki | PromQL, LogQL | Grafana, Alertmanager |
+| Automation | Nornir, Netmiko, TextFSM, TTP, pyATS | Automation REST API | `make` targets |
+| AgenticOps | the three above, via six MCP servers | MCP | an AI platform |
+
+AgenticOps adds no capability of its own: every MCP tool is a bounded view of
+something a script can already do, which is why the stack works the same with
+or without an AI platform. Scripts: [how-to/automate-with-python.md](how-to/automate-with-python.md).
+Devices are a platform entry in `platforms.yml`, not code — other vendors are
+added the same way: [how-to/add-a-platform.md](how-to/add-a-platform.md).
+
 ## Component interdependency
 
 A different question: **what breaks when something is down.** Arrows point from

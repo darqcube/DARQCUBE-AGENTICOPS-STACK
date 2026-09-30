@@ -33,6 +33,7 @@ files and commands. If you are looking for *what a component is*, see
 | Change retention, intervals or resource limits | [change-settings.md](change-settings.md) |
 | Add a whole new service to the stack | [add-a-service.md](add-a-service.md) |
 | Connect an AI platform | [connect-an-ai-platform.md](connect-an-ai-platform.md) |
+| Script the stack from Python — assurance, state, config, intent, metrics, logs | [automate-with-python.md](automate-with-python.md) |
 | Deploy at a customer site (PoC or small production) | [deploy-on-customer-premises.md](deploy-on-customer-premises.md) |
 | Move the deployment to a new host | [move-to-a-new-host.md](move-to-a-new-host.md) |
 | Run on an existing Docker engine, without a VM or `install.py` | [run-on-a-docker-engine.md](run-on-a-docker-engine.md) |

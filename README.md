@@ -1,21 +1,25 @@
 # DARQCUBE-AGENTICOPS-STACK
 
-A single-VM network telemetry, source-of-truth and automation stack for
-**Cisco IOS-XE**, **Huawei VRP** and **MikroTik RouterOS**. Docker Compose,
-containers grouped and tagged by function, everything driven from YAML.
+A single-VM stack for **network intent, observability, automation and
+AgenticOps** — one source of truth that everything else is labelled from.
+Docker Compose, containers grouped and tagged by function, everything driven
+from YAML. Ships with **Cisco IOS-XE**, **Huawei VRP** and **MikroTik
+RouterOS**, and takes other platforms — Nokia SR Linux, Arista EOS, VyOS and
+more — by [adding them](#more-platforms).
 
 Built for demos, proofs of concept and small production networks —
 **sized and tested to 400 devices** on one Ubuntu box.
 
-It does four things:
+## Four ways to use it
 
-- **Devices send telemetry to it** — Telegraf ingests SNMP, gNMI and
-  NetFlow/IPFIX; Logstash ingests syslog.
-- **Infrahub holds what should exist** — every metric and log line is labelled
-  from it, so they line up on the same device.
-- **Automation gets and puts** configuration and state — Nornir, Netmiko,
-  TextFSM, TTP and pyATS/Genie, with assurance checks across every vendor.
-- **MCP servers expose all of it** to an AI platform, if you want one.
+| Use | What it gives you | Way in |
+|---|---|---|
+| **Network intent** | Infrahub holds what *should* exist — devices, sites, roles, platforms. Every metric and log line is labelled from it, so all four uses agree on what a device is | Infrahub UI · GraphQL · YAML + `make seed` |
+| **Observability** | Telegraf ingests SNMP, gNMI and NetFlow/IPFIX; Logstash ingests syslog. Dashboards, alerts and log search, per device, site and role | Grafana · Prometheus and Loki APIs |
+| **Automation** | Get and put configuration, parsed state, assurance checks, pre/post snapshots — Nornir, Netmiko, TextFSM, TTP and pyATS/Genie, across every vendor | `make` targets · REST API · [Python scripts](docs/how-to/automate-with-python.md) |
+| **AgenticOps** | The same capabilities as bounded MCP tools for an AI platform — read-only unless writing is explicitly enabled | [MCP servers](docs/how-to/connect-an-ai-platform.md) |
+
+Each use works on its own. Intent is the only one the others depend on.
 
 ## Works with or without AI
 
@@ -29,6 +33,27 @@ feature is unaffected. That is a structural property, not a claim: MCP sits at
 the bottom of the dependency graph with no inbound edges, and the test suite
 checks it.
 
+## Use it from Python
+
+Scripts use the same stack an AI platform does, over plain HTTP — no SDK:
+
+```python
+import json, urllib.request
+
+API = "http://localhost:18100"      # AUTOMATION_PORT
+def call(path, method="GET"):
+    with urllib.request.urlopen(urllib.request.Request(API + path, method=method), timeout=300) as r:
+        return json.load(r)
+
+for dev in call("/devices")["devices"]:
+    results = call(f"/device/{dev['name']}/check", method="POST")["results"]
+    bad = [r["rule"] for r in results if r["status"] in ("fail", "error")]
+    print(dev["name"], "OK" if not bad else bad)
+```
+
+Intent over GraphQL, metrics over PromQL, logs over LogQL, and the full API:
+[docs/how-to/automate-with-python.md](docs/how-to/automate-with-python.md).
+
 ## Architecture
 
 ```mermaid
@@ -38,6 +63,7 @@ flowchart LR
     C["Cisco IOS-XE"]
     H["Huawei VRP"]
     M["MikroTik RouterOS"]
+    X["+ more platforms<br/>SR Linux · Arista EOS · VyOS · …"]
   end
 
   subgraph VM["Single VM — Docker Compose"]
@@ -63,6 +89,7 @@ flowchart LR
   end
 
   AIP["🤖 AI-Platform<br/>(optional)"]
+  PY["🐍 Python scripts<br/>and tools"]
 
   DEV -. "SNMP · gNMI" .-> TG
   DEV == "NetFlow / IPFIX" ==> TG
@@ -80,6 +107,9 @@ flowchart LR
   AU --- MS
   MS -. optional .-> AIP
   AM -. optional .-> AIP
+  PY -. "REST API" .-> AU
+  PY -. "GraphQL" .-> IH
+  PY -. "PromQL · LogQL" .-> PR
 
   %% Colour follows the four container groups — the same grouping as the
   %% com.darqcube.group label. Light fills with explicit dark text, so the
@@ -93,6 +123,8 @@ flowchart LR
   classDef auto    fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#1e293b
   classDef mcp     fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#1e293b
   classDef ai      fill:#e2e8f0,stroke:#475569,stroke-width:2px,stroke-dasharray:5 3,color:#1e293b
+  classDef extend  fill:#f8fafc,stroke:#1d4ed8,stroke-width:1px,stroke-dasharray:4 3,color:#1e293b
+  classDef script  fill:#ede9fe,stroke:#6d28d9,stroke-width:2px,color:#1e293b
 
   class C,H,M device
   class IH sot
@@ -103,6 +135,8 @@ flowchart LR
   class AU auto
   class MS mcp
   class AIP ai
+  class X extend
+  class PY script
 
   style DEV  fill:#f8fafc,stroke:#1d4ed8,stroke-width:2px,color:#1e293b
   style VM   fill:#ffffff,stroke:#94a3b8,stroke-width:2px,color:#1e293b
@@ -119,6 +153,7 @@ flowchart LR
   linkStyle 6,7,8,9,10 stroke:#0e7490,stroke-width:2px
   linkStyle 11,12,13 stroke:#0f766e,stroke-width:1px
   linkStyle 14,15 stroke:#475569,stroke-width:1px
+  linkStyle 16,17,18 stroke:#6d28d9,stroke-width:1.5px
 ```
 
 Dashed = the stack reaches out. Solid = the device pushes to us.
@@ -253,6 +288,26 @@ formats.
 
 Device-side configuration: [docs/devices/](docs/devices/).
 
+### More platforms
+
+Nothing in the stack is specific to these three vendors — a platform is data.
+Adding one is [six edits](docs/how-to/add-a-platform.md): an entry in
+`platforms.yml`, a syslog pattern, TextFSM templates where none exist, a
+normaliser, the Infrahub `platform` choice, and an onboarding page. How much is
+already written for some common platforms, checked against the libraries this
+stack installs:
+
+| Platform | SSH driver (Netmiko) | `show` parsing (ntc-templates) | pyATS/Genie | Metrics |
+|---|---|---|---|---|
+| Arista EOS | ✅ `arista_eos` | ✅ 47 templates, incl. interfaces | — | SNMP; gNMI |
+| Cisco NX-OS | ✅ `cisco_nxos` | ✅ 82 templates | ✅ | SNMP; gNMI |
+| Juniper Junos | ✅ `juniper_junos` | ✅ 21 templates | ✅ | SNMP |
+| Nokia SR Linux | ✅ `nokia_srl` | — write templates, or parse its JSON output | — | gNMI; SNMP |
+| VyOS | ✅ `vyos` | — write templates | — | SNMP |
+
+Interface metrics come from IF-MIB, which every one of them implements, so
+dashboards and alerts work unchanged; only CPU and memory need vendor OIDs.
+
 ## How device work is done
 
 | Layer | Tool | Job |
@@ -312,7 +367,7 @@ seed` updates the source of truth, `make render` pushes it to the collectors.
 | [docs/INSTALL.md](docs/INSTALL.md) | install on a fresh VM — `install.py` or by hand |
 | [docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md) | sites and devices in Infrahub — UI or YAML — and verifying end to end |
 | [docs/scale.md](docs/scale.md) | the 400-device envelope and how to grow |
-| [docs/how-to/](docs/how-to/) | 18 task guides: add a device, change an alert, add a vendor… |
+| [docs/how-to/](docs/how-to/) | 19 task guides: add a device, change an alert, add a vendor… |
 | [docs/install/](docs/install/) | one page per component — config, ports, verify, problems |
 | [docs/devices/](docs/devices/) | device-side config per platform |
 | [docs/architecture.md](docs/architecture.md) | diagrams and the failure table |
