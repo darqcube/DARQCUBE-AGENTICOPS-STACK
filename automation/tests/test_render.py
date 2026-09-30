@@ -405,3 +405,20 @@ def test_metric_names_the_rules_and_dashboards_use_are_produced():
         used |= set(re.findall(r"\binterface_([a-z_]+)", path.read_text()))
     assert used, "no interface_* metric referenced — test is not looking in the right place"
     assert used <= fields, f"queried but never produced: {sorted(used - fields)}"
+
+
+def test_identity_table_exists_before_the_collectors_start():
+    """Telegraf refuses to start without devices.json (processors.lookup fails
+    on a missing file), and a fresh install renders nothing — the repo ships no
+    inventory. config-init creates an empty table first, and never replaces a
+    rendered one; Telegraf and Logstash wait for it."""
+    services = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]
+    init = services["config-init"]
+    assert "../observability/telegraf/generated:/generated" in init["volumes"]
+    script = init["command"][-1]
+    for f in ("devices.json", "devices.yml"):
+        assert f in script
+    assert '[ ! -e "/generated/$$f" ]' in script, "must only create a missing table"
+    for svc in ("telegraf", "logstash"):
+        dep = services[svc]["depends_on"]["config-init"]
+        assert dep["condition"] == "service_completed_successfully", svc

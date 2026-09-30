@@ -12,9 +12,17 @@
 
 services:
 
-  # Alertmanager has no environment-variable expansion of its own, so the one
-  # value that must vary per install — where alerts are delivered — is
-  # substituted here before Alertmanager starts. Runs once and exits.
+  # Runs once, before the services that need it, and exits.
+  #
+  # 1. Alertmanager has no environment-variable expansion of its own, so the one
+  #    value that must vary per install — where alerts are delivered — is
+  #    substituted here.
+  # 2. Telegraf will not start without the identity table (processors.lookup
+  #    fails on a missing file), and a fresh install has none: the repo ships
+  #    no inventory, so `make render` has nothing to write yet. An EMPTY table
+  #    is created only when there is no table at all — a rendered one is never
+  #    touched. Telegraf then starts, collects nothing, and picks up the real
+  #    table on the first render.
   config-init:
     image: alpine:3.20
     labels:
@@ -25,6 +33,7 @@ services:
     volumes:
       - ../observability/alertmanager/alertmanager.yml.tmpl:/src/alertmanager.yml.tmpl:ro
       - alertmanager-config:/out
+      - ../observability/telegraf/generated:/generated
     command:
       - sh
       - -c
@@ -40,6 +49,14 @@ services:
           echo "Alerts will be delivered to $$url"
         fi
         sed "s|__ALERT_WEBHOOK_URL__|$$url|" /src/alertmanager.yml.tmpl > /out/alertmanager.yml
+
+        for f in devices.json devices.yml; do
+          if [ ! -e "/generated/$$f" ]; then
+            echo '{}' > "/generated/$$f"
+            chmod 0644 "/generated/$$f"     # Logstash reads as uid 1000
+            echo "no $$f yet — wrote an empty one until the first make render"
+          fi
+        done
     restart: "no"
     networks: [darqcube]
 
@@ -149,6 +166,8 @@ services:
       com.darqcube.group: observability
       com.darqcube.role: collector
     profiles: [devices]
+    depends_on:
+      config-init: { condition: service_completed_successfully }
     command:
       - telegraf
       - --config=/etc/telegraf/telegraf.conf
@@ -208,6 +227,7 @@ services:
       - "${SYSLOG_PORT:-514}:514/tcp"
     depends_on:
       loki: { condition: service_healthy }
+      config-init: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9600/_node/stats >/dev/null || exit 1"]
       interval: 20s

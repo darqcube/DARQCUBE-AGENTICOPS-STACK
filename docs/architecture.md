@@ -408,7 +408,7 @@ into the repo tree. Both are gitignored apart from a `.gitkeep`.
 
 | Host path | Written by | Read by | Holds |
 |---|---|---|---|
-| `observability/telegraf/generated/` | `infrahub-server` (`make render`) | `telegraf`, `logstash` | SNMP and gNMI shards, `devices.json`, `devices.yml` |
+| `observability/telegraf/generated/` | `infrahub-server` (`make render`); `config-init` writes empty `devices.json`/`devices.yml` only if none exist | `telegraf`, `logstash` | SNMP and gNMI shards, `devices.json`, `devices.yml` |
 | `automation/configs/` | `automation` | — | running configs fetched from devices |
 
 `generated/` is a bind mount rather than a volume on purpose: it is where every
