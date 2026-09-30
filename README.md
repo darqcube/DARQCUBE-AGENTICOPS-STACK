@@ -127,13 +127,26 @@ Full diagrams and the "what breaks if X is down" table:
 
 ## Install
 
-On a fresh Ubuntu Server, prepare the host once:
+On a fresh Ubuntu Server, prepare the host once — OS packages, Docker with the
+Compose plugin, and your user in the `docker` group:
+
+```bash
+git clone <this repo> && cd DARQCUBE-AGENTICOPS-STACK
+./scripts/prepare-ubuntu.sh
+```
+
+It needs `sudo`, changes nothing else, skips whatever is already done, and ends
+by printing the next steps. The same thing by hand:
 
 ```bash
 sudo apt update && sudo apt install -y git make jq python3-venv curl
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker "$USER"
 ```
+
+`install.py` cannot do this itself: `python3-venv`, `make` and Docker are
+operating-system packages, not Python ones, and the installer runs before any of
+them exist.
 
 Then **log out and back in**. Group membership is read at login, so the current
 session cannot see it — `install.py` will report the socket as unreachable until
@@ -143,7 +156,6 @@ reconnecting, but minimal and container images do not always ship it.)
 Then install:
 
 ```bash
-git clone <this repo> && cd DARQCUBE-AGENTICOPS-STACK
 sudo python3 install.py --fix-sysctl          # UDP buffers, once per host
 cp site.example.yml site.yml && chmod 600 site.yml
 ls -l site.yml                                # confirm the copy landed

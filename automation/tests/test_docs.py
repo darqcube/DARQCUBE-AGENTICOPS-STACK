@@ -260,3 +260,23 @@ def test_architecture_volume_section_matches_compose():
     documented = {r for r in rows if re.fullmatch(r"[a-z0-9-]+-(?:data|logs|storage|config)", r)}
     stale = documented - named
     assert not stale, f"documented volumes no longer in compose: {stale}"
+
+
+def test_prepare_script_installs_what_the_docs_list():
+    """scripts/prepare-ubuntu.sh and the prerequisites page must name the same
+    packages, or one route leaves a host without something the other has."""
+    import re as _re
+
+    script = (ROOT / "scripts/prepare-ubuntu.sh").read_text()
+    listed = _re.search(r"^PACKAGES=\(([^)]*)\)", script, _re.M)
+    assert listed, "no PACKAGES=(...) array in prepare-ubuntu.sh"
+    prereq = (ROOT / "docs/install/01-prerequisites.md").read_text()
+    apt = _re.search(r"apt install -y ([a-z0-9 .-]+)", prereq)
+    assert set(listed.group(1).split()) == set(apt.group(1).split())
+    assert "include:" in script and 'COMPOSE_MIN="2.20"' in script, \
+        "the script must enforce the Compose version compose.yaml needs"
+
+
+def test_prepare_script_is_executable():
+    import os
+    assert os.access(ROOT / "scripts/prepare-ubuntu.sh", os.X_OK)

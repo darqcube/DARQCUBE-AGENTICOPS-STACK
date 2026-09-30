@@ -7,7 +7,12 @@ if you would rather run them yourself.
 
 ## 0. Prepare the host
 
-A fresh Ubuntu Server has almost none of this. One command:
+**One command:** `./scripts/prepare-ubuntu.sh` does everything in this section
+on Ubuntu or Debian — packages, Docker, the `docker` group — and skips what is
+already done. The steps below are what it runs, for any other distribution or if
+you would rather see each one.
+
+A fresh Ubuntu Server has almost none of this. By hand:
 
 ```bash
 sudo apt update && sudo apt install -y git make jq python3-venv curl

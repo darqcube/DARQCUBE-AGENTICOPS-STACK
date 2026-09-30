@@ -24,7 +24,8 @@ device-facing ports reachable from your network.
 
 ## Host packages
 
-A fresh Ubuntu Server has almost none of these.
+A fresh Ubuntu Server has almost none of these. `./scripts/prepare-ubuntu.sh`
+installs this section and the next (Docker) in one go; by hand:
 
 ```bash
 sudo apt update && sudo apt install -y git make jq python3-venv curl

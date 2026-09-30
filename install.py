@@ -560,7 +560,7 @@ def preflight(args) -> None:
     # better to say so now than to fail at `make state` a week later.
     if not _has_venv():
         bad("python3-venv is missing — step 6 cannot create a test environment. "
-            "Fix: sudo apt install -y python3-venv")
+            "Fix: ./scripts/prepare-ubuntu.sh (or sudo apt install -y python3-venv)")
     else:
         ok("python3-venv")
 
@@ -571,11 +571,11 @@ def preflight(args) -> None:
             ok(tool)
         else:
             warn(f"{tool} is not installed — needed for {why}. "
-                 f"Fix: sudo apt install -y {tool}")
+                 f"Fix: ./scripts/prepare-ubuntu.sh (or sudo apt install -y {tool})")
 
     # --- Docker ---
     if not shutil.which("docker"):
-        bad("docker not found — see docs/install/01-prerequisites.md")
+        bad("docker not found — Fix: ./scripts/prepare-ubuntu.sh (or see docs/install/01-prerequisites.md)")
         return
     try:
         proc = run(["docker", "version", "--format", "{{.Server.Version}}"], check=False, timeout=30)
