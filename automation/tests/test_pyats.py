@@ -208,3 +208,87 @@ print(json.dumps(problems))
     assert out.returncode == 0, out.stderr[-800:]
     problems = json.loads(out.stdout.strip().splitlines()[-1])
     assert not problems, "platforms.yml claims support Genie does not have:\n  " + "\n  ".join(problems)
+
+
+# --- collect only what a rule needs; one empty feature sinks only its rules ------
+# Found on Cisco IOL: learn("platform") is empty (Genie's platform model does not
+# recognise it) and learn("lldp") is empty on a lab without LLDP, while
+# learn("bgp") works. collect() learned every declared feature and aborted on the
+# first empty one, so the BGP rule reported an error about "platform".
+
+class _Learned:
+    def __init__(self, info):
+        self.info = info
+
+
+class _Device:
+    def __init__(self, by_feature):
+        self.by_feature, self.learned = by_feature, []
+
+    def connect(self, **kw):
+        pass
+
+    def disconnect(self):
+        pass
+
+    def learn(self, feature):
+        self.learned.append(feature)
+        return _Learned(self.by_feature.get(feature))
+
+
+def _stub_testbed(monkeypatch, device, spec):
+    """collect() imports build_testbed at call time; the real module pulls in
+    Nornir, which the offline tests do not install — so stand in the module."""
+    import types
+
+    class TB:
+        devices = {"cr1": device}
+
+    mod = types.ModuleType("automation.pyats.testbed")
+    mod.build_testbed = lambda name: (TB, spec)
+    monkeypatch.setitem(sys.modules, "automation.pyats.testbed", mod)
+
+
+SPEC = {"os": "iosxe", "learn": ["interface", "platform", "bgp", "lldp"]}
+
+
+def test_collect_learns_only_the_wanted_features(monkeypatch):
+    dev = _Device({"bgp": sample("iosxe-learn-bgp.json")})
+    _stub_testbed(monkeypatch, dev, SPEC)
+    features, errors = checks.collect("cr1", {"bgp"})
+    assert dev.learned == ["bgp"]
+    assert set(features) == {"bgp"} and errors == {}
+
+
+def test_an_empty_feature_is_an_error_for_that_feature_only(monkeypatch):
+    dev = _Device({"bgp": sample("iosxe-learn-bgp.json"), "platform": None})
+    _stub_testbed(monkeypatch, dev, SPEC)
+    features, errors = checks.collect("cr1", {"bgp", "platform"})
+    assert set(features) == {"bgp"}
+    assert set(errors) == {"platform"} and "learn('platform') returned nothing" in errors["platform"]
+
+
+def test_nothing_wanted_opens_no_session(monkeypatch):
+    class Boom(_Device):
+        def connect(self, **kw):
+            raise AssertionError("connected although no rule needs pyATS")
+    _stub_testbed(monkeypatch, Boom({}), SPEC)
+    assert checks.collect("cr1", set()) == ({}, {})
+
+
+def test_feature_error_fails_only_the_rules_that_need_it(rows):
+    from automation.assurance import engine
+
+    result = engine.run_rules("ios_xe", rows("ios_xe"), {"bgp": sample("iosxe-learn-bgp.json")},
+                              pyats_feature_errors={"lldp": "cr1: learn('lldp') returned nothing"})
+    bgp = next(r for r in result["results"] if r["source"] == "pyats" and r.get("rule") == "bgp_peers_established")
+    assert bgp["status"] != "error", bgp
+
+
+def test_feature_error_is_reported_on_its_rule(rows):
+    from automation.assurance import engine
+
+    msg = "cr1: learn('bgp') returned nothing"
+    result = engine.run_rules("ios_xe", rows("ios_xe"), {}, pyats_feature_errors={"bgp": msg})
+    bgp = next(r for r in result["results"] if r["source"] == "pyats")
+    assert bgp["status"] == "error" and bgp["detail"] == msg

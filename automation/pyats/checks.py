@@ -27,8 +27,15 @@ class PyatsEmpty(RuntimeError):
     """
 
 
-def collect(device: str) -> dict:
-    """Run the platform's declared pyATS calls. Returns {feature: data}.
+def collect(device: str, wanted: set[str] | None = None) -> tuple[dict, dict]:
+    """Run the platform's declared pyATS calls for the `wanted` features.
+
+    Returns ({feature: data}, {feature: error}). Only what a rule needs is
+    collected: a platform declares what Genie CAN do, a rule says what is
+    NEEDED, and learning the rest costs seconds per feature for nothing. An
+    empty feature is an error for that feature only — one gap (IOL has no
+    Genie platform model, a lab has no LLDP) must not sink an unrelated rule.
+    A failed connection still raises, and every pyATS rule reports it.
 
     The caller must hold device_lock(device): this opens its own SSH session
     through unicon, separate from Netmiko's, and the two must not overlap on
@@ -37,33 +44,42 @@ def collect(device: str) -> dict:
     from automation.pyats.testbed import build_testbed
 
     testbed, spec = build_testbed(device)
+    learn = [f for f in (spec.get("learn", []) or []) if wanted is None or f in wanted]
+    parse = {f: c for f, c in (spec.get("parse", {}) or {}).items() if wanted is None or f in wanted}
+    features: dict = {}
+    errors: dict = {}
+    if not learn and not parse:
+        return features, errors
+
     dev = testbed.devices[device]
     dev.connect(log_stdout=False, learn_hostname=True)
-    features: dict = {}
     try:
-        for feature in spec.get("learn", []) or []:
+        for feature in learn:
             learned = dev.learn(feature)
             info = getattr(learned, "info", None)
-            if not info:
-                raise PyatsEmpty(
+            if info:
+                features[feature] = info
+            else:
+                errors[feature] = (
                     f"{device}: learn('{feature}') returned nothing. Either the "
-                    f"feature is not configured, or Genie has no '{feature}' model "
-                    f"for os '{spec['os']}' — check the pyats block in platforms.yml."
+                    f"feature is not configured on the device, or Genie has no "
+                    f"'{feature}' model for os '{spec['os']}'."
                 )
-            features[feature] = info
-        for feature, command in (spec.get("parse", {}) or {}).items():
+        for feature, command in parse.items():
             try:
                 parsed = dev.parse(command)
             except Exception as exc:
                 # Genie raises SchemaEmptyParserError when the command produced
                 # no parsable output — the same "nothing" as above.
-                raise PyatsEmpty(f"{device}: parse('{command}') returned nothing: {exc}") from exc
-            if not parsed:
-                raise PyatsEmpty(f"{device}: parse('{command}') returned nothing")
-            features[feature] = parsed
+                errors[feature] = f"{device}: parse('{command}') returned nothing: {exc}"
+                continue
+            if parsed:
+                features[feature] = parsed
+            else:
+                errors[feature] = f"{device}: parse('{command}') returned nothing"
     finally:
         dev.disconnect()
-    return features
+    return features, errors
 
 
 def bgp_peers(tree) -> list[dict]:
