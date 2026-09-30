@@ -156,12 +156,19 @@ reconnecting, but minimal and container images do not always ship it.)
 Then install:
 
 ```bash
+cd ~/DARQCUBE-AGENTICOPS-STACK                # re-login starts in your home folder
 sudo python3 install.py --fix-sysctl          # UDP buffers, once per host
 cp site.example.yml site.yml && chmod 600 site.yml
 ls -l site.yml                                # confirm the copy landed
-${EDITOR:-nano} site.yml                      # ten fields describing this deployment
+${EDITOR:-nano} site.yml                      # six required values — docs/INSTALL.md lists them
 python3 install.py
 ```
+
+Your **devices** go in separately — the repo ships no inventory, so Infrahub
+starts empty. Add them in the Infrahub UI, or copy
+`source-of-truth/devices/examples/*.yml` into `source-of-truth/devices/`, edit,
+and `make seed && make render`:
+[docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md).
 
 That is the whole thing. One file, standard library only, seven steps:
 preflight the host → generate `.env` → build the images → start and wait for
@@ -194,7 +201,11 @@ Run every command **from the repo folder**. After logging out and back in you
 start in your home directory, where `python3 install.py` fails with
 `can't open file '/home/<you>/install.py'` — `cd DARQCUBE-AGENTICOPS-STACK` first.
 
-Size the VM before installing — [prerequisites](docs/install/01-prerequisites.md#sizing).
+Before installing, check what is **yours to provide** — a VM of the right size,
+Ubuntu 22.04 or 24.04, network reachability in both directions between the VM
+and the devices, and the devices' own configuration:
+[docs/INSTALL.md — Before you start](docs/INSTALL.md#before-you-start).
+Size the VM first — [prerequisites](docs/install/01-prerequisites.md#sizing).
 The preflight warns about a small VM but does not stop; one below the minimum
 fails part-way through the build.
 

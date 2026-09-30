@@ -7,10 +7,17 @@ if you would rather run them yourself.
 
 ## 0. Prepare the host
 
+Get the repo first — every command below runs from inside it:
+
+```bash
+git clone <this repo> && cd DARQCUBE-AGENTICOPS-STACK
+```
+
 **One command:** `./scripts/prepare-ubuntu.sh` does everything in this section
-on Ubuntu or Debian — packages, Docker, the `docker` group — and skips what is
-already done. The steps below are what it runs, for any other distribution or if
-you would rather see each one.
+on Ubuntu or Debian — packages, Docker, the `docker` group, Docker waiting for
+NTP — and skips what is already done. Then **log out, log back in, and `cd` into
+the repo again.** The steps below are what it runs, for any other distribution or
+if you would rather see each one.
 
 A fresh Ubuntu Server has almost none of this. By hand:
 
@@ -36,6 +43,18 @@ sudo usermod -aG docker "$USER"
 docker compose version   # must be 2.20 or newer — compose.yaml uses `include:`
 ```
 
+Start Docker only after the clock is synced — a VM that boots with a wrong clock
+otherwise poisons Prometheus with future-dated samples
+([why](install/01-prerequisites.md#start-docker-only-after-the-clock-is-synced)):
+
+```bash
+sudo systemctl enable systemd-time-wait-sync.service
+sudo mkdir -p /etc/systemd/system/docker.service.d
+printf '[Unit]\nAfter=time-sync.target\nWants=time-sync.target\n' \
+  | sudo tee /etc/systemd/system/docker.service.d/wait-for-time.conf
+sudo systemctl daemon-reload
+```
+
 And the kernel setting that decides whether syslog and flow survive:
 
 ```bash
@@ -54,11 +73,27 @@ sudo python3 install.py --fix-sysctl
 ## 1. The short way
 
 ```bash
-git clone <this repo> && cd DARQCUBE-AGENTICOPS-STACK
+cd ~/DARQCUBE-AGENTICOPS-STACK    # after re-login you start in your home folder
 cp site.example.yml site.yml && chmod 600 site.yml
-${EDITOR:-nano} site.yml          # the ten values below
+${EDITOR:-nano} site.yml          # six required values — see "What to fill in"
 python3 install.py
 ```
+
+**Your devices** are not in `site.yml`. The repo ships no inventory, so a fresh
+install starts with an empty Infrahub. Add them — before or after installing —
+either in the Infrahub UI, or in YAML:
+
+```bash
+cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+${EDITOR:-nano} source-of-truth/devices/sites.yml     # your sites and tags
+${EDITOR:-nano} source-of-truth/devices/devices.yml   # your devices
+make seed && make render                              # only if installed already
+```
+
+These files are yours and gitignored. The step-by-step, UI or YAML:
+[administration/infrahub-guide.md](administration/infrahub-guide.md).
+Rebuilding an existing deployment on a new VM — copying `.env` and the device
+files — is [how-to/move-to-a-new-host.md](how-to/move-to-a-new-host.md).
 
 Every command in this guide runs **from the repo folder**. A new login starts
 in your home directory, where `python3 install.py` fails with
@@ -88,6 +123,17 @@ python3 install.py --step 6       # run one step on its own
 ```
 
 ### Before you start
+
+The installer builds and checks the stack. Four things are yours, because they
+depend on your environment and nothing in the repository can do them for you:
+
+| You provide | Why it is yours | Where it is covered |
+|---|---|---|
+| **A VM of the right size** | the preflight **warns** below the minimum but does not stop — the install then fails part-way (disk full, out of memory) | sizing below; [prerequisites](install/01-prerequisites.md#sizing) |
+| **Ubuntu 22.04 or 24.04** | the only tested OS. `prepare-ubuntu.sh` and every command here use `apt`; on another Linux, translate the packages and Docker install yourself — untested | [prerequisites](install/01-prerequisites.md#host-packages) |
+| **Network reachability, both directions** | devices must reach this VM (syslog, flow) **and** this VM must reach the devices (SNMP, SSH). Usually two firewall rules; the stack cannot open either, and a gap shows only as missing data | [devices/README.md — Reachability](devices/README.md#reachability--both-directions-and-they-are-different) |
+| **The devices' own configuration** | SNMPv3 user, syslog destination, SSH account, NTP — on each device, matching `site.yml` | [devices/](devices/) |
+
 
 - **Ubuntu Linux** (22.04 or 24.04), 8 vCPU / 24 GB RAM / 200 GB disk for the
   full 400-device ceiling. A lab of a dozen devices runs happily on 4 / 16 / 80.
@@ -126,6 +172,10 @@ chmod 600 site.yml
 > don't paste it into a ticket, and delete it when the engagement ends.
 
 ### What to fill in
+
+Six are **required**: `site.collector_ip`, `devices.ssh_user`,
+`devices.ssh_password`, `devices.snmpv3.auth`, `devices.snmpv3.priv`, and a
+`site.name` you choose. Everything else has a working default.
 
 | Field | What it is | Where to get it | If it's wrong |
 |---|---|---|---|
