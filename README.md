@@ -275,11 +275,11 @@ something already using the usual ones —
 
 ## Supported devices
 
-| Platform | Metrics | Flow | Config & state | Interface assurance | BGP assurance |
-|---|---|---|---|---|---|
-| **Cisco IOS-XE** | SNMP or gNMI | ✅ | Netmiko `cisco_xe` | TextFSM | pyATS `learn("bgp")` |
-| **Huawei VRP** | SNMP | ✅ | Netmiko `huawei_vrp` | TextFSM | pyATS `display bgp peer` |
-| **MikroTik RouterOS** | SNMP | ✅ | Netmiko `mikrotik_routeros` | TextFSM | — not supported |
+| Platform | Metrics | Flow | Config & state | Assurance |
+|---|---|---|---|---|
+| **Cisco IOS-XE** | SNMP or gNMI | ✅ | Netmiko `cisco_xe` | TextFSM · TTP · pyATS |
+| **Huawei VRP** | SNMP | ✅ | Netmiko `huawei_vrp` | TextFSM · TTP · pyATS |
+| **MikroTik RouterOS** | SNMP | ✅ | Netmiko `mikrotik_routeros` | TextFSM · TTP |
 
 All three produce the same metric names — `cpu_usage`,
 `interface_oper_status`, `memory_used_percent` — despite three different MIBs,
