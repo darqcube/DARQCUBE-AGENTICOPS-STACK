@@ -222,8 +222,11 @@ class _Learned:
 
 
 class _Device:
-    def __init__(self, by_feature):
-        self.by_feature, self.learned = by_feature, []
+    def __init__(self, by_feature, running_config=""):
+        self.by_feature, self.learned, self.running_config = by_feature, [], running_config
+
+    def execute(self, command):
+        return self.running_config
 
     def connect(self, **kw):
         pass
@@ -241,8 +244,12 @@ def _stub_testbed(monkeypatch, device, spec):
     Nornir, which the offline tests do not install — so stand in the module."""
     import types
 
+    class _Any(dict):
+        def __missing__(self, name):
+            return device
+
     class TB:
-        devices = {"cr1": device}
+        devices = _Any()
 
     mod = types.ModuleType("automation.pyats.testbed")
     mod.build_testbed = lambda name: (TB, spec)
@@ -255,15 +262,15 @@ SPEC = {"os": "iosxe", "learn": ["interface", "platform", "bgp", "lldp"]}
 def test_collect_learns_only_the_wanted_features(monkeypatch):
     dev = _Device({"bgp": sample("iosxe-learn-bgp.json")})
     _stub_testbed(monkeypatch, dev, SPEC)
-    features, errors = checks.collect("cr1", {"bgp"})
+    features, errors, absent = checks.collect("cr1", {"bgp"})
     assert dev.learned == ["bgp"]
-    assert set(features) == {"bgp"} and errors == {}
+    assert set(features) == {"bgp"} and errors == {} and absent == {}
 
 
 def test_an_empty_feature_is_an_error_for_that_feature_only(monkeypatch):
     dev = _Device({"bgp": sample("iosxe-learn-bgp.json"), "platform": None})
     _stub_testbed(monkeypatch, dev, SPEC)
-    features, errors = checks.collect("cr1", {"bgp", "platform"})
+    features, errors, absent = checks.collect("cr1", {"bgp", "platform"})
     assert set(features) == {"bgp"}
     assert set(errors) == {"platform"} and "learn('platform') returned nothing" in errors["platform"]
 
@@ -273,7 +280,7 @@ def test_nothing_wanted_opens_no_session(monkeypatch):
         def connect(self, **kw):
             raise AssertionError("connected although no rule needs pyATS")
     _stub_testbed(monkeypatch, Boom({}), SPEC)
-    assert checks.collect("cr1", set()) == ({}, {})
+    assert checks.collect("cr1", set()) == ({}, {}, {})
 
 
 def test_feature_error_fails_only_the_rules_that_need_it(rows):
@@ -292,3 +299,26 @@ def test_feature_error_is_reported_on_its_rule(rows):
     result = engine.run_rules("ios_xe", rows("ios_xe"), {}, pyats_feature_errors={"bgp": msg})
     bgp = next(r for r in result["results"] if r["source"] == "pyats")
     assert bgp["status"] == "error" and bgp["detail"] == msg
+
+
+def test_feature_not_configured_is_absent_not_an_error(monkeypatch):
+    """An access switch with no BGP: the rule does not apply."""
+    _stub_testbed(monkeypatch, _Device({"bgp": None}, running_config=""), SPEC)
+    features, errors, absent = checks.collect("cs1", {"bgp"})
+    assert errors == {} and set(absent) == {"bgp"} and "not configured" in absent["bgp"]
+
+
+def test_configured_but_empty_is_still_an_error(monkeypatch):
+    """BGP configured and Genie returned nothing — a real gap, keep it visible."""
+    _stub_testbed(monkeypatch, _Device({"bgp": None}, running_config="router bgp 65501"), SPEC)
+    features, errors, absent = checks.collect("cr1", {"bgp"})
+    assert absent == {} and set(errors) == {"bgp"}
+
+
+def test_absent_feature_skips_its_rule(rows):
+    from automation.assurance import engine
+
+    why = "cs1: bgp is not configured (nothing matches 'show running-config | include ^router bgp')"
+    result = engine.run_rules("ios_xe", rows("ios_xe"), {}, pyats_absent={"bgp": why})
+    bgp = next(r for r in result["results"] if r["source"] == "pyats")
+    assert bgp["status"] == "skipped" and bgp["detail"] == why

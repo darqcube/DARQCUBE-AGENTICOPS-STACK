@@ -335,17 +335,17 @@ def run_assurance(device: str) -> dict:
 
     with device_lock(device):
         state = get_state(device)
-        features, feature_errors, pyats_error = {}, {}, None
+        features, feature_errors, absent, pyats_error = {}, {}, {}, None
         wanted = {r["feature"] for r in engine.load_rules() if r.get("source") == "pyats"}
         if pyats_spec(state["platform"]) and wanted:
             try:
-                features, feature_errors = pyats_checks.collect(device, wanted)
+                features, feature_errors, absent = pyats_checks.collect(device, wanted)
             except Exception as exc:
                 # The session itself failed — reported on every pyATS rule; the
                 # TextFSM results still stand.
                 pyats_error = f"pyATS could not collect: {exc}"
         result = engine.run_rules(state["platform"], state["rows"], features, pyats_error,
-                                  feature_errors)
+                                  feature_errors, absent)
 
     result["device"] = device
     result["command"] = state["command"]

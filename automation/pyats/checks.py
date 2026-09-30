@@ -27,10 +27,22 @@ class PyatsEmpty(RuntimeError):
     """
 
 
-def collect(device: str, wanted: set[str] | None = None) -> tuple[dict, dict]:
+# When a feature comes back empty: is it configured at all? An empty result on
+# a device without the feature (BGP on an access switch) is "does not apply",
+# not an error. A match here means it IS configured and Genie returned nothing —
+# a real gap, reported as an error. (os, feature) -> a command whose output is
+# empty exactly when the feature is not configured.
+CONFIGURED_PROBES = {
+    ("iosxe", "bgp"): "show running-config | include ^router bgp",
+    ("hvrp", "bgp"): "display current-configuration | include ^bgp",
+}
+
+
+def collect(device: str, wanted: set[str] | None = None) -> tuple[dict, dict, dict]:
     """Run the platform's declared pyATS calls for the `wanted` features.
 
-    Returns ({feature: data}, {feature: error}). Only what a rule needs is
+    Returns ({feature: data}, {feature: error}, {feature: why it does not
+    apply}). Only what a rule needs is
     collected: a platform declares what Genie CAN do, a rule says what is
     NEEDED, and learning the rest costs seconds per feature for nothing. An
     empty feature is an error for that feature only — one gap (IOL has no
@@ -48,8 +60,17 @@ def collect(device: str, wanted: set[str] | None = None) -> tuple[dict, dict]:
     parse = {f: c for f, c in (spec.get("parse", {}) or {}).items() if wanted is None or f in wanted}
     features: dict = {}
     errors: dict = {}
+    absent: dict = {}
     if not learn and not parse:
-        return features, errors
+        return features, errors, absent
+
+    def nothing(feature: str, message: str) -> None:
+        """File an empty result as absent (not configured) or as an error."""
+        probe = CONFIGURED_PROBES.get((spec["os"], feature))
+        if probe and not dev.execute(probe).strip():
+            absent[feature] = f"{device}: {feature} is not configured (nothing matches '{probe}')"
+        else:
+            errors[feature] = message
 
     dev = testbed.devices[device]
     dev.connect(log_stdout=False, learn_hostname=True)
@@ -60,26 +81,25 @@ def collect(device: str, wanted: set[str] | None = None) -> tuple[dict, dict]:
             if info:
                 features[feature] = info
             else:
-                errors[feature] = (
-                    f"{device}: learn('{feature}') returned nothing. Either the "
-                    f"feature is not configured on the device, or Genie has no "
-                    f"'{feature}' model for os '{spec['os']}'."
-                )
+                nothing(feature,
+                        f"{device}: learn('{feature}') returned nothing although it is "
+                        f"configured — Genie may have no '{feature}' model for os "
+                        f"'{spec['os']}' on this device")
         for feature, command in parse.items():
             try:
                 parsed = dev.parse(command)
             except Exception as exc:
                 # Genie raises SchemaEmptyParserError when the command produced
                 # no parsable output — the same "nothing" as above.
-                errors[feature] = f"{device}: parse('{command}') returned nothing: {exc}"
+                nothing(feature, f"{device}: parse('{command}') returned nothing: {exc}")
                 continue
             if parsed:
                 features[feature] = parsed
             else:
-                errors[feature] = f"{device}: parse('{command}') returned nothing"
+                nothing(feature, f"{device}: parse('{command}') returned nothing")
     finally:
         dev.disconnect()
-    return features, errors
+    return features, errors, absent
 
 
 def bgp_peers(tree) -> list[dict]:

@@ -62,7 +62,8 @@ CHECKS = {
 # --- public API ------------------------------------------------------------
 
 def run_rules(platform: str, rows: list[dict], pyats_features: dict | None = None,
-              pyats_error: str | None = None, pyats_feature_errors: dict | None = None) -> dict:
+              pyats_error: str | None = None, pyats_feature_errors: dict | None = None,
+              pyats_absent: dict | None = None) -> dict:
     """Run every applicable rule against a device.
 
     Two sources, one result:
@@ -80,6 +81,7 @@ def run_rules(platform: str, rows: list[dict], pyats_features: dict | None = Non
     interfaces = normalise.normalise_interfaces(platform, rows)
     pyats_features = pyats_features or {}
     pyats_feature_errors = pyats_feature_errors or {}
+    pyats_absent = pyats_absent or {}
 
     results, failed, skipped = [], 0, 0
     for rule in load_rules():
@@ -109,6 +111,12 @@ def run_rules(platform: str, rows: list[dict], pyats_features: dict | None = Non
                 # rather than letting them look skipped for a coverage reason.
                 results.append({**base, "status": "error", "detail": pyats_error})
                 failed += 1
+                continue
+            if feature in pyats_absent:
+                # Not configured on this device (no BGP on an access switch):
+                # the rule does not apply. Skipped, with why — never pass.
+                results.append({**base, "status": "skipped", "detail": pyats_absent[feature]})
+                skipped += 1
                 continue
             if feature in pyats_feature_errors:
                 # Declared and attempted, but nothing came back — this rule
