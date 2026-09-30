@@ -34,7 +34,7 @@ else
 fi
 
 # --- 1. OS packages ---------------------------------------------------------
-echo "[1/3] OS packages"
+echo "[1/4] OS packages"
 missing=()
 for p in "${PACKAGES[@]}"; do
   dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p")
@@ -47,7 +47,7 @@ fi
 ok "${PACKAGES[*]}"
 
 # --- 2. Docker with the Compose v2 plugin -----------------------------------
-echo "[2/3] Docker"
+echo "[2/4] Docker"
 if ! command -v docker >/dev/null; then
   do_ "installing Docker (get.docker.com)"
   curl -fsSL https://get.docker.com | $SUDO sh
@@ -64,7 +64,7 @@ fi
 ok "docker compose $compose"
 
 # --- 3. Run Docker without sudo --------------------------------------------
-echo "[3/3] docker group"
+echo "[3/4] docker group"
 relogin=0
 if [[ $(id -u) -ne 0 ]]; then
   if id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
@@ -73,6 +73,41 @@ if [[ $(id -u) -ne 0 ]]; then
     do_ "adding $USER to the docker group"
     $SUDO usermod -aG docker "$USER"
     relogin=1
+  fi
+fi
+
+# --- 4. Start containers only after the clock is right ---------------------
+# A VM can boot with a wrong clock — VMware hands a guest the host's LOCAL time
+# at power-on — and NTP corrects it seconds later. Anything started in between
+# stamps data with that wrong time. Prometheus is the casualty: samples written
+# hours in the future make every later, correct sample "out of bounds", so all
+# metrics are rejected until its data is wiped. Make Docker wait for the first
+# NTP sync instead.
+echo "[4/4] Docker waits for NTP"
+if [[ ! -d /run/systemd/system ]]; then
+  ok "no systemd here — skipped (nothing to order Docker against)"
+else
+  $SUDO timedatectl set-ntp true
+  if systemctl cat systemd-time-wait-sync.service >/dev/null 2>&1; then
+    wait_unit=systemd-time-wait-sync.service        # timesyncd — Ubuntu's default
+  elif systemctl cat chrony-wait.service >/dev/null 2>&1; then
+    wait_unit=chrony-wait.service                   # hosts running chrony
+  else
+    wait_unit=""
+  fi
+  if [[ -z $wait_unit ]]; then
+    printf '  \033[33mwarn\033[0m  no NTP wait service found — Docker may start before the clock is synced\n'
+  else
+    systemctl is-enabled "$wait_unit" >/dev/null 2>&1 || $SUDO systemctl enable "$wait_unit" >/dev/null 2>&1
+    dropin=/etc/systemd/system/docker.service.d/wait-for-time.conf
+    want=$'[Unit]\nAfter=time-sync.target\nWants=time-sync.target\n'
+    if [[ "$(cat "$dropin" 2>/dev/null)"$'\n' != "$want" ]]; then
+      do_ "Docker will start after the first NTP sync"
+      $SUDO mkdir -p "$(dirname "$dropin")"
+      printf '%s' "$want" | $SUDO tee "$dropin" >/dev/null
+      $SUDO systemctl daemon-reload
+    fi
+    ok "Docker starts after time-sync.target ($wait_unit)"
   fi
 fi
 

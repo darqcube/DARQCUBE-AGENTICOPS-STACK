@@ -280,3 +280,14 @@ def test_prepare_script_installs_what_the_docs_list():
 def test_prepare_script_is_executable():
     import os
     assert os.access(ROOT / "scripts/prepare-ubuntu.sh", os.X_OK)
+
+
+def test_prepare_script_and_prerequisites_agree_on_the_ntp_wait():
+    """Both routes must make Docker wait for the first NTP sync, or a VM that
+    boots with a wrong clock poisons Prometheus with future-dated samples."""
+    script = (ROOT / "scripts/prepare-ubuntu.sh").read_text()
+    prereq = (ROOT / "docs/install/01-prerequisites.md").read_text()
+    for text, where in ((script, "prepare-ubuntu.sh"), (prereq, "01-prerequisites.md")):
+        assert "systemd-time-wait-sync" in text, where
+        assert "After=time-sync.target" in text, where
+        assert "docker.service.d/wait-for-time.conf" in text, where

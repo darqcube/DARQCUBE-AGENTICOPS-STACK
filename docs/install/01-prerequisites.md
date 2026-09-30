@@ -121,6 +121,37 @@ The devices need NTP too, for a second reason: Logstash files a log line under
 the device's own timestamp when it is plausible (see
 [05-logstash.md](05-logstash.md)), and only a synchronised clock is.
 
+### Start Docker only after the clock is synced
+
+A VM can boot with the wrong time — VMware gives a guest the host's **local**
+time at power-on, so a host five hours east of UTC boots its VM five hours
+ahead — and NTP corrects it seconds later. Containers started in between stamp
+data with the wrong time. Prometheus is the one that breaks: samples written
+hours in the future make every later, correct sample `out of bounds`, and **all
+metrics are rejected** until its data is wiped. The Telegraf scrape target shows
+`down` with `out of bounds`; Grafana shows nothing.
+
+Make Docker wait for the first NTP sync. `./scripts/prepare-ubuntu.sh` does this;
+by hand:
+
+```bash
+sudo systemctl enable systemd-time-wait-sync.service     # chrony hosts: chrony-wait.service
+sudo mkdir -p /etc/systemd/system/docker.service.d
+printf '[Unit]\nAfter=time-sync.target\nWants=time-sync.target\n' \
+  | sudo tee /etc/systemd/system/docker.service.d/wait-for-time.conf
+sudo systemctl daemon-reload
+systemctl show docker -p After | grep -o time-sync.target   # confirms it
+```
+
+If it has already happened, clear Prometheus's data — on a new install there is
+nothing of value in it:
+
+```bash
+docker compose rm -sf prometheus
+docker volume rm darqcube_prometheus-data     # <project>_prometheus-data
+make up
+```
+
 > **Container-based VMs** (OrbStack machines, LXC) cannot set the clock —
 > `systemd-timesyncd` refuses to start there by design, and the clock follows
 > the host. Check `timedatectl` still says `synchronized: yes`; configure NTP
