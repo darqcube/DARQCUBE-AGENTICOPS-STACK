@@ -291,3 +291,17 @@ def test_prepare_script_and_prerequisites_agree_on_the_ntp_wait():
         assert "systemd-time-wait-sync" in text, where
         assert "After=time-sync.target" in text, where
         assert "docker.service.d/wait-for-time.conf" in text, where
+
+
+def test_make_targets_that_call_the_api_fail_loudly():
+    """`curl -sf ... | jq .` printed nothing on an API error and still exited 0,
+    hiding a broken inventory behind a quiet `make state`."""
+    import re as _re
+
+    make = (ROOT / "Makefile").read_text()
+    recipes = [l for l in make.splitlines() if "AUTOMATION_PORT)/device" in l]
+    assert recipes
+    assert not any("curl -sf" in l for l in recipes), "curl -sf hides the API's error"
+    for line in make.splitlines():
+        if line.startswith("\t@") and "|" in line and ("curl" in line or "jq -Rs" in line):
+            assert "set -o pipefail" in line, f"piped recipe without pipefail: {line.strip()}"

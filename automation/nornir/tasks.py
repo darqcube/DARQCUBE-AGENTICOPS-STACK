@@ -146,8 +146,11 @@ def _build_nornir():
                 "token": INFRAHUB_TOKEN,
                 "branch": BRANCH,
                 "host_node": {"kind": "NetworkDevice"},
+                # An ATTRIBUTE is mapped by its bare name. A dotted mapping must
+                # start with a relationship: nornir-infrahub 1.2 rejects
+                # "platform.value" and the whole inventory fails to load.
                 "schema_mappings": [
-                    {"name": "platform", "mapping": "platform.value"},
+                    {"name": "platform", "mapping": "platform"},
                 ],
             },
         },

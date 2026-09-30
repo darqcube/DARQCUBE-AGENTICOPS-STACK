@@ -222,6 +222,30 @@ The web UIs and their ports: [architecture.md](architecture.md#web-uis-and-apis)
 
 ---
 
+## 5. Verify end to end
+
+The installer's step 6 proves the **stack** works. Once devices are configured,
+prove the **path from devices to dashboards** — in this order, because each
+stage depends on the one before:
+
+```bash
+make verify                     # services healthy, wired, devices in Infrahub, Loki has device labels
+```
+
+| Stage | Check | Pass |
+|---|---|---|
+| Inventory | `make verify` → "N device(s) in the source of truth" | your device count |
+| Collector config | `ls observability/telegraf/generated/` | `snmp-*.conf`, `devices.json` |
+| Metrics | Prometheus: `count by (device) (device_uptime)` and `count(interface_oper_status)` | every device; every interface |
+| Logs | on a Cisco device `conf t` then `end`; Grafana → Explore → Loki: `{device="<name>"} \|= "%SYS-5-CONFIG_I"` | the line within seconds, with `site` and `role` |
+| Automation | `make state DEV=<name>` and `make check DEV=<name>` | parsed state and rule results, not an error |
+| Everything | `make test` | all pass — the Loki test passes rather than skips |
+
+The full exercise, with what each failure means:
+[administration/infrahub-guide.md — Verify end to end](administration/infrahub-guide.md#6-verify-end-to-end).
+
+---
+
 ## Other ways to run it
 
 | | |

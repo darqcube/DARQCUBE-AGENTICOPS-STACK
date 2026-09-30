@@ -79,27 +79,35 @@ render: ## Infrahub -> Telegraf + Logstash configs. Run after any device change.
 	$(SOT) python /scripts/render-inventory.py
 
 # --- devices: get and put ------------------------------------------------
+# Every recipe that talks to the automation API fails loudly: --fail-with-body
+# prints the API's error, and `set -o pipefail` makes a failure in curl fail the
+# target even when its output is piped into jq. Without both, an API error
+# printed nothing and `make state` still reported success.
 
 config-get: ## Fetch a running config:  make config-get DEV=cr1
 	@mkdir -p automation/configs
-	@curl -sf localhost:$(AUTOMATION_PORT)/device/$(DEV)/config | tee automation/configs/$(DEV).cfg
+	@curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/config \
+	    > automation/configs/$(DEV).cfg.part \
+	  && mv automation/configs/$(DEV).cfg.part automation/configs/$(DEV).cfg \
+	  && cat automation/configs/$(DEV).cfg \
+	  || { cat automation/configs/$(DEV).cfg.part; echo; rm -f automation/configs/$(DEV).cfg.part; exit 1; }
 
 config-put: ## Push config lines:  make config-put DEV=cr1 FILE=change.txt
-	@jq -Rs '{lines: split("\n") | map(select(length > 0))}' < $(FILE) \
-	  | curl -sf -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/config \
+	@set -o pipefail; jq -Rs '{lines: split("\n") | map(select(length > 0))}' < $(FILE) \
+	  | curl -sS --fail-with-body -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/config \
 	      -H 'Content-Type: application/json' -d @-
 
 state: ## Parsed operational state:  make state DEV=mt-01
-	@curl -sf localhost:$(AUTOMATION_PORT)/device/$(DEV)/state | jq .
+	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/state | jq .
 
 check: ## Run the assurance rules:  make check DEV=cr1
-	@curl -sf -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/check | jq .
+	@set -o pipefail; curl -sS --fail-with-body -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/check | jq .
 
 snapshot: ## Point-in-time state, for pre/post comparison:  make snapshot DEV=cr1
-	@curl -sf localhost:$(AUTOMATION_PORT)/device/$(DEV)/snapshot | jq .
+	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/snapshot | jq .
 
 config-parsed: ## Running config parsed with TTP:  make config-parsed DEV=cr1
-	@curl -sf localhost:$(AUTOMATION_PORT)/device/$(DEV)/config/structured | jq .
+	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/config/structured | jq .
 
 # --- tests ---------------------------------------------------------------
 

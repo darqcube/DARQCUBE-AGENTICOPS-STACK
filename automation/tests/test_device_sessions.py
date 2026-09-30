@@ -274,3 +274,26 @@ def test_management_address_matches_the_renderer(node, expected):
     """SSH goes where the collectors poll: the DNS name when set, else the IP
     without its prefix — and an empty management_ip must not raise."""
     assert tasks.management_address(node) == expected
+
+
+def test_inventory_mappings_are_valid_for_the_schema():
+    """nornir-infrahub 1.2 rejects a dotted mapping whose first part is not a
+    relationship, and then NO host loads: "platform.value" broke every device
+    operation. The unit tests replace _build_nornir, so this checks the real
+    mappings against darqcube.yml instead."""
+    import re as _re
+    import yaml as _yaml
+
+    src = (Path(__file__).resolve().parents[2] / "automation/nornir/tasks.py").read_text()
+    mappings = _re.findall(r'"mapping":\s*"([^"]+)"', src)
+    assert mappings, "no schema_mappings found in tasks.py"
+    schema = _yaml.safe_load((Path(__file__).resolve().parents[2] / "source-of-truth/schema/darqcube.yml").read_text())
+    device = next(n for n in schema["nodes"] if n["name"] == "Device")
+    attrs = {a["name"] for a in device["attributes"]}
+    rels = {r["name"] for r in device.get("relationships", [])}
+    for m in mappings:
+        parts = m.split(".")
+        if len(parts) == 1:
+            assert m in attrs | rels, f"{m!r} is not a Device attribute or relationship"
+        else:
+            assert len(parts) == 2 and parts[0] in rels, f"{m!r}: a dotted mapping must start with a relationship"
