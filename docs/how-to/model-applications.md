@@ -109,6 +109,8 @@ seeded before it.
 | Consumer | How |
 |---|---|
 | **AI platform (MCP)** | `list_applications`, `get_application`, `get_host`, `get_site_services`, `get_application_dependencies` on `mcp-infrahub` — see [connect-an-ai-platform.md](connect-an-ai-platform.md) |
+| **NetFlow** | every flow labelled with `application` and `criticality` after `make render` — [label-flows-by-application.md](label-flows-by-application.md) |
+| **Grafana and alerts** | the Applications dashboard; `CriticalApplicationSilent` |
 | **Infrahub UI** | the four kinds appear in the menu; relationships are browsable both ways |
 | **Automation** | the same GraphQL, for intent checks of your own |
 

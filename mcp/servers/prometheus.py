@@ -104,7 +104,10 @@ def list_alerts(state: str = "firing") -> dict:
 
 @mcp.tool()
 def get_flow_summary(device: str | None = None, window: str = "1h") -> dict:
-    """Traffic volume from NetFlow/IPFIX, by protocol.
+    """Traffic volume from NetFlow/IPFIX, by protocol and by application.
+
+    Applications come from the services modelled in the source of truth;
+    unmodelled traffic is application "other".
 
     Per-flow addresses and ports are deliberately not collected, so this
     answers "how much traffic, of what kind" but NOT "which host is the top
@@ -116,12 +119,24 @@ def get_flow_summary(device: str | None = None, window: str = "1h") -> dict:
     """
     window = duration(window)
     sel = f'{{device="{identifier(device, "device")}"}}' if device else ""
-    rows = _rows(_query(f"sum by (device, protocol) (increase(flow_bytes_total{sel}[{window}]))"), "bytes")
+    # netflow_flow_bytes_total is a gauge: bytes per 60 s aggregation window.
+    # Total over the window = mean per-minute value x minutes in the window.
+    minutes = _seconds(window) / 60
+    volume = f"avg_over_time(netflow_flow_bytes_total{sel}[{window}])"
+    by_protocol = _rows(_query(f"sum by (device, protocol) ({volume}) * {minutes:g}"), "bytes")
+    by_application = _rows(_query(f"sum by (application, criticality) ({volume}) * {minutes:g}"), "bytes")
     return {
         "window": window,
         "device": device or "all",
-        "by_protocol": sorted(rows, key=lambda r: -r["bytes"]),
+        "by_protocol": sorted(by_protocol, key=lambda r: -r["bytes"]),
+        "by_application": sorted(by_application, key=lambda r: -r["bytes"]),
     }
+
+
+def _seconds(window: str) -> int:
+    """'15m' / '6h' / '1d' -> seconds. duration() has already bounded it."""
+    unit = {"s": 1, "m": 60, "h": 3600, "d": 86400}[window[-1]]
+    return int(window[:-1]) * unit
 
 
 @mcp.tool()

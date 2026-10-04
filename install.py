@@ -53,7 +53,7 @@ VENV = ROOT / ".venv"
 GENERATED = [
     "NEO4J_PASSWORD", "RABBITMQ_PASSWORD", "POSTGRES_PASSWORD",
     "INFRAHUB_SECRET_KEY", "INFRAHUB_ADMIN_TOKEN", "MCP_AUTH_TOKEN",
-    "GRAFANA_ADMIN_PASSWORD",
+    "GRAFANA_ADMIN_PASSWORD", "RENDER_HOOK_SECRET",
 ]
 
 # Values only the operator can know.
@@ -294,7 +294,7 @@ def site_to_env(site: dict) -> dict[str, str]:
     """Site file -> the .env variables it determines.
 
     Only the keys the site file speaks for. Everything else in .env.example
-    keeps its default, and the seven secrets are generated separately.
+    keeps its default, and the eight secrets are generated separately.
     """
     env: dict[str, str] = {}
 
@@ -330,6 +330,8 @@ def site_to_env(site: dict) -> dict[str, str]:
     profiles = ["devices", "automation"]
     if as_bool(dig(site, "ai_platform.enabled"), "ai_platform.enabled", default=True):
         profiles.append("mcp")
+    if as_bool(dig(site, "source_of_truth.auto_render"), "source_of_truth.auto_render"):
+        profiles.append("auto-render")
     env["COMPOSE_PROFILES"] = ",".join(profiles)
     env["MCP_ALLOW_WRITE"] = str(
         as_bool(dig(site, "ai_platform.allow_write"), "ai_platform.allow_write")
@@ -343,7 +345,7 @@ def validate_site(site: dict) -> list[str]:
     problems: list[str] = []
 
     # Typos in keys are silent otherwise — the value is simply never applied.
-    known = {"site", "devices", "scale", "ports", "alerts", "ai_platform"}
+    known = {"site", "devices", "scale", "ports", "alerts", "ai_platform", "source_of_truth"}
     for key in site:
         if key not in known:
             problems.append(f"unknown top-level key '{key}' — expected one of {sorted(known)}")
@@ -394,7 +396,8 @@ def validate_site(site: dict) -> list[str]:
 
     for field, default in (("ports.standard", False),
                            ("ai_platform.enabled", True),
-                           ("ai_platform.allow_write", False)):
+                           ("ai_platform.allow_write", False),
+                           ("source_of_truth.auto_render", False)):
         try:
             as_bool(dig(site, field), field, default)
         except SiteError as exc:

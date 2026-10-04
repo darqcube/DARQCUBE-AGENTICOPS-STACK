@@ -42,7 +42,7 @@ curl -X POST localhost:${PROMETHEUS_PORT:-9090}/-/reload
 | `cpu_usage` | percent, one series per core/entity |
 | `memory_used` / `_free` / `_total` | raw, units vary — see below |
 | `device_uptime` | SNMP sysUpTime |
-| `flow_bytes_total` / `flow_packets_total` | NetFlow/IPFIX, by protocol |
+| `netflow_flow_bytes_total` / `netflow_flow_packets_total` | NetFlow/IPFIX — **bytes (packets) per 60 s window, a gauge**; labels `protocol`, `direction`, `application`, `criticality` |
 | `device:cpu_usage:max` | recording rule — one value per device |
 | `device:memory_used_percent:max` | recording rule — comparable across vendors |
 
@@ -52,6 +52,10 @@ Every metric carries `device`, `site`, `role` and `platform` from Infrahub, plus
 **Alert on `device:memory_used_percent:max`, not on `memory_used`.** The three
 vendors report memory in percent, bytes and allocation units respectively; the
 recording rule in `observability/prometheus/rules/recording.yml` is what makes them comparable.
+
+**Flow alerts shipped:** `NoFlowsReceived` (no flow from anywhere for 15 min)
+and `CriticalApplicationSilent` (a `critical` application that had traffic in
+the last 6 h has had none for 15 min — needs services modelled in Infrahub).
 
 ## Useful patterns
 

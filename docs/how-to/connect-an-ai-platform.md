@@ -29,7 +29,8 @@ Six servers, all reached over the Docker network:
 | `get_application_dependencies(application)` | the hosts, subnets, gateways and site devices an application depends on — "what breaks if X fails?" |
 
 The application tools return empty results until hosts and services are
-modelled — [model-applications.md](model-applications.md).
+modelled — [model-applications.md](model-applications.md). With services
+modelled, `get_flow_summary` on `mcp-prometheus` also returns `by_application`.
 
 Transport is streamable-HTTP; auth is a bearer token:
 

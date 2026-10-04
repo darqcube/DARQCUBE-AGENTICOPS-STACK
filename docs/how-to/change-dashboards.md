@@ -18,6 +18,10 @@ The workflow that avoids hand-writing JSON:
 The UI will not let you *save*, which is the point. Copying the JSON is the
 save.
 
+Shipped dashboards: **Network Overview** (`darqcube-network`) and
+**Applications** (`darqcube-applications`, NetFlow by application —
+[label-flows-by-application.md](label-flows-by-application.md)).
+
 ## Add a new dashboard
 
 Build it in the UI, export the JSON, then save it in that directory with:

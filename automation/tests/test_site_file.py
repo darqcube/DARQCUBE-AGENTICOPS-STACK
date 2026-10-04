@@ -159,6 +159,12 @@ def test_dedicated_flow_range_follows_the_standard_toggle(inst, site):
     assert (env["FLOW_DEDICATED_FIRST"], env["FLOW_DEDICATED_LAST"]) == ("12056", "12105")
 
 
+def test_auto_render_is_off_unless_asked_for(inst, site):
+    assert "auto-render" not in inst.site_to_env(site)["COMPOSE_PROFILES"]
+    site["source_of_truth"] = {"auto_render": True}
+    assert "auto-render" in inst.site_to_env(site)["COMPOSE_PROFILES"]
+
+
 def test_port_overrides_win(inst, site):
     site["ports"]["overrides"] = {"syslog": 514}
     env = inst.site_to_env(site)
@@ -199,7 +205,7 @@ def test_the_site_file_covers_every_value_a_human_must_supply(inst, site):
 
 
 def test_no_secret_is_derived_from_the_site_file(inst, site):
-    """The seven generated secrets must stay generated — a site file that could
+    """The eight generated secrets must stay generated — a site file that could
     set them would invite reusing one across customers."""
     assert not (set(inst.site_to_env(site)) & set(inst.GENERATED))
 

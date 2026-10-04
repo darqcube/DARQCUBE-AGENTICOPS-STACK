@@ -51,7 +51,7 @@ class Device:
         self.site = Rel(site)
 
 
-def load_renderer(monkeypatch, devices, out_dir):
+def load_renderer(monkeypatch, devices, out_dir, services=()):
     """Import render-inventory.py with the SDK replaced by a stub."""
     sdk = types.ModuleType("infrahub_sdk")
 
@@ -60,7 +60,7 @@ def load_renderer(monkeypatch, devices, out_dir):
             pass
 
         def filters(self, **kw):
-            return devices
+            return list(services) if kw.get("kind") == "NetworkService" else devices
 
     sdk.InfrahubClientSync = StubClient
     sdk.Config = lambda **kw: None
@@ -96,6 +96,8 @@ def test_renders_one_resource_file_per_platform(monkeypatch, tmp_path):
         "snmp-ios_xe.conf",
         "snmp-vrp.conf",
         "snmp-routeros.conf",
+        "services-dst.json",
+        "services-src.json",
         "devices.json",
         "devices.yml",
     }
@@ -511,3 +513,119 @@ def test_flow_lookup_prefers_the_dedicated_listener_tag():
 def test_compose_publishes_the_dedicated_flow_range():
     body = (ROOT / "compose/observability.yaml").read_text()
     assert "${FLOW_DEDICATED_FIRST:-2056}-${FLOW_DEDICATED_LAST:-2105}:" in body
+
+
+# --- application labels for flows -------------------------------------------
+
+class Host:
+    def __init__(self, name, address, status="active"):
+        self.name = Attr(name)
+        self.address = Attr(address)
+        self.status = Attr(status)
+
+
+class App:
+    def __init__(self, name, criticality="medium"):
+        self.name = Attr(name)
+        self.criticality = Attr(criticality)
+
+
+class One:
+    def __init__(self, peer):
+        self.peer = peer
+
+
+class Service:
+    def __init__(self, name, host, app, port, protocol="tcp"):
+        self.name = Attr(name)
+        self.host = One(host)
+        self.application = One(app)
+        self.port = Attr(port)
+        self.protocol = Attr(protocol)
+
+
+def test_service_tables_key_the_server_side_of_both_directions(monkeypatch, tmp_path):
+    db = Host("srv-db-01", "10.0.10.12/32")
+    erp = App("erp", "critical")
+    services = [Service("db-pg", db, erp, 5432), Service("dns-udp", Host("dns-01", "10.0.10.13"), App("dns"), 53, "udp")]
+    mod = load_renderer(monkeypatch, THREE, tmp_path, services)
+    assert mod.main() == 0
+    dst = json.loads((tmp_path / "services-dst.json").read_text())
+    src = json.loads((tmp_path / "services-src.json").read_text())
+    assert dst["10.0.10.12:5432/tcp"] == {"application": "erp", "criticality": "critical"}
+    assert src["10.0.10.12:5432/tcp"] == {"reply_application": "erp", "reply_criticality": "critical"}
+    assert dst["10.0.10.13:53/udp"]["application"] == "dns", "/32 stripped, protocol kept"
+
+
+def test_service_tables_exist_even_when_nothing_is_modelled(monkeypatch, tmp_path):
+    """processors.lookup refuses to start on a missing file."""
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    for name in ("services-dst.json", "services-src.json"):
+        assert json.loads((tmp_path / name).read_text()) == {}
+
+
+def test_service_on_a_host_without_address_or_inactive_is_skipped(monkeypatch, tmp_path, capsys):
+    services = [Service("a", Host("h1", None), App("x"), 80),
+                Service("b", Host("h2", "10.0.0.2", status="maintenance"), App("y"), 80)]
+    mod = load_renderer(monkeypatch, THREE, tmp_path, services)
+    assert mod.main() == 0
+    assert json.loads((tmp_path / "services-dst.json").read_text()) == {}
+    assert "has no address" in capsys.readouterr().err
+
+
+
+
+
+
+def test_flow_queries_use_the_metric_name_prometheus_stores():
+    """The aggregator's flow_bytes_total field is exposed as
+    netflow_flow_bytes_total. The bare name matched nothing, so the
+    NoFlowsReceived alert fired forever and the flow panel stayed empty."""
+    paths = [*(ROOT / "observability/prometheus").rglob("*.yml"),
+             *(ROOT / "observability/grafana").rglob("*.json"),
+             ROOT / "mcp/servers/prometheus.py"]
+    for path in paths:
+        text = path.read_text()
+        bare = re.findall(r"(?<![a-z_])flow_(?:bytes|packets)_total", text)
+        assert not bare, f"{path.name}: queries flow_*_total without the netflow_ prefix"
+
+def test_static_flow_config_keeps_labels_bounded_and_references_no_generated_file():
+    """conf.d is live the moment it is pulled; a lookup table it named would not
+    exist until make render, and Telegraf refuses to start on a missing file."""
+    conf = (ROOT / "observability/telegraf/conf.d/netflow.conf").read_text()
+    assert "services-dst.json" not in conf and "services-src.json" not in conf
+    assert 'tag = ["protocol", "direction"]' in conf
+    taginclude = re.search(r"taginclude = \[(.*?)\]", conf).group(1)
+    for label in ("application", "criticality", "protocol", "direction"):
+        assert f'"{label}"' in taginclude
+    for banned in ("src", "dst", "src_port", "dst_port"):
+        assert f'"{banned}"' not in taginclude, "a per-flow value became a label"
+    assert 'fieldpass = ["in_bytes", "in_packets"]' in conf
+
+
+def test_application_processors_render_only_with_services(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    assert not (tmp_path / "netflow-applications.conf").exists()
+
+    services = [Service("db-pg", Host("srv-db-01", "10.0.10.12"), App("erp", "critical"), 5432)]
+    mod = load_renderer(monkeypatch, THREE, tmp_path, services)
+    assert mod.main() == 0
+    body = (tmp_path / "netflow-applications.conf").read_text()
+    assert body.count("[[processors.lookup]]") == 2 and "[[processors.starlark]]" in body
+    assert '{{.Field "dst"}}:{{.Field "dst_port"}}/{{.Tag "protocol"}}' in body
+    assert "services-dst.json" in body and "services-src.json" in body
+    orders = [int(n) for n in re.findall(r"order = (\d+)", body)]
+    static = (ROOT / "observability/telegraf/conf.d/netflow.conf").read_text()
+    converter = int(re.search(r"\[\[processors.converter\]\]\s*\n\s*order = (\d+)", static).group(1))
+    override = int(re.search(r"\[\[processors.override\]\]\s*\n\s*order = (\d+)", static).group(1))
+    assert all(converter < n < override for n in orders), "lookups must run after protocol is a tag, before addresses go"
+
+
+def test_dropping_the_last_service_removes_the_processors(monkeypatch, tmp_path):
+    (tmp_path / "netflow-applications.conf").write_text("stale")
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    assert not (tmp_path / "netflow-applications.conf").exists()
+

@@ -107,3 +107,11 @@ ai_platform:
   # not registered at all — it cannot be discovered, let alone called. Turn
   # this on deliberately, not by default.
   allow_write: false
+
+
+source_of_truth:
+  # Re-render collector configuration automatically when Infrahub's main
+  # branch changes, instead of running `make render` by hand. Off by default:
+  # turn it on, re-run install.py (or add "auto-render" to COMPOSE_PROFILES),
+  # `make up`, then `make auto-render` once. docs/how-to/auto-render.md
+  auto_render: false

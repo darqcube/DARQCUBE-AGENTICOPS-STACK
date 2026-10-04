@@ -24,7 +24,7 @@ cp .env.example .env
 # anywhere is a leak everywhere.
 for var in NEO4J_PASSWORD RABBITMQ_PASSWORD POSTGRES_PASSWORD \
            INFRAHUB_SECRET_KEY INFRAHUB_ADMIN_TOKEN MCP_AUTH_TOKEN \
-           GRAFANA_ADMIN_PASSWORD; do
+           GRAFANA_ADMIN_PASSWORD RENDER_HOOK_SECRET; do
   secret=$(python3 -c "import secrets; print(secrets.token_hex(24))")
   # The delimiter is | because a hex secret can never contain one.
   sed -i.bak "s|^${var}=.*|${var}=${secret}|" .env
@@ -34,7 +34,7 @@ rm -f .env.bak
 echo "Generated .env with random secrets for:"
 echo "  NEO4J_PASSWORD  RABBITMQ_PASSWORD  POSTGRES_PASSWORD"
 echo "  INFRAHUB_SECRET_KEY  INFRAHUB_ADMIN_TOKEN  MCP_AUTH_TOKEN"
-echo "  GRAFANA_ADMIN_PASSWORD"
+echo "  GRAFANA_ADMIN_PASSWORD  RENDER_HOOK_SECRET"
 echo
 echo "Still to fill in yourself — these cannot be generated:"
 # Only real assignments — the header comments mention CHANGEME too.

@@ -75,6 +75,12 @@ BRANCH ?= main
 seed: ## Apply source-of-truth/devices/*.yml to Infrahub. BRANCH=x stages it for review
 	$(COMPOSE) exec -T -e INFRAHUB_BRANCH=$(strip $(BRANCH)) infrahub-server python /scripts/seed.py
 
+auto-render: ## Register the Infrahub webhook for auto-render (needs the auto-render profile up)
+	$(COMPOSE) exec -T -e RENDER_HOOK_SECRET=$(strip $(RENDER_HOOK_SECRET)) infrahub-server python /scripts/render-hook.py --register
+
+auto-render-off: ## Deactivate the auto-render webhook (back to make render by hand)
+	$(COMPOSE) exec -T infrahub-server python /scripts/render-hook.py --unregister
+
 render: ## Infrahub -> Telegraf + Logstash configs. Run after any device change.
 	$(COMPOSE) exec -T -e FLOW_DEDICATED_FIRST=$(strip $(FLOW_DEDICATED_FIRST)) \
 		-e FLOW_DEDICATED_LAST=$(strip $(FLOW_DEDICATED_LAST)) infrahub-server python /scripts/render-inventory.py

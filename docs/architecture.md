@@ -324,10 +324,15 @@ Step by step: [administration/infrahub-guide.md](administration/infrahub-guide.m
 
 Besides sites and devices, Infrahub can hold **prefixes, hosts, applications
 and services** — which servers run which applications on which ports, in which
-subnets, behind which gateway. Collectors do not read them yet; the AI
-platform does, through `mcp-infrahub`
-(`get_application_dependencies` and friends). Seeded like devices:
-[how-to/model-applications.md](how-to/model-applications.md).
+subnets, behind which gateway. The AI platform reads them through `mcp-infrahub`
+(`get_application_dependencies` and friends), and `make render` turns the
+services into NetFlow lookup tables so every flow carries `application` and
+`criticality` ([how-to/label-flows-by-application.md](how-to/label-flows-by-application.md)).
+Seeded like devices: [how-to/model-applications.md](how-to/model-applications.md).
+
+**Auto-render (optional).** With the `auto-render` profile, Infrahub calls
+`render-hook` on every change to `main` and the render happens by itself —
+[how-to/auto-render.md](how-to/auto-render.md).
 
 ## Ingest ownership
 

@@ -233,6 +233,45 @@ services:
     networks: [darqcube]
     restart: unless-stopped
 
+  # Auto-render (OPTIONAL, off by default — profile "auto-render"): re-runs
+  # render-inventory.py when Infrahub's main branch changes, so collectors
+  # follow Infrahub without `make render`. Enable it in site.yml
+  # (source_of_truth.auto_render: true) or COMPOSE_PROFILES, then
+  # `make auto-render` once. docs/how-to/auto-render.md
+  render-hook:
+    profiles: ["auto-render"]
+    image: registry.opsmill.io/opsmill/infrahub:${INFRAHUB_VERSION:-1.10.9}
+    labels:
+      com.darqcube.group: source-of-truth
+      com.darqcube.role: render-hook
+    command: ["python", "/scripts/render-hook.py"]
+    environment:
+      INFRAHUB_ADDRESS: http://infrahub-server:8000
+      INFRAHUB_API_TOKEN: ${INFRAHUB_ADMIN_TOKEN:?set in .env}
+      RENDER_HOOK_SECRET: ${RENDER_HOOK_SECRET:-}
+      RENDER_HOOK_DEBOUNCE: ${RENDER_HOOK_DEBOUNCE:-15}
+      # Same inputs as `make render`, so both write identical output.
+      SNMP_SHARD_SIZE: ${SNMP_SHARD_SIZE:-150}
+      FLOW_DEDICATED_FIRST: ${FLOW_DEDICATED_FIRST:-2056}
+      FLOW_DEDICATED_LAST: ${FLOW_DEDICATED_LAST:-2105}
+    volumes:
+      - ../source-of-truth/scripts:/scripts:ro
+      - ../platforms.yml:/platforms.yml:ro
+      - ../observability/telegraf/profiles:/profiles:ro
+      - ../observability/telegraf/generated:/generated
+    # Compose network only — never published. Infrahub's workers call it.
+    expose: ["8099"]
+    depends_on:
+      infrahub-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8099/healthz').status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks: [darqcube]
+    restart: unless-stopped
+
 volumes:
   neo4j-data:
   neo4j-logs:

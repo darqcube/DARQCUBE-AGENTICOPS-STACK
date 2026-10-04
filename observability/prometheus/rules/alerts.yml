@@ -48,12 +48,26 @@ groups:
       # Flow is device-initiated, so silence is the only symptom of an exporter
       # that has stopped. Nothing else in the stack would notice.
       - alert: NoFlowsReceived
-        expr: absent_over_time(flow_bytes_total[15m])
+        expr: absent_over_time(netflow_flow_bytes_total[15m])
         for: 15m
         labels: { severity: warning }
         annotations:
           summary: "No NetFlow/IPFIX received for 15 minutes"
           description: "Check /ip traffic-flow or the device's flow export config."
+
+      # A critical application (Infrahub criticality) that was carrying traffic
+      # and has gone quiet: the service, its host or the path to it is likely
+      # down. Needs services modelled in Infrahub; silent otherwise.
+      - alert: CriticalApplicationSilent
+        expr: |
+          max by (application) (max_over_time(netflow_flow_bytes_total{criticality="critical"}[6h]) > 0)
+            unless on (application)
+          max by (application) (max_over_time(netflow_flow_bytes_total{criticality="critical"}[15m]))
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "No traffic to critical application {{ $labels.application }} for 15 minutes"
+          description: "It carried traffic in the last 6 hours. Check its hosts and services in Infrahub (get_application_dependencies)."
 
   - name: platform
     rules:

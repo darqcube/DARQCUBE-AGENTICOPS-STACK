@@ -256,12 +256,12 @@ Other routes:
 
 ## What's in the box
 
-21 containers in four groups. Select a group with
+22 containers in four groups (render-hook only with auto-render). Select a group with
 `docker ps --filter "label=com.darqcube.group=observability"`.
 
 | Group | Containers | Published |
 |---|---|---|
-| **source-of-truth** | infrahub-server, infrahub-worker, neo4j, redis, rabbitmq, task-db, task-manager | Infrahub UI |
+| **source-of-truth** | infrahub-server, infrahub-worker, neo4j, redis, rabbitmq, task-db, task-manager, render-hook (optional, auto-render) | Infrahub UI |
 | **observability** | telegraf, logstash, prometheus, loki, alertmanager, grafana, config-init | Grafana, Prometheus, Alertmanager, Loki, syslog, NetFlow, IPFIX |
 | **automation** | automation | the automation API |
 | **mcp** | mcp-infrahub, -prometheus, -loki, -grafana, -netmiko, -assurance | nothing — internal only |
@@ -354,6 +354,8 @@ make config-put DEV=cr1 FILE=change.txt   # push, and report what changed
 | Change a port | `.env` → [guide](docs/how-to/change-ports.md) |
 | NetFlow from devices behind NAT | device `flow_port` → [guide](docs/how-to/flow-behind-nat.md) |
 | Model applications and services | `source-of-truth/devices/*.yml` → [guide](docs/how-to/model-applications.md) |
+| NetFlow by application | services in Infrahub → [guide](docs/how-to/label-flows-by-application.md) |
+| Render automatically on Infrahub changes | `auto-render` profile → [guide](docs/how-to/auto-render.md) |
 | Connect an AI platform | [guide](docs/how-to/connect-an-ai-platform.md) |
 | Deploy at a customer site | [guide](docs/how-to/deploy-on-customer-premises.md) |
 | Chase data loss that produces **no error** | [guide](docs/how-to/fix-silent-data-loss.md) |
@@ -369,7 +371,7 @@ seed` updates the source of truth, `make render` pushes it to the collectors.
 | [docs/INSTALL.md](docs/INSTALL.md) | install on a fresh VM — `install.py` or by hand |
 | [docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md) | sites and devices in Infrahub — UI or YAML — and verifying end to end |
 | [docs/scale.md](docs/scale.md) | the 400-device envelope and how to grow |
-| [docs/how-to/](docs/how-to/) | 21 task guides: add a device, change an alert, add a vendor… |
+| [docs/how-to/](docs/how-to/) | 23 task guides: add a device, change an alert, add a vendor… |
 | [docs/install/](docs/install/) | one page per component — config, ports, verify, problems |
 | [docs/devices/](docs/devices/) | device-side config per platform |
 | [docs/architecture.md](docs/architecture.md) | diagrams and the failure table |

@@ -191,6 +191,7 @@ Six are **required**: `site.collector_ip`, `devices.ssh_user`,
 | `alerts.webhook_url` | where alerts are delivered | optional | empty means alerts stay in the Alertmanager UI — no external dependency |
 | `ai_platform.enabled` | run the six MCP servers | optional | `false` removes no other feature |
 | `ai_platform.allow_write` | may an AI push configuration to devices | **leave `false` unless you mean it** | `true` registers the write tool; `false` means it does not exist to be called |
+| `source_of_truth.auto_render` | re-render collectors automatically on Infrahub changes | optional, default `false` | `true` adds the `auto-render` profile; then `make auto-render` once — [how-to/auto-render.md](how-to/auto-render.md) |
 
 ### `expected_devices` does the tuning for you
 
@@ -206,7 +207,7 @@ It sets three things you would otherwise get right by reading
 ### Re-running is safe
 
 `install.py` reads `site.yml` every time and regenerates `.env`, but **keeps the
-seven secrets it already generated** — regenerating those would orphan the data
+eight secrets it already generated** — regenerating those would orphan the data
 already in Neo4j and Postgres. Change a value in `site.yml`, re-run, and only
 that value moves.
 
