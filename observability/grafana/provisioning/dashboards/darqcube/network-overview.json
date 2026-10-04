@@ -50,15 +50,25 @@
       }
     ]
   },
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
+  ],
+  "description": "PoC landing page: site and WAN health, critical applications, internet edge, configuration changes and network events. Details live on the linked dashboards.",
   "panels": [
     {
-      "id": 1,
       "type": "stat",
       "title": "Devices monitored",
-      "description": "Devices currently reporting SNMP. Compare with the device count in Infrahub \u2014 a gap means a device exists in intent but is not being polled.",
+      "description": "Devices currently reporting SNMP. Compare with Infrahub \u2014 a gap means a device exists in intent but is not polled.",
       "gridPos": {
         "h": 4,
-        "w": 8,
+        "w": 4,
         "x": 0,
         "y": 0
       },
@@ -74,6 +84,8 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
@@ -92,17 +104,27 @@
           }
         },
         "overrides": []
-      }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 1
     },
     {
-      "id": 2,
       "type": "stat",
       "title": "Interfaces down",
       "description": "Admin-up but operationally down. Deliberately shut ports are excluded.",
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 8,
+        "w": 4,
+        "x": 4,
         "y": 0
       },
       "datasource": {
@@ -111,12 +133,14 @@
       },
       "targets": [
         {
-          "expr": "sum(interface_oper_status{device=~\"$device\"} == 2 and interface_admin_status{device=~\"$device\"} == 1) or vector(0)",
+          "expr": "count(interface_oper_status{device=~\"$device\", site=~\"$site\"} == 2 and interface_admin_status{device=~\"$device\", site=~\"$site\"} == 1) or vector(0)",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
@@ -139,16 +163,27 @@
           }
         },
         "overrides": []
-      }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 2
     },
     {
-      "id": 3,
       "type": "stat",
       "title": "Alerts firing",
+      "description": "",
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 16,
+        "w": 4,
+        "x": 8,
         "y": 0
       },
       "datasource": {
@@ -163,6 +198,8 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
@@ -181,15 +218,183 @@
           }
         },
         "overrides": []
-      }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 3
     },
     {
-      "id": 6,
-      "type": "table",
-      "title": "Interface status",
-      "description": "Every interface, with the site and role Infrahub holds for its device.",
+      "type": "stat",
+      "title": "WAN tunnels down",
+      "description": "Tunnel interfaces (IANA ifType 131 \u2014 DMVPN, GRE, VTI) that are configured up but down.",
       "gridPos": {
-        "h": 9,
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(interface_oper_status{device=~\"$device\", site=~\"$site\", ifType=\"131\"} == 2 and interface_admin_status{device=~\"$device\", site=~\"$site\", ifType=\"131\"} == 1) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 4
+    },
+    {
+      "type": "stat",
+      "title": "Config changes (24 h)",
+      "description": "Configuration-change syslog events (Cisco %SYS-5-CONFIG_I and equivalents).",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({device=~\".+\", device=~\"$device\", site=~\"$site\"} |~ \"CONFIG_I|CFGCHANGE|(?i)configuration changed|config changed\" [24h])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 5
+    },
+    {
+      "type": "stat",
+      "title": "Unclassified traffic",
+      "description": "Flow traffic matching no service in Infrahub (application=\"other\") \u2014 internet traffic and unmodelled servers. Informational: internet browsing, routing protocols and tunnels are not applications.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", application=\"other\"}) / sum(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\"})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 6
+    },
+    {
+      "type": "stat",
+      "title": "Site health",
+      "description": "Per site: devices that reported in the last hour but not now, plus interfaces that are configured up but down. 0 = OK.",
+      "gridPos": {
+        "h": 6,
         "w": 12,
         "x": 0,
         "y": 4
@@ -200,79 +405,68 @@
       },
       "targets": [
         {
-          "expr": "interface_oper_status{device=~\"$device\", site=~\"$site\"}",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "instance": true,
-              "job": true,
-              "agent_host": true,
-              "hostname": true
-            },
-            "renameByName": {
-              "Value": "oper",
-              "ifName": "interface",
-              "ifAlias": "description",
-              "ifType": "type"
-            }
-          }
+          "expr": "(count by (site) (max_over_time(device_uptime{site=~\"$site\"}[1h])) - (count by (site) (device_uptime{site=~\"$site\"}) or count by (site) (max_over_time(device_uptime{site=~\"$site\"}[1h])) * 0)) + (count by (site) (interface_oper_status{site=~\"$site\"} == 2 and interface_admin_status{site=~\"$site\"} == 1) or count by (site) (max_over_time(device_uptime{site=~\"$site\"}[1h])) * 0)",
+          "refId": "A",
+          "legendFormat": "{{site}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "oper"
-            },
-            "properties": [
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
               {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "1": {
-                        "text": "up",
-                        "color": "green",
-                        "index": 0
-                      },
-                      "2": {
-                        "text": "down",
-                        "color": "red",
-                        "index": 1
-                      }
-                    }
-                  }
-                ]
+                "color": "green",
+                "value": null
               },
               {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
               }
             ]
-          }
-        ]
-      }
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "id": 7
     },
     {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Interface throughput",
+      "type": "stat",
+      "title": "WAN tunnels down per device",
+      "description": "Every device with tunnel interfaces: how many are down. 'all up' = every tunnel operational.",
       "gridPos": {
-        "h": 9,
+        "h": 6,
         "w": 12,
         "x": 12,
         "y": 4
@@ -283,36 +477,67 @@
       },
       "targets": [
         {
-          "expr": "rate(interface_in_octets{device=~\"$device\"}[5m]) * 8",
-          "legendFormat": "{{device}} {{ifName}} in",
-          "refId": "A"
-        },
-        {
-          "expr": "rate(interface_out_octets{device=~\"$device\"}[5m]) * 8",
-          "legendFormat": "{{device}} {{ifName}} out",
-          "refId": "B"
+          "expr": "count by (device) (interface_oper_status{device=~\"$device\", site=~\"$site\", ifType=\"131\"} == 2 and interface_admin_status{device=~\"$device\", site=~\"$site\", ifType=\"131\"} == 1) or count by (device) (interface_oper_status{device=~\"$device\", site=~\"$site\", ifType=\"131\"}) * 0",
+          "refId": "A",
+          "legendFormat": "{{device}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bps",
-          "custom": {
-            "fillOpacity": 0
-          }
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "all up",
+                  "color": "green"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
-      }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "id": 8
     },
     {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Flow volume by protocol",
-      "description": "From NetFlow/IPFIX. Per-flow addresses and ports are deliberately not collected, so this shows how much traffic of what kind \u2014 not who is talking to whom.",
+      "type": "table",
+      "title": "Critical applications \u2014 now vs normal",
+      "description": "Applications marked critical in Infrahub: traffic in the last 5 min against the 6 h average. A sharp drop is the first sign of an application problem.",
       "gridPos": {
-        "h": 10,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 13
+        "y": 10
       },
       "datasource": {
         "type": "prometheus",
@@ -320,8 +545,213 @@
       },
       "targets": [
         {
-          "expr": "sum by (protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\"}[5m])) * 8 / 60",
-          "legendFormat": "{{protocol}}",
+          "expr": "sum by (application) (avg_over_time(netflow_flow_bytes_total{criticality=\"critical\"}[5m])) * 8 / 60",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (application) (avg_over_time(netflow_flow_bytes_total{criticality=\"critical\"}[6h])) * 8 / 60",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "now",
+              "Value #B": "6 h average"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "alias": "vs normal",
+            "binary": {
+              "left": "now",
+              "operator": "/",
+              "right": "6 h average"
+            },
+            "replaceFields": false
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vs normal"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.5
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.8
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "vs normal",
+            "desc": false
+          }
+        ]
+      },
+      "id": 9
+    },
+    {
+      "type": "bargauge",
+      "title": "Top applications per site (last 15 min)",
+      "description": "Modelled applications per exporter site. Several exporters in one site see the same flows, so each site shows its busiest exporter's view.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, max by (site, application) (sum by (site, device, application) (avg_over_time(netflow_flow_bytes_total{site=~\"$site\", application!=\"other\"}[15m]))) * 8 / 60))",
+          "legendFormat": "{{site}} \u00b7 {{application}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "Internet edge traffic",
+      "description": "Flows seen by devices with role internet-edge (Infrahub). Ingress/egress are per monitored interface.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (direction) (avg_over_time(netflow_flow_bytes_total{role=\"internet-edge\"}[5m])) * 8 / 60",
+          "legendFormat": "{{direction}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(avg_over_time(netflow_flow_bytes_total{role=\"internet-edge\", application=\"other\"}[5m])) * 8 / 60",
+          "legendFormat": "unclassified",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 11
+    },
+    {
+      "type": "timeseries",
+      "title": "WAN tunnel throughput",
+      "description": "In + out across each device's tunnel interfaces \u2014 the WAN load per site router.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (device) (rate(interface_in_octets{device=~\"$device\", site=~\"$site\", ifType=\"131\"}[5m]) + rate(interface_out_octets{device=~\"$device\", site=~\"$site\", ifType=\"131\"}[5m])) * 8",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -330,24 +760,36 @@
           "unit": "bps",
           "custom": {
             "fillOpacity": 20,
-            "stacking": {
-              "mode": "normal"
-            }
+            "showPoints": "never"
           }
         },
         "overrides": []
-      }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 12
     },
     {
-      "id": 9,
       "type": "logs",
-      "title": "Device logs",
-      "description": "Syslog via Logstash. Labelled with the same device/site/role as the metrics above, which is what lets the two line up.",
+      "title": "Configuration changes",
+      "description": "Who changed what, when \u2014 from the device's own syslog.",
       "gridPos": {
-        "h": 10,
+        "h": 9,
         "w": 12,
-        "x": 12,
-        "y": 13
+        "x": 0,
+        "y": 26
       },
       "datasource": {
         "type": "loki",
@@ -355,25 +797,124 @@
       },
       "targets": [
         {
-          "expr": "{device=~\"$device\"}",
+          "expr": "{device=~\".+\", device=~\"$device\", site=~\"$site\"} |~ \"CONFIG_I|CFGCHANGE|(?i)configuration changed|config changed\"",
           "refId": "A"
         }
       ],
       "options": {
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": true
-      }
-    }
-  ],
-  "links": [
+        "wrapLogMessage": true,
+        "showLabels": true
+      },
+      "id": 13
+    },
     {
-      "title": "DarqCube dashboards",
-      "type": "dashboards",
-      "tags": [
-        "darqcube"
+      "type": "timeseries",
+      "title": "Routing and link events",
+      "description": "BGP/OSPF adjacency changes, link and line-protocol up/down, DMVPN events (Cisco mnemonics). Spikes mean instability.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "sum by (event) (count_over_time({device=~\".+\", device=~\"$device\", site=~\"$site\"} | regexp `%(?P<event>BGP-5-ADJCHANGE|OSPF-5-ADJCHG|LINK-3-UPDOWN|LINEPROTO-5-UPDOWN|DMVPN-5-[A-Z_]+)` [$__auto]))",
+          "legendFormat": "{{event}}",
+          "refId": "A"
+        }
       ],
-      "asDropdown": true
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 14
+    },
+    {
+      "type": "logs",
+      "title": "Routing and link events \u2014 log",
+      "description": "",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "{device=~\".+\", device=~\"$device\", site=~\"$site\"} |~ \"ADJCHANGE|ADJCHG|UPDOWN|DMVPN\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "showLabels": true
+      },
+      "id": 15
+    },
+    {
+      "type": "logs",
+      "title": "All device logs",
+      "description": "Syslog via Logstash, labelled with the same device/site/role as the metrics.",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "{device=~\".+\", device=~\"$device\", site=~\"$site\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "showLabels": true
+      },
+      "id": 16
     }
   ]
 }

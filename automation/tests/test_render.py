@@ -677,3 +677,14 @@ def test_grafana_opens_on_a_shipped_dashboard():
     assert home.startswith("/etc/grafana/provisioning/dashboards/darqcube/")
     assert (DASHBOARDS / home.rsplit("/", 1)[1]).exists(), "home dashboard file is not shipped"
 
+
+def test_every_loki_panel_has_a_non_empty_matcher():
+    """{device=~"$device"} alone fails in Loki once the variable expands to .*
+    — the panel shows nothing and only the query inspector says why."""
+    for f in DASHBOARDS.glob("*.json"):
+        for p in json.loads(f.read_text())["panels"]:
+            if p.get("datasource", {}).get("type") != "loki":
+                continue
+            for target in p.get("targets", []):
+                assert 'device=~".+"' in target["expr"], f"{f.name}: '{p['title']}' has no non-empty matcher"
+

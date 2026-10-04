@@ -157,6 +157,7 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Telegraf | `--watch-config poll`, never inotify — inotify is unreliable across a volume mount |
 | Loki | labels are `device, site, role, severity` **only**. Message body and Cisco mnemonics stay fields — promoting a mnemonic to a label multiplies stream count by the number of message types. The mnemonic must stay in the stored log line, or it is not searchable at all |
 | Prometheus | never let per-flow IPs or ports become labels; the flow config drops them on purpose. Flow labels are `device, site, role, protocol, direction, source, application, criticality` — all bounded |
+| Grafana + Loki | every Loki target needs a matcher that cannot match empty (`device=~".+"`) besides the `$device` one — a variable expanding to `.*` otherwise fails the whole panel |
 | Flow metrics | the metric is `netflow_flow_bytes_total` (not `flow_bytes_total`) and it is a **gauge** — bytes per 60 s window. Use `avg_over_time(...)/60` for bytes/s, never `rate()` |
 | Telegraf conf.d | must never reference a file under `generated/`: conf.d reloads on `git pull`, before `make render`, and `processors.lookup` refuses to start on a missing file. Processors that need rendered tables are rendered too (`netflow-applications.conf`) |
 | render-hook | the only thing that rewrites collector config without a human. Signed (HMAC), `expose:` only, refuses to run without `RENDER_HOOK_SECRET`. Off by default — profile `auto-render` |

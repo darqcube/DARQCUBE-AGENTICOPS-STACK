@@ -114,7 +114,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (severity) (count_over_time({device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} [$__auto]))",
+          "expr": "sum by (severity) (count_over_time({device=~\".+\", device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} [$__auto]))",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -165,7 +165,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device) (count_over_time({device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} [$__auto]))",
+          "expr": "sum by (device) (count_over_time({device=~\".+\", device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} [$__auto]))",
           "legendFormat": "{{device}}",
           "refId": "A"
         }
@@ -216,7 +216,7 @@
       },
       "targets": [
         {
-          "expr": "topk(15, sum by (mnemonic) (count_over_time({device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} | regexp `%(?P<mnemonic>[A-Z0-9_]+-[0-7]-[A-Z0-9_]+)` [1h])))",
+          "expr": "topk(15, sum by (mnemonic) (count_over_time({device=~\".+\", device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} | regexp `%(?P<mnemonic>[A-Z0-9_]+-[0-7]-[A-Z0-9_]+)` [1h])))",
           "queryType": "instant",
           "refId": "A"
         }
@@ -271,7 +271,7 @@
       },
       "targets": [
         {
-          "expr": "{device=~\"$device\", site=~\"$site\", severity=~\"error|critical|alert|emergency\"}",
+          "expr": "{device=~\".+\", device=~\"$device\", site=~\"$site\", severity=~\"error|critical|alert|emergency\"}",
           "refId": "A"
         }
       ],
@@ -299,7 +299,7 @@
       },
       "targets": [
         {
-          "expr": "{device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} |~ \"(?i)$search\"",
+          "expr": "{device=~\".+\", device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} |~ \"(?i)$search\"",
           "refId": "A"
         }
       ],

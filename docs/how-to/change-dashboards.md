@@ -26,7 +26,7 @@ All in the **DarqCube** folder, linked to each other from the top-right
 
 | Dashboard | uid | Source | Shows |
 |---|---|---|---|
-| **Network Overview** | `darqcube-network` | Prometheus + Loki | the one-page summary: devices, interfaces down, alerts, interface status and throughput, flow by protocol, recent logs (CPU and memory live on Devices & Interfaces) |
+| **Network Overview** | `darqcube-network` | Prometheus + Loki | the landing page: site health, WAN tunnels (ifType 131), critical applications now vs normal, top applications per site, internet edge (role `internet-edge`), WAN throughput, configuration changes, routing and link events, recent logs |
 | **Devices & Interfaces** | `darqcube-devices` | Prometheus (SNMP) | device table (site, role, platform, uptime), interface status, throughput in/out, top utilisation, errors, CPU and memory |
 | **NetFlow** | `darqcube-netflow` | Prometheus (flow) | throughput and packets by exporter, protocol, site and direction |
 | **Applications** | `darqcube-applications` | Prometheus (flow) | flow traffic by application and criticality — needs services in Infrahub ([label-flows-by-application.md](label-flows-by-application.md)) |
@@ -34,6 +34,12 @@ All in the **DarqCube** folder, linked to each other from the top-right
 
 CPU and memory panels stay empty for images that do not implement the
 platform's CPU/memory MIB (for example Cisco IOL); real hardware fills them.
+
+**Loki queries in dashboards** need one matcher that cannot match an empty
+value — `{device=~".+", device=~"$device"}`, not just `{device=~"$device"}`.
+When a variable expands to `.*`, Loki rejects the bare form with
+*queries require at least one regexp or equality matcher that does not have an
+empty-compatible value*, and the panel shows nothing. A test enforces it.
 
 ## Add a new dashboard
 
