@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# EXAMPLE applications. Never seeded from here — copy it first:
+#
+#   cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+#
+# Optional: a deployment that models only devices can leave these out.
+# Hosts, applications, services and prefixes describe what the network
+# serves — see docs/how-to/model-applications.md.
+#
+# Fields:
+#   name         unique, e.g. erp
+#   category     web | code | database | file | mail | directory | dns | time
+#                | logging | collaboration | other (default)
+#   criticality  low | medium (default) | high | critical
+#   owner, description — free text
+# ---------------------------------------------------------------------------
+
+applications:
+  - name: intranet
+    category: web
+    criticality: medium
+    owner: it-web
+
+  - name: erp
+    category: database
+    criticality: critical
+    owner: finance-it
+    description: Orders, customers and invoicing

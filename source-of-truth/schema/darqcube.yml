@@ -59,6 +59,16 @@ nodes:
         optional: true
         cardinality: many
         kind: Component
+      - name: hosts
+        peer: NetworkHost
+        optional: true
+        cardinality: many
+        kind: Component
+      - name: prefixes
+        peer: NetworkPrefix
+        optional: true
+        cardinality: many
+        kind: Component
 
   - name: Device
     namespace: Network
@@ -175,3 +185,230 @@ nodes:
         cardinality: many
         kind: Attribute
         description: Free-form grouping for people browsing. Never a metric or log label.
+
+  # -------------------------------------------------------------------------
+  # What the network serves. Optional: a deployment that models only devices
+  # is unaffected. Seeded from source-of-truth/devices/*.yml like devices —
+  # see docs/how-to/model-applications.md.
+  # -------------------------------------------------------------------------
+  - name: Prefix
+    namespace: Network
+    label: Prefix
+    description: A subnet at a site — users, servers, transit or management.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Short identifier, e.g. site-a-users.
+      - name: prefix
+        kind: IPNetwork
+        optional: true
+        description: The subnet in CIDR form, e.g. 10.10.1.0/24. Required by make seed.
+      - name: purpose
+        kind: Dropdown
+        default_value: users
+        description: What lives in the subnet.
+        choices:
+          - name: users
+          - name: servers
+          - name: transit
+          - name: management
+          - name: dmz
+          - name: internet
+      - name: vlan_id
+        kind: Number
+        optional: true
+        description: VLAN carrying the subnet, if any.
+      - name: description
+        kind: Text
+        optional: true
+    relationships:
+      - name: site
+        peer: NetworkSite
+        optional: true
+        cardinality: one
+        kind: Attribute
+      - name: gateway
+        peer: NetworkDevice
+        optional: true
+        cardinality: one
+        kind: Attribute
+        description: The device that routes for this subnet.
+      - name: hosts
+        peer: NetworkHost
+        optional: true
+        cardinality: many
+        kind: Component
+
+  - name: Host
+    namespace: Network
+    label: Host
+    description: A non-network endpoint — server, workstation, gateway or appliance.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Host name, e.g. srv-01.
+      - name: host_type
+        kind: Dropdown
+        default_value: server
+        description: What the host is.
+        choices:
+          - name: server
+          - name: workstation
+          - name: gateway
+          - name: appliance
+      - name: address
+        kind: IPHost
+        optional: true
+        description: Primary IP address. Required when the host runs services.
+      - name: operating_system
+        kind: Text
+        optional: true
+        description: Operating system, free text.
+      - name: environment
+        kind: Dropdown
+        default_value: production
+        description: Deployment environment.
+        choices:
+          - name: production
+          - name: staging
+          - name: lab
+          - name: demo
+      - name: status
+        kind: Dropdown
+        default_value: active
+        description: Lifecycle state.
+        choices:
+          - name: active
+          - name: provisioning
+          - name: maintenance
+          - name: decommissioned
+      - name: description
+        kind: Text
+        optional: true
+    relationships:
+      - name: site
+        peer: NetworkSite
+        optional: false
+        cardinality: one
+        kind: Attribute
+      - name: prefix
+        peer: NetworkPrefix
+        optional: true
+        cardinality: one
+        kind: Attribute
+      - name: services
+        peer: NetworkService
+        optional: true
+        cardinality: many
+        kind: Component
+      - name: tags
+        peer: BuiltinTag
+        optional: true
+        cardinality: many
+        kind: Attribute
+        description: Free-form grouping for people browsing. Never a metric or log label.
+
+  - name: Application
+    namespace: Network
+    label: Application
+    description: A business application, delivered by one or more services.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Application name as people say it, e.g. erp.
+      - name: category
+        kind: Dropdown
+        default_value: other
+        description: Kind of application.
+        choices:
+          - name: web
+          - name: code
+          - name: database
+          - name: file
+          - name: mail
+          - name: directory
+          - name: dns
+          - name: time
+          - name: logging
+          - name: collaboration
+          - name: other
+      - name: criticality
+        kind: Dropdown
+        default_value: medium
+        description: Business impact if it is down.
+        choices:
+          - name: low
+          - name: medium
+          - name: high
+          - name: critical
+      - name: owner
+        kind: Text
+        optional: true
+        description: Team or person responsible.
+      - name: description
+        kind: Text
+        optional: true
+    relationships:
+      - name: services
+        peer: NetworkService
+        optional: true
+        cardinality: many
+        kind: Component
+
+  - name: Service
+    namespace: Network
+    label: Service
+    description: One listening endpoint — a protocol and port on a host, part of an application.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Unique service name, e.g. srv-01-https.
+      - name: protocol
+        kind: Dropdown
+        default_value: tcp
+        description: Transport protocol.
+        choices:
+          - name: tcp
+          - name: udp
+      - name: port
+        kind: Number
+        optional: true
+        description: Listening port, 1-65535. Required by make seed.
+      - name: description
+        kind: Text
+        optional: true
+    relationships:
+      - name: host
+        peer: NetworkHost
+        optional: false
+        cardinality: one
+        kind: Attribute
+      - name: application
+        peer: NetworkApplication
+        optional: false
+        cardinality: one
+        kind: Attribute

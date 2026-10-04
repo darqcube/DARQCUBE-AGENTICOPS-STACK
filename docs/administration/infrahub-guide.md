@@ -16,7 +16,7 @@ your VM:
 | Tracked in git — the same for everyone | Yours — gitignored |
 |---|---|
 | `source-of-truth/schema/darqcube.yml` | `.env`, `site.yml` |
-| `source-of-truth/devices/examples/*.yml` | `source-of-truth/devices/*.yml` |
+| `source-of-truth/devices/examples/*.yml` | `source-of-truth/devices/*.yml` — devices, sites, and optionally hosts, applications, services, prefixes |
 
 `make seed` reads `source-of-truth/devices/*.yml` and **never** the `examples/`
 folder, so a fresh install starts with an empty Infrahub rather than made-up
@@ -82,6 +82,37 @@ Defined in `source-of-truth/schema/darqcube.yml`, loaded with `make schema`.
 | `telemetry_mode` | Dropdown | `snmp` (default), `gnmi` |
 | `snmp_security` | Dropdown | `auth_priv` (default), `auth_no_priv` — only for images that cannot encrypt SNMP, e.g. Cisco L2 IOL |
 | `flow_enabled` | Boolean | default `false` |
+
+### Prefix, Host, Application, Service (optional)
+
+What the network serves — leave them out if you only model devices.
+Walkthrough: [../how-to/model-applications.md](../how-to/model-applications.md).
+
+| Kind | Attribute / relationship | Values |
+|---|---|---|
+| Prefix | `name` | Text, unique |
+| | `prefix` | IPNetwork, strict CIDR — required by `make seed` |
+| | `purpose` | `users` (default), `servers`, `transit`, `management`, `dmz`, `internet` |
+| | `vlan_id`, `description` | optional |
+| | `site` → Site, `gateway` → Device | optional |
+| Host | `name` | Text, unique |
+| | `site` → Site | required |
+| | `host_type` | `server` (default), `workstation`, `gateway`, `appliance` |
+| | `address` | IPHost — required if the host runs services, inside its prefix |
+| | `prefix` → Prefix, `tags` → Tag | optional |
+| | `operating_system`, `environment`, `status`, `description` | as for devices |
+| Application | `name` | Text, unique |
+| | `category` | `web`, `code`, `database`, `file`, `mail`, `directory`, `dns`, `time`, `logging`, `collaboration`, `other` (default) |
+| | `criticality` | `low`, `medium` (default), `high`, `critical` |
+| | `owner`, `description` | optional |
+| Service | `name` | Text, unique |
+| | `host` → Host, `application` → Application | required |
+| | `protocol` | `tcp` (default), `udp` |
+| | `port` | 1–65535, required by `make seed`; unique per host and protocol |
+
+The reverse lists — a site's hosts, a host's services, an application's
+services — are maintained by Infrahub from the forward side; they are never
+set in the YAML.
 
 **Dropdown or tag?** If code or alerting may act on a value, it is a dropdown —
 a typo in a dropdown is rejected. Tags are for people filtering and browsing.

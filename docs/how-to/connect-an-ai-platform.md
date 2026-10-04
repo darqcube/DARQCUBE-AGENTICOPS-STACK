@@ -17,6 +17,20 @@ Six servers, all reached over the Docker network:
 | `mcp-netmiko` | `http://mcp-netmiko:9005/mcp` | device config and parsed state |
 | `mcp-assurance` | `http://mcp-assurance:9006/mcp` | assurance checks, snapshots, parsed config |
 
+`mcp-infrahub` tools — fixed queries, each taking at most one validated name:
+
+| Tool | Answers |
+|---|---|
+| `list_devices`, `get_device(device)`, `get_site_devices(site)` | which devices exist, where, and how they are reached |
+| `list_applications` | every application with its criticality and the hosts it runs on |
+| `get_application(application)` | its services (protocol, port), hosts, sites, owner |
+| `get_host(host)` | address, site, subnet and gateway device, and the services it runs |
+| `get_site_services(site)` | the hosts at a site and the applications they serve |
+| `get_application_dependencies(application)` | the hosts, subnets, gateways and site devices an application depends on — "what breaks if X fails?" |
+
+The application tools return empty results until hosts and services are
+modelled — [model-applications.md](model-applications.md).
+
 Transport is streamable-HTTP; auth is a bearer token:
 
 ```

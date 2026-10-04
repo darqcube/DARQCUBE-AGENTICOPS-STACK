@@ -43,6 +43,9 @@ devices:
     description: Second core router
 ```
 
+Servers, applications and the services they offer are modelled the same way,
+in their own files — [model-applications.md](model-applications.md).
+
 Every field is defined by the schema, not by the seed script — see
 [administration/infrahub-guide.md](../administration/infrahub-guide.md) for the
 full list, tags, and how to add a field.

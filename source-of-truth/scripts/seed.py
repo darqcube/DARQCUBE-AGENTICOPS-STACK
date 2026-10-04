@@ -49,6 +49,13 @@ SECTIONS = (
     ("tags", "BuiltinTag"),
     ("sites", "NetworkSite"),
     ("devices", "NetworkDevice"),
+    # What the network serves (optional; docs/how-to/model-applications.md).
+    # A prefix may name its gateway device, a host its prefix, a service its
+    # host and application — so each comes after what it refers to.
+    ("prefixes", "NetworkPrefix"),
+    ("hosts", "NetworkHost"),
+    ("applications", "NetworkApplication"),
+    ("services", "NetworkService"),
 )
 
 # Relationships a record may set. Component, Parent, Group and Profile
@@ -154,6 +161,13 @@ def _value_error(attr: dict, value) -> str | None:
         except ValueError:
             return f"'{value}' is not an IP address"
         return None
+    if attr["kind"] == "IPNetwork":
+        # strict: 10.0.1.5/24 is a typo for a host or a prefix, never a prefix.
+        try:
+            ipaddress.ip_network(str(value), strict=True)
+        except ValueError:
+            return f"'{value}' is not a network in CIDR form (e.g. 10.0.1.0/24)"
+        return None
     expected = VALUE_TYPES.get(attr["kind"])
     # bool is a subclass of int: `true` must not pass as a Number.
     if expected and (not isinstance(value, expected) or (expected == (int,) and isinstance(value, bool))):
@@ -174,6 +188,61 @@ def check_device(rec: dict, platforms: dict) -> list[str]:
     if not rec.get("management_ip") and not rec.get("management_host"):
         problems.append("needs management_ip or management_host — nothing to poll or SSH to")
     return problems
+
+
+def check_service(rec: dict) -> list[str]:
+    """A service is an endpoint flows are matched against: it needs a real port."""
+    port = rec.get("port")
+    if port is None:
+        return ["needs a port"]
+    if isinstance(port, int) and not isinstance(port, bool) and not 1 <= port <= 65535:
+        return [f"port {port} is outside 1-65535"]
+    return []
+
+
+def check_prefix(rec: dict) -> list[str]:
+    return [] if rec.get("prefix") else ["needs a prefix, e.g. 10.0.1.0/24"]
+
+
+def check_relations(sections: dict) -> list[str]:
+    """Rules that span records, so they cannot live on a single one.
+
+    - Two services on one host with the same protocol and port would make a
+      flow match two applications.
+    - A host that runs services needs an address, or nothing can be matched
+      to it.
+    - A host's address must fall inside the prefix it says it lives in.
+    """
+    errors: list[str] = []
+    hosts = {str(r["name"]): (src, r) for src, r in sections.get("hosts", [])}
+    prefixes = {str(r["name"]): r for _, r in sections.get("prefixes", [])}
+
+    seen: dict[tuple, str] = {}
+    for src, rec in sections.get("services", []):
+        key = (rec.get("host"), rec.get("protocol", "tcp"), rec.get("port"))
+        if key in seen:
+            errors.append(
+                f"{src}: service '{rec['name']}' uses {key[1]}/{key[2]} on host '{key[0]}', "
+                f"already used by service '{seen[key]}'"
+            )
+        else:
+            seen[key] = rec["name"]
+        host = hosts.get(str(rec.get("host")))
+        if host and not host[1].get("address"):
+            errors.append(f"{host[0]}: host '{rec['host']}' runs service '{rec['name']}' but has no address")
+
+    for name, (src, rec) in hosts.items():
+        prefix = prefixes.get(str(rec.get("prefix")))
+        if not (prefix and rec.get("address") and prefix.get("prefix")):
+            continue
+        try:
+            inside = ipaddress.ip_interface(str(rec["address"])).ip in ipaddress.ip_network(str(prefix["prefix"]))
+        except ValueError:
+            continue  # the per-record check already reported the bad value
+        if not inside:
+            errors.append(f"{src}: host '{name}' address {rec['address']} is not inside prefix "
+                          f"'{rec['prefix']}' ({prefix['prefix']})")
+    return errors
 
 
 def validate(sections: dict, views: dict, known: dict, platforms: dict) -> list[str]:
@@ -229,6 +298,11 @@ def validate(sections: dict, views: dict, known: dict, platforms: dict) -> list[
 
             if kind == "NetworkDevice":
                 errors.extend(f"{where}: {p}" for p in check_device(rec, platforms))
+            elif kind == "NetworkService":
+                errors.extend(f"{where}: {p}" for p in check_service(rec))
+            elif kind == "NetworkPrefix":
+                errors.extend(f"{where}: {p}" for p in check_prefix(rec))
+    errors.extend(check_relations(sections))
     return errors
 
 
@@ -290,7 +364,7 @@ def apply(client, sections: dict, views: dict, existing: dict, ids: dict) -> dic
                         setattr(node, rel_name, peer_ids(rel_name))
                 node.save()
                 action = "updated"
-            print(f"  {section[:-1]:<7}{name:<24}{action}")
+            print(f"  {section[:-1]:<12}{name:<24}{action}")
         counts[section] = len(sections[section])
     return counts
 

@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+# EXAMPLE prefixes (subnets). Never seeded from here — copy it first:
+#
+#   cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+#
+# Optional: a deployment that models only devices can leave these out.
+# Hosts, applications, services and prefixes describe what the network
+# serves — see docs/how-to/model-applications.md.
+#
+# Fields (from source-of-truth/schema/darqcube.yml):
+#   name       unique, e.g. hq-servers
+#   prefix     CIDR, required — strict: 10.0.10.0/24, not 10.0.10.5/24
+#   purpose    users (default) | servers | transit | management | dmz | internet
+#   vlan_id    optional
+#   site       optional; must exist in sites.yml
+#   gateway    optional; the device that routes for it (devices.yml)
+# ---------------------------------------------------------------------------
+
+prefixes:
+  - name: hq-servers
+    prefix: 10.0.10.0/24
+    purpose: servers
+    vlan_id: 20
+    site: hq
+    gateway: cr1
+
+  - name: branch-01-users
+    prefix: 10.0.11.0/24
+    purpose: users
+    vlan_id: 10
+    site: branch-01
+    gateway: mt-01

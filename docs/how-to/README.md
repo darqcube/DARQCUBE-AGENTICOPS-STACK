@@ -31,6 +31,7 @@ files and commands. If you are looking for *what a component is*, see
 |---|---|
 | Change a published port | [change-ports.md](change-ports.md) |
 | Collect NetFlow from devices behind NAT (labs, remote sites) | [flow-behind-nat.md](flow-behind-nat.md) |
+| Model servers, applications, services and subnets in Infrahub | [model-applications.md](model-applications.md) |
 | Change retention, intervals or resource limits | [change-settings.md](change-settings.md) |
 | Add a whole new service to the stack | [add-a-service.md](add-a-service.md) |
 | Connect an AI platform | [connect-an-ai-platform.md](connect-an-ai-platform.md) |

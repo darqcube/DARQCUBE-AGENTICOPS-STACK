@@ -253,6 +253,15 @@ def test_schema_platforms_match_platforms_yml():
     )
 
 
+def test_no_schema_name_is_shorter_than_three_characters():
+    """Infrahub rejects the whole schema load with string_too_short for an
+    attribute or relationship name under 3 characters (e.g. os, ip)."""
+    schema = yaml.safe_load((ROOT / "source-of-truth/schema/darqcube.yml").read_text())
+    for node in schema["nodes"]:
+        for item in node.get("attributes", []) + node.get("relationships", []):
+            assert len(item["name"]) >= 3, f"{node[name]}.{item[name]} is too short for Infrahub"
+
+
 def test_no_schema_description_hits_the_128_char_limit():
     """Infrahub rejects the ENTIRE schema load with string_too_long and does
     not name the field, so this is checked here instead of by bisecting."""

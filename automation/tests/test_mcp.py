@@ -101,3 +101,15 @@ def test_device_arguments_are_validated():
     for server in ("netmiko", "assurance", "prometheus", "loki", "infrahub"):
         source = (SERVERS / f"{server}.py").read_text()
         assert "identifier(" in source, f"{server}: no argument validation"
+
+
+def test_infrahub_serves_the_service_model():
+    """The AI platform's way into hosts, applications and services. Each tool
+    takes one validated name (or none) and builds its query server-side."""
+    source = (SERVERS / "infrahub.py").read_text()
+    for tool in ("list_applications", "get_application", "get_host",
+                 "get_site_services", "get_application_dependencies"):
+        assert f"def {tool}(" in source, f"infrahub: {tool} missing"
+    for arg in ("application", "host", "site"):
+        assert f'identifier({arg}, "{arg}")' in source, f"infrahub: '{arg}' is not validated"
+

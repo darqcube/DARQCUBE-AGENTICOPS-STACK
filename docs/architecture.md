@@ -320,6 +320,15 @@ What render writes for each device is decided by three of its attributes:
 
 Step by step: [administration/infrahub-guide.md](administration/infrahub-guide.md).
 
+### What the network serves (optional)
+
+Besides sites and devices, Infrahub can hold **prefixes, hosts, applications
+and services** — which servers run which applications on which ports, in which
+subnets, behind which gateway. Collectors do not read them yet; the AI
+platform does, through `mcp-infrahub`
+(`get_application_dependencies` and friends). Seeded like devices:
+[how-to/model-applications.md](how-to/model-applications.md).
+
 ## Ingest ownership
 
 Each feed has exactly one owner. No feed is collected twice.

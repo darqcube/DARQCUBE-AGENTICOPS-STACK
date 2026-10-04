@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# EXAMPLE services (listening endpoints). Never seeded from here — copy it first:
+#
+#   cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+#
+# Optional: a deployment that models only devices can leave these out.
+# Hosts, applications, services and prefixes describe what the network
+# serves — see docs/how-to/model-applications.md.
+#
+# Fields:
+#   name         unique, e.g. srv-web-01-https
+#   host         required; must exist in hosts.yml (and have an address)
+#   application  required; must exist in applications.yml
+#   protocol     tcp (default) | udp
+#   port         required, 1-65535; unique per host and protocol
+# ---------------------------------------------------------------------------
+
+services:
+  - name: srv-web-01-http
+    host: srv-web-01
+    application: intranet
+    protocol: tcp
+    port: 80
+
+  - name: srv-web-01-https
+    host: srv-web-01
+    application: intranet
+    protocol: tcp
+    port: 443
+
+  - name: srv-db-01-postgres
+    host: srv-db-01
+    application: erp
+    protocol: tcp
+    port: 5432

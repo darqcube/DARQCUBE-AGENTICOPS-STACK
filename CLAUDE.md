@@ -144,6 +144,9 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Area | Constraint |
 |---|---|
 | Infrahub schema | every `description:` must be **under 128 characters** — one longer field fails the entire schema load with `string_too_long` and never names the field |
+| Infrahub schema | attribute and relationship **names need at least 3 characters** (`os`, `ip` fail the whole load with `string_too_short`) |
+| Infrahub schema | reverse lists (a site's hosts, a host's services) are `kind: Component`: `seed.py` never writes them, so seeding a parent cannot unlink its children. Forward sides are `kind: Attribute` |
+| Seeding | a new **kind** is the only code change: add it to `SECTIONS` in `seed.py`, after every kind it refers to |
 | Infrahub compose | Postgres 18+ mounts at `/var/lib/postgresql`, **not** `/var/lib/postgresql/data` |
 | Infrahub compose | Prefect is embedded in the Infrahub image — no separate Prefect image |
 | Infrahub API | every attribute comes wrapped as `{"value": x}` — flatten before returning it to a model |

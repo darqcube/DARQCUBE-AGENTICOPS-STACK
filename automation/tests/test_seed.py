@@ -224,3 +224,117 @@ def test_merged_branch_is_refused_before_any_write(seed, monkeypatch, tmp_path, 
     assert "merged and read-only" in err
     assert "BRANCH=cs1-snmp-2" in err
     assert client.created == []
+
+
+# --- hosts, applications, services, prefixes --------------------------------
+
+PREFIX = {"name": "hq-servers", "prefix": "10.0.10.0/24", "purpose": "servers", "site": "hq", "gateway": "cr1"}
+HOST = {"name": "srv-01", "site": "hq", "address": "10.0.10.11", "prefix": "hq-servers"}
+APP = {"name": "erp", "category": "database", "criticality": "critical"}
+SERVICE = {"name": "srv-01-pg", "host": "srv-01", "application": "erp", "protocol": "tcp", "port": 5432}
+
+
+def model(**overrides):
+    """A small valid inventory; override one section to break it."""
+    doc = {"sites": [SITE], "devices": [DEVICE], "prefixes": [PREFIX], "hosts": [HOST],
+           "applications": [APP], "services": [SERVICE]}
+    doc.update(overrides)
+    return doc
+
+
+def test_shipped_examples_cover_every_section(seed):
+    """The examples are someone's starting point for the service model too."""
+    sections, errors = seed.load_records(EXAMPLES)
+    assert not errors
+    for section in ("prefixes", "hosts", "applications", "services"):
+        assert sections[section], f"examples/ has no {section}"
+
+
+def test_sections_are_ordered_by_dependency(seed):
+    """A record may only refer to kinds seeded before it."""
+    order = [name for name, _ in seed.SECTIONS]
+    assert order.index("devices") < order.index("prefixes") < order.index("hosts")
+    assert order.index("hosts") < order.index("services")
+    assert order.index("applications") < order.index("services")
+
+
+def test_a_valid_service_model_passes(seed, tmp_path):
+    assert check(seed, tmp_path, model()) == []
+
+
+def test_service_needs_a_port_in_range(seed, tmp_path):
+    no_port = {k: v for k, v in SERVICE.items() if k != "port"}
+    assert any("needs a port" in e for e in check(seed, tmp_path, model(services=[no_port])))
+    errors = check(seed, tmp_path, model(services=[{**SERVICE, "port": 70000}]))
+    assert any("outside 1-65535" in e for e in errors)
+
+
+def test_same_port_twice_on_one_host_is_rejected(seed, tmp_path):
+    """A flow to that port would match two applications."""
+    twin = {**SERVICE, "name": "srv-01-pg-again"}
+    errors = check(seed, tmp_path, model(services=[SERVICE, twin]))
+    assert any("already used by service 'srv-01-pg'" in e for e in errors)
+
+
+def test_same_port_on_another_protocol_is_fine(seed, tmp_path):
+    dns_tcp = {**SERVICE, "name": "srv-01-dns-tcp", "port": 53}
+    dns_udp = {**SERVICE, "name": "srv-01-dns-udp", "port": 53, "protocol": "udp"}
+    assert check(seed, tmp_path, model(services=[dns_tcp, dns_udp])) == []
+
+
+def test_host_running_services_needs_an_address(seed, tmp_path):
+    bare = {k: v for k, v in HOST.items() if k not in ("address",)}
+    errors = check(seed, tmp_path, model(hosts=[bare]))
+    assert any("runs service 'srv-01-pg' but has no address" in e for e in errors)
+
+
+def test_host_address_must_be_inside_its_prefix(seed, tmp_path):
+    errors = check(seed, tmp_path, model(hosts=[{**HOST, "address": "10.9.9.9"}]))
+    assert any("not inside prefix 'hq-servers'" in e for e in errors)
+
+
+def test_prefix_must_be_strict_cidr(seed, tmp_path):
+    errors = check(seed, tmp_path, model(prefixes=[{**PREFIX, "prefix": "10.0.10.5/24"}]))
+    assert any("not a network in CIDR form" in e for e in errors)
+    no_cidr = {k: v for k, v in PREFIX.items() if k != "prefix"}
+    assert any("needs a prefix" in e for e in check(seed, tmp_path, model(prefixes=[no_cidr])))
+
+
+def test_service_must_name_a_known_host_and_application(seed, tmp_path):
+    errors = check(seed, tmp_path, model(services=[{**SERVICE, "host": "nope", "application": "nada"}]))
+    assert any("host 'nope' does not exist" in e for e in errors)
+    assert any("application 'nada' does not exist" in e for e in errors)
+
+
+def test_unknown_service_field_is_rejected(seed, tmp_path):
+    errors = check(seed, tmp_path, model(services=[{**SERVICE, "ports": [5432]}]))
+    assert any("unknown field 'ports'" in e for e in errors)
+
+
+def test_reverse_lists_are_never_written_by_seed():
+    """Site.hosts, Host.services and friends are Component relationships:
+    seed sets the forward side only, so seeding a site cannot unlink hosts."""
+    schema = yaml.safe_load(SCHEMA.read_text())
+    reverse = {("Site", "hosts"), ("Site", "prefixes"), ("Prefix", "hosts"),
+               ("Host", "services"), ("Application", "services")}
+    for node in schema["nodes"]:
+        for rel in node.get("relationships", []):
+            if (node["name"], rel["name"]) in reverse:
+                assert rel["kind"] == "Component", f"{node['name']}.{rel['name']} must be Component"
+
+
+
+def test_worked_example_in_the_model_applications_guide_is_valid(seed, tmp_path):
+    """The guide builds on the shipped device examples; its YAML must seed."""
+    import re
+
+    guide = (ROOT / "docs/how-to/model-applications.md").read_text()
+    section = guide.split("## Worked example", 1)[1].split("\n## ", 1)[0]
+    blocks = [yaml.safe_load(b) for b in re.findall(r"```yaml\n(.*?)```", section, re.S)]
+    assert len(blocks) == 3
+    base = [yaml.safe_load((EXAMPLES / f).read_text()) for f in ("sites.yml", "devices.yml")]
+    merged: dict = {}
+    for doc in blocks:
+        for key, items in doc.items():
+            merged.setdefault(key, []).extend(items)
+    assert check(seed, tmp_path, *base, merged) == []
