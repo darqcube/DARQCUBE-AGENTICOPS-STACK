@@ -22,8 +22,14 @@
   # which writes one input per level (a device's snmp_security in Infrahub).
 __SECURITY__
   interval = "${SNMP_INTERVAL}"
-  timeout = "10s"
-  retries = 1
+  # Per request. SNMP is UDP: a reply lost on the path (WAN, firewall, NAT,
+  # a busy control plane) is only recovered by a retry, and one more loss
+  # than `retries` fails the whole device for that interval. An unreachable
+  # device costs timeout x (retries + 1) of its shard's window — 5s x 4 = 20s
+  # by default, the figure docs/scale.md is sized for. The :- defaults keep a
+  # render that runs before `make up` (no env yet) loadable.
+  timeout = "${SNMP_TIMEOUT:-5s}"
+  retries = ${SNMP_RETRIES:-3}
   agent_host_tag = "agent_host"
 
   [inputs.snmp.tags]

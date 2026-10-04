@@ -629,3 +629,20 @@ def test_dropping_the_last_service_removes_the_processors(monkeypatch, tmp_path)
     assert mod.main() == 0
     assert not (tmp_path / "netflow-applications.conf").exists()
 
+
+def test_snmp_timing_comes_from_env_with_a_bounded_worst_case():
+    """Hardcoded 10s x 1 retry failed a device on two lost UDP replies.
+    The timing is per deployment now; the default keeps a dead device's cost
+    at the 20 s docs/scale.md is sized for."""
+    for tmpl in ("_interfaces.conf.tmpl", "_resources.conf.tmpl"):
+        body = (ROOT / "observability/telegraf/profiles" / tmpl).read_text()
+        # The :- defaults matter: a make render before make up (no env yet) must still load.
+        assert 'timeout = "${SNMP_TIMEOUT:-5s}"' in body and "retries = ${SNMP_RETRIES:-3}" in body, tmpl
+    env = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]["telegraf"]["environment"]
+    timeout = int(re.match(r"\$\{SNMP_TIMEOUT:-(\d+)s\}", env["SNMP_TIMEOUT"]).group(1))
+    retries = int(re.match(r"\$\{SNMP_RETRIES:-(\d+)\}", env["SNMP_RETRIES"]).group(1))
+    assert retries >= 3, "fewer retries fails a device on ordinary UDP loss"
+    assert timeout * (retries + 1) <= 20, "a dead device would hold its shard longer than scale.md allows"
+    example = (ROOT / ".env.example").read_text()
+    assert f"SNMP_TIMEOUT={timeout}s" in example and f"SNMP_RETRIES={retries}" in example
+

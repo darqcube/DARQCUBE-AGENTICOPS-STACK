@@ -82,9 +82,16 @@ intervals of headroom.
 
 ### 3. SNMP poll window
 
-A timeout plus one retry is 20 seconds. At a 30s interval, one unreachable
-device is close to overrunning the whole cycle, and Telegraf logs
-`did not complete within its interval` and skips samples.
+An unreachable device costs `SNMP_TIMEOUT x (SNMP_RETRIES + 1)` — 5 s x 4 =
+20 seconds by default. At a 30s interval, one unreachable device is close to
+overrunning the whole cycle, and Telegraf logs `did not complete within its
+interval` and skips samples.
+
+The split matters. **Retries** recover lost UDP replies — the normal case on
+a WAN, through a firewall or NAT, or from a busy control plane — so the
+default spends the 20 s on four short attempts rather than two long ones.
+**Timeout** only needs to exceed the slowest real reply; raise it for
+high-latency sites, and lower `SNMP_RETRIES` to keep the product at 20 s.
 
 Two mitigations, both on by default:
 

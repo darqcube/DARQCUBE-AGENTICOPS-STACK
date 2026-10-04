@@ -181,6 +181,8 @@ services:
       SNMPV3_AUTH: ${SNMPV3_AUTH:?set in .env}
       SNMPV3_PRIV: ${SNMPV3_PRIV:?set in .env}
       SNMP_INTERVAL: ${SNMP_INTERVAL:-30s}
+      SNMP_TIMEOUT: ${SNMP_TIMEOUT:-5s}
+      SNMP_RETRIES: ${SNMP_RETRIES:-3}
       GNMI_USER: ${GNMI_USER:-}
       GNMI_PASSWORD: ${GNMI_PASSWORD:-}
     volumes:

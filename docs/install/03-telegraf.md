@@ -22,7 +22,7 @@ Without it: all metrics and flow stop. Logs and automation are unaffected.
 | `observability/telegraf/profiles/_resources.conf.tmpl` | CPU/memory shape |
 | `platforms.yml` | the per-vendor CPU and memory OIDs |
 | `observability/telegraf/generated/` | **written by `make render` — never edit** (includes `netflow-dedicated.conf` when any device has a `flow_port`) |
-| `.env` → `SNMP_INTERVAL`, `SNMPV3_*`, `NETFLOW_PORT`, `IPFIX_PORT`, `FLOW_DEDICATED_FIRST`, `FLOW_DEDICATED_LAST` | |
+| `.env` → `SNMP_INTERVAL`, `SNMP_TIMEOUT`, `SNMP_RETRIES`, `SNMPV3_*`, `NETFLOW_PORT`, `IPFIX_PORT`, `FLOW_DEDICATED_FIRST`, `FLOW_DEDICATED_LAST` | |
 
 ## Two SNMP inputs per device, on purpose
 
@@ -76,6 +76,7 @@ curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=count by (platform)(de
 |---|---|
 | `translating: MIB search path: ...` | a symbolic OID like `IF-MIB::ifName`. The image ships no MIBs — use numeric OIDs. |
 | `request timeout` per agent | SNMP credentials, ACL or firewall — or the device's SNMPv3 level differs from its `snmp_security`. Test with `nc -zvu <ip> 161`. |
+| occasional `request timeout`, a different device each time | replies lost on the path (NAT, firewall, WAN loss), not the devices. The retries absorb it; if it persists, raise `SNMP_RETRIES` (keeping `SNMP_TIMEOUT x (SNMP_RETRIES + 1)` ≤ 20 s). Known case: a stack VM behind a desktop hypervisor's NAT (e.g. VMware Fusion) drops replies when many devices answer at once |
 | Interface metrics named `device_*`, not `interface_*` | `name_override` in an SNMP template renames the table too — use `name`. A test forbids it |
 | New `generated/` files not polled | Telegraf has not loaded them — `make restart SVC=telegraf` |
 | Metric has an extra prefix | the field name repeats the measurement — `interface` + `interface_oper_status` gives `interface_interface_oper_status` |

@@ -10,6 +10,7 @@ config file, listed below.
 | `PROM_RETENTION` | `15d` | how long metrics are kept |
 | `LOKI_RETENTION` | `336h` | how long logs are kept (14 days) |
 | `SNMP_INTERVAL` | `30s` | how often devices are polled |
+| `SNMP_TIMEOUT` / `SNMP_RETRIES` | `5s` / `3` | per SNMP request; their product + 1 attempt is a dead device's cost (20 s) — [../scale.md](../scale.md) |
 | `AUTOMATION_CONCURRENCY` | `8` | devices talked to at once |
 | `MAX_CONFIG_LINES` | `200` | cap on a single config push |
 | `INFRAHUB_BRANCH` | `main` | which Infrahub branch is read |

@@ -165,6 +165,7 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Cisco syslog | IOS does **not** emit conformant RFC3164 (counter and hostname come before the timestamp). A strict parser drops every line silently |
 | Log time | Loki files a line under the device's timestamp only when it names its zone and is near arrival; otherwise arrival time, tagged `clock_skew`. Never widen the window past Loki's out-of-order and future limits |
 | SNMP security | set per device (`snmp_security`). Never lower the fleet's level to accommodate one device that cannot encrypt |
+| SNMP timing | `SNMP_TIMEOUT x (SNMP_RETRIES + 1)` is what a dead device costs its shard — keep it ≤ 20 s (scale.md). Prefer more retries over a longer timeout: lost UDP replies are common, slow replies rare |
 | MikroTik SNMP | no vendor CPU MIB — uses HOST-RESOURCES-MIB `hrProcessorLoad` |
 | UDP buffers | the most consequential host setting. syslog and flow are UDP: an undersized `net.core.rmem_max` drops datagrams with **no error anywhere**, and the application's larger request is clamped without complaint. Only `netstat -su` shows it |
 | install.py | stdlib only — it runs before pip has been used. A test asserts no third-party imports |
