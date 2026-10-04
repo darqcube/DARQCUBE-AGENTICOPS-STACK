@@ -45,6 +45,7 @@ curl -X POST localhost:${PROMETHEUS_PORT:-9090}/-/reload
 | `bgp_peer_state` | BGP4-MIB, 6 = established; with `bgp_peer_admin_status` (2 = start) |
 | `intent_device_present` | 1 per device active in Infrahub (from `make render`) |
 | `device:not_reporting` | recording rule — intended devices with no SNMP/gNMI data |
+| `assurance_rule_state` | scheduled assurance — `1` per device and rule, label `state` = pass / fail / error / skipped |
 | `netflow_flow_bytes_total` / `netflow_flow_packets_total` | NetFlow/IPFIX — **bytes (packets) per 60 s window, a gauge**; labels `protocol`, `direction`, `application`, `criticality` |
 | `device:cpu_usage:max` | recording rule — one value per device |
 | `device:memory_used_percent:max` | recording rule — comparable across vendors |
@@ -63,6 +64,12 @@ Infrahub, no SNMP/gNMI data for 10 min — names the device and site) and
 **WAN quality alerts shipped:** `IPSLAProbeFailing` (a probe below 80 %
 success over 15 min) and `WANLatencyHigh` (ICMP probe RTT above 150 ms for
 10 min — set the threshold to the WAN's SLA).
+
+**Assurance alerts shipped** (need `ASSURANCE_INTERVAL_MINUTES` > 0):
+`AssuranceCheckFailing` (a rule in `fail` or `error` for 20 min — longer than
+one interval, so a single bad run does not page) and `AssuranceStale` (a
+device not assured for three intervals — the scheduler stopped or the device
+keeps timing out).
 
 **Flow alerts shipped:** `NoFlowsReceived` (no flow from anywhere for 15 min)
 and `CriticalApplicationSilent` (a `critical` application that had traffic in

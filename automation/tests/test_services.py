@@ -38,3 +38,11 @@ def test_infrahub_answers(env, http, compose_ps):
 def test_automation_api_answers(env, http, compose_ps):
     requires_profile(env, "automation")
     assert http(f"http://localhost:{env['AUTOMATION_PORT']}/healthz", retries=3)["status"] == "ok"
+
+
+def test_automation_exposes_assurance_metrics(env, compose_ps):
+    """Prometheus scrapes /metrics; it answers even with the scheduler off."""
+    import urllib.request
+    requires_profile(env, "automation")
+    with urllib.request.urlopen(f"http://localhost:{env['AUTOMATION_PORT']}/metrics", timeout=10) as r:
+        assert "assurance_interval_seconds" in r.read().decode()

@@ -148,3 +148,11 @@ and including them would make every comparison noise.
 | TextFSM parses nothing | `[]` is indistinguishable from "no interfaces" |
 | A normaliser reads a field the parser does not emit | produces plausible but **wrong** booleans — worse than an error, because it still looks like data |
 | Comparing against an empty snapshot | an empty side diffs clean against anything, reporting "no change" when nothing was checked |
+
+## Seeing results over time
+
+Set `ASSURANCE_INTERVAL_MINUTES` and every rule — including one you just
+added — runs on every device on that schedule. A new rule appears on the
+Devices dashboard's assurance matrix after the next run, and
+`AssuranceCheckFailing` covers it with no alert edit: see
+[../install/07-automation.md](../install/07-automation.md#scheduled-assurance).

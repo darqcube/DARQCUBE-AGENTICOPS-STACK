@@ -63,6 +63,28 @@ groups:
           summary: "BGP peer {{ $labels.peer }} on {{ $labels.device }} is not established"
           description: "bgpPeerState {{ $value }} (6 = established) for 5 minutes."
 
+  - name: assurance
+    rules:
+      # A rule from automation/assurance/rules.yml failing on a device for two
+      # consecutive scheduled runs (the for: window covers at least one more).
+      - alert: AssuranceCheckFailing
+        expr: assurance_rule_state{state=~"fail|error"} == 1
+        for: 20m
+        labels: { severity: warning }
+        annotations:
+          summary: "Assurance {{ $labels.rule }} is {{ $labels.state }} on {{ $labels.device }}"
+          description: "Detail: GET /assurance/latest on the automation API, or make check DEV={{ $labels.device }}."
+      # The scheduler is on but a device has not been assured for 3 intervals.
+      - alert: AssuranceStale
+        expr: >-
+          (time() - assurance_device_last_run_timestamp_seconds)
+            > on () group_left () (3 * assurance_interval_seconds > 0)
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.device }} has not been assured for 3 intervals"
+          description: "The scheduled assurance run is stuck or failing — check the automation service log."
+
   - name: wan-quality
     rules:
       # IP SLA probes: a probe that keeps failing is a path (or service) that

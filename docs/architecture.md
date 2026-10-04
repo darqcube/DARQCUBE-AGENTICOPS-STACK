@@ -325,6 +325,12 @@ names every device that is in Infrahub but silent, the `DeviceNotReporting`
 alert fires on it, and the dashboards show it — "is everything we own
 monitored?" answered from the source of truth, not from guesswork.
 
+**Assurance as metrics.** With `ASSURANCE_INTERVAL_MINUTES` set, the
+automation service runs the assurance rules on every device on a schedule
+and exposes `assurance_rule_state` at `/metrics`; Prometheus scrapes it like
+any collector. "Is the network behaving as intended?" then has a history and
+an alert, not only an on-demand answer.
+
 Step by step: [administration/infrahub-guide.md](administration/infrahub-guide.md).
 
 ### What the network serves (optional)

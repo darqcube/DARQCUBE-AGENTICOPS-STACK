@@ -67,8 +67,10 @@ The per-vendor mappings and how to add a rule:
 | `automation/assurance/` | `normalise.py`, `engine.py`, `rules.yml` |
 | `automation/pyats/` | `testbed.py`, `checks.py`, and `samples/` — Genie's own golden fixtures |
 | `automation/service/main.py` | the HTTP API |
+| `automation/service/scheduler.py` | scheduled assurance — runs the rules on every device and exposes the results |
 | `.env` → `DEVICE_USER` / `DEVICE_PASSWORD` | one pair, used by all of the above |
 | `.env` → `AUTOMATION_CONCURRENCY` | devices talked to at once (default 8) |
+| `.env` → `ASSURANCE_INTERVAL_MINUTES` | scheduled assurance every N minutes (default 0 = off) |
 | `.env` → `MAX_CONFIG_LINES` | cap on a single push (default 200) |
 | `.env` → `AUTOMATION_PORT` | published port (default 18100) |
 
@@ -84,6 +86,8 @@ The per-vendor mappings and how to add a rule:
 | `GET /device/{name}/snapshot` | comparable state, for pre/post comparison |
 | `POST /device/{name}/config` | push config lines (reports what changed) |
 | `POST /device/{name}/check` | run the assurance rules — TextFSM on every platform, pyATS where supported |
+| `GET /assurance/latest` | the latest scheduled results, with each rule's detail |
+| `GET /metrics` | the same results in Prometheus format — scraped as job `automation` |
 
 Or from the Makefile:
 
@@ -121,6 +125,43 @@ Adding a rule is a YAML edit. Adding a *platform* needs a normaliser function in
 `automation/assurance/normalise.py` — see
 [../how-to/add-a-platform.md](../how-to/add-a-platform.md).
 
+## Scheduled assurance
+
+On demand, assurance answers "is this device right *now*?". Scheduled, it
+becomes a history: which rule failed, on which device, since when — in
+Prometheus, alertable and on the dashboards.
+
+```bash
+# .env
+ASSURANCE_INTERVAL_MINUTES=15
+docker compose up -d automation
+```
+
+Every interval the service runs the rules on every device in the inventory,
+`AUTOMATION_CONCURRENCY` at a time, through the same `run_assurance` the API
+uses — so a scheduled result and `make check` can never disagree.
+
+It is **off by default** because each run opens an SSH session (and, where
+pyATS is declared, a unicon session) to every device. Pick an interval your
+devices' session limits and AAA logs tolerate; 15 minutes is a reasonable
+start. One run takes roughly `devices ÷ AUTOMATION_CONCURRENCY × ~30 s`.
+
+| Metric | Meaning |
+|---|---|
+| `assurance_rule_state{device, rule, severity, source, state}` | `1` for the current state: `pass`, `fail`, `error` or `skipped` |
+| `assurance_device_run_ok{device}` | `1` the run completed, `0` it could not (unreachable, login failed) |
+| `assurance_device_last_run_timestamp_seconds{device}` | when the device was last assured |
+| `assurance_device_run_duration_seconds{device}` | how long that took |
+| `assurance_interval_seconds` | the configured interval (`0` = off) |
+
+Labels are bounded — devices × rules. *Which* interface or peer failed stays
+in `GET /assurance/latest`, never in a label. Alerts `AssuranceCheckFailing`
+and `AssuranceStale` and the dashboards' assurance panels read these.
+
+The scheduler lives in the API process, and the image runs one uvicorn worker.
+Adding `--workers` would start one scheduler per worker, each assuring every
+device.
+
 ## Import rule
 
 `automation/nornir/`, `automation/textfsm/` and `automation/ttp/` are named
@@ -151,6 +192,8 @@ result still looks like data. This was a real bug: RouterOS flags live in
 against anything, reporting "no change" when nothing was actually checked.
 
 ## Verify
+
+With scheduled assurance on, the first run starts at boot: `docker compose logs automation | grep assurance:` prints `assurance: N device(s) in Ns`, and `curl -s localhost:${AUTOMATION_PORT}/metrics | grep -c assurance_rule_state` counts devices × rules.
 
 ```bash
 source .env

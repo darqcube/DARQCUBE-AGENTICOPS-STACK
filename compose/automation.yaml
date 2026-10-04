@@ -31,6 +31,9 @@ services:
       NET_TEXTFSM: /app/automation/textfsm
       MAX_CONFIG_LINES: ${MAX_CONFIG_LINES:-200}
       AUTOMATION_CONCURRENCY: ${AUTOMATION_CONCURRENCY:-8}
+      # Scheduled assurance: minutes between runs over every device, 0 = off.
+      # Results at /metrics (scraped by Prometheus) and /assurance/latest.
+      ASSURANCE_INTERVAL_MINUTES: ${ASSURANCE_INTERVAL_MINUTES:-0}
       LOKI_URL: http://loki:3100
     volumes:
       # Mounted rather than baked in, so a template or task can be edited and

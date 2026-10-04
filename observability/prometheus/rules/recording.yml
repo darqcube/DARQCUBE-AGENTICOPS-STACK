@@ -65,6 +65,11 @@ groups:
       # IP SLA (platforms with ipsla: true). ipsla:ok is 1 when the latest
       # operation succeeded; its average over a window is the success ratio
       # (1 - loss). Jitter is the spread of the probe's RTT samples.
+      # Scheduled assurance (automation service, ASSURANCE_INTERVAL_MINUTES > 0)
+      - record: network:assurance_failing:count
+        expr: count(assurance_rule_state{state=~"fail|error"} == 1) or vector(0)
+      - record: network:assurance_passing:count
+        expr: count(assurance_rule_state{state="pass"} == 1) or vector(0)
       - record: ipsla:ok
         expr: ipsla_sense == bool 1
       - record: ipsla:success:ratio15m

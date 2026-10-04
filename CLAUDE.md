@@ -177,6 +177,7 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | ntc-templates | IOS-XE templates are filed under `cisco_ios`, not `cisco_xe`. That is why `platforms.yml` carries both `netmiko_type` (how to connect) and `textfsm_platform` (how templates are named) |
 | pyATS sessions | unicon opens its **own** SSH session, separate from Netmiko's. `run_assurance` holds `device_lock` across both so they never overlap on one device — which is why that lock is an `RLock`: the TextFSM read re-takes it from the same thread, and a plain `Lock` deadlocks |
 | BGP sessions | identify by **(vrf, af, peer)**, never by peer address alone. Genie's own iosxe fixture has 2.2.2.2 in both VRF1 and default — separate sessions. Collapsing by IP lets one being down hide behind the other being up |
+| Scheduled assurance | `automation/service/scheduler.py` runs inside the API process — keep uvicorn single-worker, or every worker assures every device. Off by default (`ASSURANCE_INTERVAL_MINUTES=0`): each run is an SSH session per device. Rule detail stays out of labels (`/assurance/latest`) so series stay devices × rules |
 | Genie fixtures | `automation/pyats/samples/*.json` are Genie's **own** golden test data, copied out of the installed package. Use them to test pyATS logic offline; don't hand-write Genie output |
 
 ## Don't

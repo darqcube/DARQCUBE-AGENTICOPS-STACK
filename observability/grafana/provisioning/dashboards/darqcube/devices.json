@@ -926,6 +926,104 @@
           }
         ]
       }
+    },
+    {
+      "type": "table",
+      "title": "Assurance \u2014 every rule on every device",
+      "description": "Latest scheduled assurance run, including skipped rules (a feature the device does not run).",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "assurance_rule_state{device=~\"$device\"} == 1",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "Value": true
+            },
+            "indexByName": {
+              "device": 0,
+              "rule": 1,
+              "state": 2,
+              "severity": 3,
+              "source": 4
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "pass": {
+                        "text": "pass",
+                        "color": "green"
+                      },
+                      "fail": {
+                        "text": "FAIL",
+                        "color": "red"
+                      },
+                      "error": {
+                        "text": "error",
+                        "color": "orange"
+                      },
+                      "skipped": {
+                        "text": "skipped",
+                        "color": "text"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "state",
+            "desc": false
+          }
+        ]
+      },
+      "id": 15
     }
   ],
   "links": [

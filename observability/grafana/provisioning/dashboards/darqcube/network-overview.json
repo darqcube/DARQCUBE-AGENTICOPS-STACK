@@ -974,6 +974,187 @@
       "id": 14
     },
     {
+      "type": "stat",
+      "title": "Assurance: checks failing",
+      "description": "Rules from automation/assurance/rules.yml run on every device by the scheduler (ASSURANCE_INTERVAL_MINUTES). Failing = fail or error; skipped rules do not apply to that device.",
+      "gridPos": {
+        "h": 7,
+        "w": 5,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "network:assurance_failing:count",
+          "legendFormat": "failing",
+          "refId": "A"
+        },
+        {
+          "expr": "network:assurance_passing:count",
+          "legendFormat": "passing",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "passing"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "vertical"
+      },
+      "id": 15
+    },
+    {
+      "type": "table",
+      "title": "Assurance results \u2014 failing first",
+      "description": "Latest scheduled run per device and rule. Detail (which interface, which peer): GET /assurance/latest on the automation API.",
+      "gridPos": {
+        "h": 7,
+        "w": 19,
+        "x": 5,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "assurance_rule_state{device=~\"$device\", state!=\"skipped\"} == 1",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "Value": true
+            },
+            "indexByName": {
+              "device": 0,
+              "rule": 1,
+              "state": 2,
+              "severity": 3,
+              "source": 4
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "pass": {
+                        "text": "pass",
+                        "color": "green"
+                      },
+                      "fail": {
+                        "text": "FAIL",
+                        "color": "red"
+                      },
+                      "error": {
+                        "text": "error",
+                        "color": "orange"
+                      },
+                      "skipped": {
+                        "text": "skipped",
+                        "color": "text"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "state",
+            "desc": false
+          }
+        ]
+      },
+      "id": 16
+    },
+    {
       "type": "table",
       "title": "Critical applications \u2014 now vs normal",
       "description": "Applications marked critical in Infrahub: traffic in the last 5 min against the 6 h average. A sharp drop is the first sign of an application problem.",
@@ -981,7 +1162,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 25
       },
       "datasource": {
         "type": "prometheus",
@@ -1085,7 +1266,7 @@
           }
         ]
       },
-      "id": 15
+      "id": 17
     },
     {
       "type": "bargauge",
@@ -1095,7 +1276,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 25
       },
       "datasource": {
         "type": "prometheus",
@@ -1124,7 +1305,7 @@
           ]
         }
       },
-      "id": 16
+      "id": 18
     },
     {
       "type": "timeseries",
@@ -1134,7 +1315,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 26
+        "y": 33
       },
       "datasource": {
         "type": "prometheus",
@@ -1176,7 +1357,7 @@
           "sort": "desc"
         }
       },
-      "id": 17
+      "id": 19
     },
     {
       "type": "timeseries",
@@ -1186,7 +1367,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 26
+        "y": 33
       },
       "datasource": {
         "type": "prometheus",
@@ -1223,7 +1404,7 @@
           "sort": "desc"
         }
       },
-      "id": 18
+      "id": 20
     },
     {
       "type": "logs",
@@ -1233,7 +1414,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 41
       },
       "datasource": {
         "type": "loki",
@@ -1251,7 +1432,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 19
+      "id": 21
     },
     {
       "type": "timeseries",
@@ -1261,7 +1442,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 41
       },
       "datasource": {
         "type": "loki",
@@ -1302,7 +1483,7 @@
           "sort": "desc"
         }
       },
-      "id": 20
+      "id": 22
     },
     {
       "type": "logs",
@@ -1312,7 +1493,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 50
       },
       "datasource": {
         "type": "loki",
@@ -1330,7 +1511,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 21
+      "id": 23
     },
     {
       "type": "logs",
@@ -1340,7 +1521,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 50
       },
       "datasource": {
         "type": "loki",
@@ -1358,7 +1539,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 22
+      "id": 24
     }
   ]
 }

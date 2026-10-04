@@ -22,6 +22,13 @@ scrape_configs:
     static_configs:
       - targets: [telegraf:9273]
 
+  # Scheduled assurance results (automation service /metrics). Present
+  # whether or not scheduling is on: with ASSURANCE_INTERVAL_MINUTES=0 it
+  # exposes only assurance_interval_seconds 0.
+  - job_name: automation
+    static_configs:
+      - targets: [automation:8100]
+
   - job_name: prometheus
     static_configs:
       - targets: [localhost:9090]

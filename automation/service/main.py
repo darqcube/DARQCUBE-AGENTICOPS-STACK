@@ -13,12 +13,14 @@ from __future__ import annotations
 import re
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 # Absolute imports only — automation/nornir/ and automation/textfsm/ shadow the
 # installed libraries if this package is imported any other way.
 from automation.assurance import normalise
 from automation.nornir import tasks
+from automation.service import scheduler
 from automation.textfsm import parse as textfsm_parse
 from automation.ttp import parse as ttp_parse
 
@@ -47,6 +49,24 @@ class ConfigPush(BaseModel):
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+
+@app.on_event("startup")
+def start_scheduled_assurance():
+    # Off unless ASSURANCE_INTERVAL_MINUTES > 0 — see automation/service/scheduler.py.
+    scheduler.start()
+
+
+@app.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)
+def metrics():
+    """Scheduled assurance results in Prometheus text format."""
+    return scheduler.metrics()
+
+
+@app.get("/assurance/latest")
+def assurance_latest():
+    """The latest scheduled assurance results, with each rule's detail."""
+    return scheduler.latest()
 
 
 @app.get("/devices")

@@ -12,6 +12,7 @@ config file, listed below.
 | `SNMP_INTERVAL` | `30s` | how often devices are polled |
 | `SNMP_TIMEOUT` / `SNMP_RETRIES` | `5s` / `3` | per SNMP request; their product + 1 attempt is a dead device's cost (20 s) — [../scale.md](../scale.md) |
 | `AUTOMATION_CONCURRENCY` | `8` | devices talked to at once |
+| `ASSURANCE_INTERVAL_MINUTES` | `0` (off) | scheduled assurance on every device — [../install/07-automation.md](../install/07-automation.md#scheduled-assurance) |
 | `MAX_CONFIG_LINES` | `200` | cap on a single config push |
 | `INFRAHUB_BRANCH` | `main` | which Infrahub branch is read |
 | `COMPOSE_PROFILES` | `devices,automation,mcp` | which groups start |

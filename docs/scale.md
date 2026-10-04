@@ -129,6 +129,10 @@ enforces the label list.
 fetch across 400 devices is 25 rounds. Raise it if your devices tolerate more
 concurrent sessions; the host is rarely the limit.
 
+Scheduled assurance (`ASSURANCE_INTERVAL_MINUTES`) uses the same
+concurrency: 400 devices at 16 and ~30 s each is about 13 minutes per run,
+so keep the interval above that — 30 minutes at that size.
+
 ## Growing past 400
 
 In rough order of what to do first:
