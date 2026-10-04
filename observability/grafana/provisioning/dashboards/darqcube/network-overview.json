@@ -58,7 +58,7 @@
       "description": "Devices currently reporting SNMP. Compare with the device count in Infrahub \u2014 a gap means a device exists in intent but is not being polled.",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 8,
         "x": 0,
         "y": 0
       },
@@ -101,8 +101,8 @@
       "description": "Admin-up but operationally down. Deliberately shut ports are excluded.",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 8,
+        "x": 8,
         "y": 0
       },
       "datasource": {
@@ -147,8 +147,8 @@
       "title": "Alerts firing",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 8,
+        "x": 16,
         "y": 0
       },
       "datasource": {
@@ -184,74 +184,6 @@
       }
     },
     {
-      "id": 4,
-      "type": "timeseries",
-      "title": "CPU usage",
-      "description": "Normalised across vendors. Cisco, Huawei and MikroTik use three different MIBs but produce the same metric name.",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "darqcube-prometheus"
-      },
-      "targets": [
-        {
-          "expr": "device:cpu_usage:max{device=~\"$device\", site=~\"$site\"}",
-          "legendFormat": "{{device}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "custom": {
-            "fillOpacity": 5
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Memory usage",
-      "description": "Derived by a recording rule: the three vendors report memory in percent, bytes and allocation units respectively. See observability/prometheus/rules/recording.yml.",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "darqcube-prometheus"
-      },
-      "targets": [
-        {
-          "expr": "device:memory_used_percent:max{device=~\"$device\", site=~\"$site\"}",
-          "legendFormat": "{{device}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "custom": {
-            "fillOpacity": 5
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 6,
       "type": "table",
       "title": "Interface status",
@@ -260,7 +192,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -343,7 +275,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -377,10 +309,10 @@
       "title": "Flow volume by protocol",
       "description": "From NetFlow/IPFIX. Per-flow addresses and ports are deliberately not collected, so this shows how much traffic of what kind \u2014 not who is talking to whom.",
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 12,
         "x": 0,
-        "y": 21
+        "y": 13
       },
       "datasource": {
         "type": "prometheus",
@@ -415,7 +347,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 21
+        "y": 13
       },
       "datasource": {
         "type": "loki",

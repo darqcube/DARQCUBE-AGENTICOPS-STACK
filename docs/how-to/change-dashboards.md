@@ -26,7 +26,7 @@ All in the **DarqCube** folder, linked to each other from the top-right
 
 | Dashboard | uid | Source | Shows |
 |---|---|---|---|
-| **Network Overview** | `darqcube-network` | Prometheus + Loki | the one-page summary: devices, interfaces down, alerts, throughput, flow by protocol, recent logs |
+| **Network Overview** | `darqcube-network` | Prometheus + Loki | the one-page summary: devices, interfaces down, alerts, interface status and throughput, flow by protocol, recent logs (CPU and memory live on Devices & Interfaces) |
 | **Devices & Interfaces** | `darqcube-devices` | Prometheus (SNMP) | device table (site, role, platform, uptime), interface status, throughput in/out, top utilisation, errors, CPU and memory |
 | **NetFlow** | `darqcube-netflow` | Prometheus (flow) | throughput and packets by exporter, protocol, site and direction |
 | **Applications** | `darqcube-applications` | Prometheus (flow) | flow traffic by application and criticality — needs services in Infrahub ([label-flows-by-application.md](label-flows-by-application.md)) |
