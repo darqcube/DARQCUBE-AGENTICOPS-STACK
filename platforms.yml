@@ -82,6 +82,7 @@ ios_xe:
       used: 1.3.6.1.4.1.9.9.221.1.1.1.1.18     # cempMemPoolHCUsed  (bytes)
       free: 1.3.6.1.4.1.9.9.221.1.1.1.1.20     # cempMemPoolHCFree  (bytes)
       mib: CISCO-ENHANCED-MEMPOOL-MIB
+    bgp: true                                   # BGP4-MIB bgpPeerTable -> bgp_peer_*
 
 vrp:
   display_name: Huawei VRP
@@ -107,6 +108,7 @@ vrp:
       kind: percent                             # the one vendor that gives a % directly
       used: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.11 # hwEntityMemUsage
       mib: HUAWEI-ENTITY-EXTENT-MIB
+    bgp: true                                   # BGP4-MIB bgpPeerTable -> bgp_peer_*
 
 routeros:
   display_name: MikroTik RouterOS

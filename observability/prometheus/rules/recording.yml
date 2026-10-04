@@ -49,3 +49,16 @@ groups:
 
       - record: network:devices_monitored:count
         expr: count(count by (device) (device_uptime))
+      # Intent vs reality: devices Infrahub says are active (make render writes
+      # intent_device) against devices actually reporting SNMP or gNMI.
+      - record: network:devices_intended:count
+        expr: count(intent_device_present)
+      - record: device:not_reporting
+        expr: >-
+          intent_device_present
+            unless on (device)
+          group by (device) ({__name__=~"device_uptime|interface_oper_status"})
+      - record: network:devices_not_reporting:count
+        expr: count(device:not_reporting) or vector(0)
+      - record: network:bgp_sessions_down:count
+        expr: count(bgp_peer_state != 6 and on (device, peer) bgp_peer_admin_status == 2) or vector(0)

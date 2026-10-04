@@ -21,7 +21,7 @@ Without it: all metrics and flow stop. Logs and automation are unaffected.
 | `observability/telegraf/profiles/_interfaces.conf.tmpl` | IF-MIB, shared by all platforms |
 | `observability/telegraf/profiles/_resources.conf.tmpl` | CPU/memory shape |
 | `platforms.yml` | the per-vendor CPU and memory OIDs |
-| `observability/telegraf/generated/` | **written by `make render` — never edit** (includes `netflow-dedicated.conf` when any device has a `flow_port`) |
+| `observability/telegraf/generated/` | **written by `make render` — never edit** (includes `netflow-dedicated.conf` when any device has a `flow_port`, `netflow-applications.conf` when services exist, and `intent.conf`/`intent.influx`) |
 | `.env` → `SNMP_INTERVAL`, `SNMP_TIMEOUT`, `SNMP_RETRIES`, `SNMPV3_*`, `NETFLOW_PORT`, `IPFIX_PORT`, `FLOW_DEDICATED_FIRST`, `FLOW_DEDICATED_LAST` | |
 
 ## Two SNMP inputs per device, on purpose

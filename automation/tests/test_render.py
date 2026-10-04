@@ -98,6 +98,8 @@ def test_renders_one_resource_file_per_platform(monkeypatch, tmp_path):
         "snmp-routeros.conf",
         "services-dst.json",
         "services-src.json",
+        "intent.conf",
+        "intent.influx",
         "devices.json",
         "devices.yml",
     }
@@ -163,7 +165,7 @@ def test_device_with_only_a_management_host(monkeypatch, tmp_path):
 def test_default_security_is_auth_priv_with_no_placeholder_left(monkeypatch, tmp_path):
     mod = load_renderer(monkeypatch, THREE, tmp_path)
     mod.main()
-    for conf in tmp_path.glob("*.conf"):
+    for conf in tmp_path.glob("snmp-*.conf"):
         body = conf.read_text()
         assert "__SECURITY__" not in body, conf.name
         assert 'sec_level = "authPriv"' in body, conf.name
@@ -180,7 +182,7 @@ def test_auth_no_priv_device_gets_its_own_inputs(monkeypatch, tmp_path):
     mod = load_renderer(monkeypatch, devices, tmp_path)
     assert mod.main() == 0
 
-    produced = {p.name for p in tmp_path.glob("*.conf")}
+    produced = {p.name for p in tmp_path.glob("snmp-*.conf")}
     assert produced == {
         "snmp-interfaces.conf", "snmp-ios_xe.conf",
         "snmp-interfaces-authnopriv.conf", "snmp-ios_xe-authnopriv.conf",
@@ -687,4 +689,66 @@ def test_every_loki_panel_has_a_non_empty_matcher():
                 continue
             for target in p.get("targets", []):
                 assert 'device=~".+"' in target["expr"], f"{f.name}: '{p['title']}' has no non-empty matcher"
+
+
+# --- intent vs reality --------------------------------------------------------
+
+def test_intent_lists_every_rendered_device_with_its_labels(monkeypatch, tmp_path):
+    """One intent_device series per active device: what SHOULD report. The
+    labels are the identity table's, so it joins the metrics on device."""
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    lines = (tmp_path / "intent.influx").read_text().splitlines()
+    assert len(lines) == 3
+    assert "intent_device,device=cr1,site=hq,role=core,platform=ios_xe,telemetry=snmp present=1i" in lines
+    conf = (tmp_path / "intent.conf").read_text()
+    assert "/etc/telegraf/telegraf.d/generated/intent.influx" in conf and 'data_format = "influx"' in conf
+
+
+def test_intent_escapes_tag_values():
+    """A site called 'branch 01, east' must not break line protocol."""
+    src = (ROOT / "source-of-truth/scripts/render-inventory.py").read_text()
+    assert 'replace(",", "\\\\,")' in src and 'replace(" ", "\\\\ ")' in src
+
+
+def test_skipped_devices_are_not_intended(monkeypatch, tmp_path):
+    """A device the renderer cannot poll (unknown platform) must not be
+    reported as silent forever."""
+    devices = [*THREE, Device("x1", "ios_xr", "10.0.0.99", "hq", "core")]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    mod.main()
+    assert "device=x1" not in (tmp_path / "intent.influx").read_text()
+
+
+# --- BGP peers ----------------------------------------------------------------
+
+def test_bgp_table_only_for_platforms_that_declare_it(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    platforms = yaml.safe_load((ROOT / "platforms.yml").read_text())
+    for platform in ("ios_xe", "vrp", "routeros"):
+        body = (tmp_path / f"snmp-{platform}.conf").read_text()
+        has = 'name = "bgp_peer"' in body
+        assert has == bool(platforms[platform]["snmp"].get("bgp")), platform
+    body = (tmp_path / "snmp-ios_xe.conf").read_text()
+    for oid in ("1.3.6.1.2.1.15.3.1.2", "1.3.6.1.2.1.15.3.1.7", "1.3.6.1.2.1.15.3.1.3"):
+        assert oid in body
+
+
+def test_bgp_and_intent_rules_use_metrics_that_are_produced():
+    rules = (ROOT / "observability/prometheus/rules/recording.yml").read_text() + \
+            (ROOT / "observability/prometheus/rules/alerts.yml").read_text()
+    for metric in ("bgp_peer_state", "bgp_peer_admin_status", "intent_device_present"):
+        assert metric in rules
+    assert "BGPPeerDown" in rules and "DeviceNotReporting" in rules
+
+
+def test_prometheus_output_outlives_a_poll_cycle():
+    """At the 60 s default, expiry equalled SNMP_INTERVAL and a slightly late
+    poll dropped the device out of Prometheus until the next one."""
+    conf = (ROOT / "observability/telegraf/conf.d/outputs.conf").read_text()
+    m = re.search(r'expiration_interval = "(\d+)([sm])"', conf)
+    assert m, "expiration_interval must be set explicitly"
+    seconds = int(m.group(1)) * (60 if m.group(2) == "m" else 1)
+    assert seconds >= 2 * 60 + 20, "must outlive the longest SNMP_INTERVAL (60 s) plus a retry round"
 

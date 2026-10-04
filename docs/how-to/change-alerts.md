@@ -42,6 +42,9 @@ curl -X POST localhost:${PROMETHEUS_PORT:-9090}/-/reload
 | `cpu_usage` | percent, one series per core/entity |
 | `memory_used` / `_free` / `_total` | raw, units vary — see below |
 | `device_uptime` | SNMP sysUpTime |
+| `bgp_peer_state` | BGP4-MIB, 6 = established; with `bgp_peer_admin_status` (2 = start) |
+| `intent_device_present` | 1 per device active in Infrahub (from `make render`) |
+| `device:not_reporting` | recording rule — intended devices with no SNMP/gNMI data |
 | `netflow_flow_bytes_total` / `netflow_flow_packets_total` | NetFlow/IPFIX — **bytes (packets) per 60 s window, a gauge**; labels `protocol`, `direction`, `application`, `criticality` |
 | `device:cpu_usage:max` | recording rule — one value per device |
 | `device:memory_used_percent:max` | recording rule — comparable across vendors |
@@ -52,6 +55,10 @@ Every metric carries `device`, `site`, `role` and `platform` from Infrahub, plus
 **Alert on `device:memory_used_percent:max`, not on `memory_used`.** The three
 vendors report memory in percent, bytes and allocation units respectively; the
 recording rule in `observability/prometheus/rules/recording.yml` is what makes them comparable.
+
+**Intent and routing alerts shipped:** `DeviceNotReporting` (active in
+Infrahub, no SNMP/gNMI data for 10 min — names the device and site) and
+`BGPPeerDown` (a peer configured up that is not Established for 5 min).
 
 **Flow alerts shipped:** `NoFlowsReceived` (no flow from anywhere for 15 min)
 and `CriticalApplicationSilent` (a `critical` application that had traffic in

@@ -318,6 +318,13 @@ What render writes for each device is decided by three of its attributes:
 | `telemetry_mode` | SNMP or gNMI — never both |
 | `snmp_security` | which SNMP input polls it. Telegraf takes one security level per input, so authNoPriv devices (images that cannot encrypt) get separate inputs rather than lowering the fleet |
 
+**Intent vs reality.** Render also writes one `intent_device` series per
+active device (`generated/intent.influx`, read by `generated/intent.conf`).
+Prometheus compares it with what actually reports: `device:not_reporting`
+names every device that is in Infrahub but silent, the `DeviceNotReporting`
+alert fires on it, and the dashboards show it — "is everything we own
+monitored?" answered from the source of truth, not from guesswork.
+
 Step by step: [administration/infrahub-guide.md](administration/infrahub-guide.md).
 
 ### What the network serves (optional)

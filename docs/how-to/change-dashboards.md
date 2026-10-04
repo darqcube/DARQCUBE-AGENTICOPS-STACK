@@ -26,8 +26,8 @@ All in the **DarqCube** folder, linked to each other from the top-right
 
 | Dashboard | uid | Source | Shows |
 |---|---|---|---|
-| **Network Overview** | `darqcube-network` | Prometheus + Loki | the landing page: site health, WAN tunnels (ifType 131), critical applications now vs normal, top applications per site, internet edge (role `internet-edge`), WAN throughput, configuration changes, routing and link events, recent logs |
-| **Devices & Interfaces** | `darqcube-devices` | Prometheus (SNMP) | device table (site, role, platform, uptime), interface status, throughput in/out, top utilisation, errors, CPU and memory |
+| **Network Overview** | `darqcube-network` | Prometheus + Loki | the landing page: devices intended vs not reporting, site health, WAN tunnels (ifType 131), BGP sessions, critical applications now vs normal, top applications per site, internet edge (role `internet-edge`), WAN throughput, configuration changes, routing and link events, recent logs |
+| **Devices & Interfaces** | `darqcube-devices` | Prometheus (SNMP) | device table (site, role, platform, uptime), interface status, throughput in/out, top utilisation, errors, CPU and memory, **intent vs reality** (every Infrahub device: reporting or not), **BGP peers** (state, uptime, remote AS) |
 | **NetFlow** | `darqcube-netflow` | Prometheus (flow) | throughput and packets by exporter, protocol, site and direction |
 | **Applications** | `darqcube-applications` | Prometheus (flow) | flow traffic by application and criticality — needs services in Infrahub ([label-flows-by-application.md](label-flows-by-application.md)) |
 | **Logs** | `darqcube-logs` | Loki (syslog) | volume by severity and device, top Cisco message types, errors and worse, a full log browser with a search box |

@@ -11,6 +11,9 @@ Writes: /generated/
     snmp-<platform>.conf   CPU + memory, one input per platform
     gnmi.conf              devices with telemetry_mode=gnmi
     netflow-dedicated.conf one NetFlow listener per device with flow_port set
+    intent.conf + intent.influx  one intent_device series per active device —
+                           what SHOULD be reporting, so dashboards and alerts can
+                           name a device that is in Infrahub but silent
     services-dst.json      server ip:port/proto -> application (flow requests)
     services-src.json      the same, keyed for flow replies
     netflow-applications.conf  the lookups that apply them — only when services exist
@@ -240,6 +243,17 @@ def resource_tables(platform: str, spec: dict) -> str:
                 f'      name = "{key}"',
                 f'      oid = "{mem[key]}"',
             ]
+    if spec.get("bgp"):
+        # BGP4-MIB bgpPeerTable — standard, so one definition serves every
+        # platform that sets `bgp: true`. One series per peer: bounded.
+        # state 6 = established; admin_status 2 = start (configured up).
+        lines += ['', '  [[inputs.snmp.table]]', '    name = "bgp_peer"', '    inherit_tags = ["hostname"]']
+        for name, oid, tag in (("peer", "1.3.6.1.2.1.15.3.1.7", True), ("state", "1.3.6.1.2.1.15.3.1.2", False),
+                               ("admin_status", "1.3.6.1.2.1.15.3.1.3", False), ("remote_as", "1.3.6.1.2.1.15.3.1.9", False),
+                               ("established_seconds", "1.3.6.1.2.1.15.3.1.16", False)):
+            lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
+            if tag:
+                lines.append('      is_tag = true')
     return "\n".join(lines)
 
 
@@ -267,7 +281,7 @@ def main() -> int:
     # dropping a platform) leaves an orphaned shard file behind and Telegraf
     # keeps polling devices that are no longer in the source of truth.
     for stale in os.listdir(OUT_DIR):
-        if stale.startswith(("snmp-", "gnmi", "netflow-")) and stale.endswith(".conf"):
+        if stale.startswith(("snmp-", "gnmi", "netflow-", "intent")) and stale.endswith((".conf", ".influx")):
             os.remove(os.path.join(OUT_DIR, stale))
 
     identity: dict[str, dict] = {}
@@ -275,6 +289,7 @@ def main() -> int:
     by_platform: dict[tuple[str, str], list] = defaultdict(list)
     snmp_targets: dict[str, list] = defaultdict(list)
     gnmi_targets: list[str] = []
+    intended: list[dict] = []
     flow_ports: dict[int, str] = {}
     warnings: list[str] = []
 
@@ -303,6 +318,7 @@ def main() -> int:
         identity[name] = record
         if ip_of(dev):
             identity[ip_of(dev)] = record
+        intended.append({**record, "telemetry": mode})
 
         # Before the telemetry branch: flow is independent of SNMP vs gNMI.
         port = flow_port_of(dev)
@@ -434,6 +450,27 @@ def main() -> int:
         written.append(filename)
     if services_dst:
         write("netflow-applications.conf", APPLICATION_PROCESSORS)
+
+    # --- intent: what SHOULD be reporting ---------------------------------
+    # The data file and the input that reads it are written together, so
+    # conf.d never names a file that make render has not created yet.
+    if intended:
+        def esc(v: str) -> str:   # influx line protocol tag-value escaping
+            return str(v).replace("\\", "\\\\").replace(",", "\\,").replace("=", "\\=").replace(" ", "\\ ")
+        path = os.path.join(OUT_DIR, "intent.influx")
+        with open(path, "w") as fh:
+            for rec in sorted(intended, key=lambda r: r["device"]):
+                tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "site", "role", "platform", "telemetry"))
+                fh.write(f"intent_device,{tags} present=1i\n")
+        _readable(path)
+        written.append("intent.influx")
+        write("intent.conf",
+              "[[inputs.file]]\n"
+              f'  files = ["/etc/telegraf/telegraf.d/generated/intent.influx"]\n'
+              '  data_format = "influx"\n'
+              # Well inside prometheus_client's 60 s expiration: at 60 s the
+              # series raced its own expiry and flickered out of Prometheus.
+              '  interval = "30s"\n')
 
     # --- identity table, in both formats ---------------------------------
     write_json = os.path.join(OUT_DIR, "devices.json")

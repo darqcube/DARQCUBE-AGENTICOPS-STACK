@@ -64,21 +64,15 @@
   "panels": [
     {
       "type": "stat",
-      "title": "Devices monitored",
-      "description": "Devices currently reporting SNMP. Compare with Infrahub \u2014 a gap means a device exists in intent but is not polled.",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 0
-      },
+      "title": "Devices (Infrahub)",
+      "description": "Active devices in the source of truth \u2014 what should be reporting.",
       "datasource": {
         "type": "prometheus",
         "uid": "darqcube-prometheus"
       },
       "targets": [
         {
-          "expr": "network:devices_monitored:count",
+          "expr": "network:devices_intended:count",
           "refId": "A"
         }
       ],
@@ -93,12 +87,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
               }
             ]
           }
@@ -115,7 +105,79 @@
         "graphMode": "none",
         "justifyMode": "center"
       },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
       "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Not reporting",
+      "description": "In Infrahub as active, but no SNMP/gNMI data. Named in the Devices & Interfaces dashboard and by the DeviceNotReporting alert.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "network:devices_not_reporting:count",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "all reporting",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 0
+      },
+      "id": 2
     },
     {
       "type": "stat",
@@ -123,8 +185,8 @@
       "description": "Admin-up but operationally down. Deliberately shut ports are excluded.",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 3,
+        "x": 6,
         "y": 0
       },
       "datasource": {
@@ -174,61 +236,6 @@
         "graphMode": "none",
         "justifyMode": "center"
       },
-      "id": 2
-    },
-    {
-      "type": "stat",
-      "title": "Alerts firing",
-      "description": "",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "darqcube-prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(ALERTS{alertstate=\"firing\"}) or vector(0)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
       "id": 3
     },
     {
@@ -237,8 +244,8 @@
       "description": "Tunnel interfaces (IANA ifType 131 \u2014 DMVPN, GRE, VTI) that are configured up but down.",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 3,
+        "x": 9,
         "y": 0
       },
       "datasource": {
@@ -288,12 +295,133 @@
     },
     {
       "type": "stat",
+      "title": "BGP sessions down",
+      "description": "BGP peers configured up (adminStatus start) that are not Established.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "network:bgp_sessions_down:count",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "0",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 0
+      },
+      "id": 5
+    },
+    {
+      "type": "stat",
+      "title": "Alerts firing",
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(ALERTS{alertstate=\"firing\"}) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "id": 6
+    },
+    {
+      "type": "stat",
       "title": "Config changes (24 h)",
       "description": "Configuration-change syslog events (Cisco %SYS-5-CONFIG_I and equivalents).",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 16,
+        "w": 3,
+        "x": 18,
         "y": 0
       },
       "datasource": {
@@ -336,7 +464,7 @@
         "graphMode": "none",
         "justifyMode": "center"
       },
-      "id": 5
+      "id": 7
     },
     {
       "type": "stat",
@@ -344,8 +472,8 @@
       "description": "Flow traffic matching no service in Infrahub (application=\"other\") \u2014 internet traffic and unmodelled servers. Informational: internet browsing, routing protocols and tunnels are not applications.",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 0
       },
       "datasource": {
@@ -387,15 +515,15 @@
         "graphMode": "none",
         "justifyMode": "center"
       },
-      "id": 6
+      "id": 8
     },
     {
       "type": "stat",
       "title": "Site health",
-      "description": "Per site: devices that reported in the last hour but not now, plus interfaces that are configured up but down. 0 = OK.",
+      "description": "Per site (every site in Infrahub): devices that are intended but not reporting, interfaces configured up but down, and BGP sessions not established. 0 = OK.",
       "gridPos": {
         "h": 6,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 4
       },
@@ -405,7 +533,7 @@
       },
       "targets": [
         {
-          "expr": "(count by (site) (max_over_time(device_uptime{site=~\"$site\"}[1h])) - (count by (site) (device_uptime{site=~\"$site\"}) or count by (site) (max_over_time(device_uptime{site=~\"$site\"}[1h])) * 0)) + (count by (site) (interface_oper_status{site=~\"$site\"} == 2 and interface_admin_status{site=~\"$site\"} == 1) or count by (site) (max_over_time(device_uptime{site=~\"$site\"}[1h])) * 0)",
+          "expr": "(count by (site) (device:not_reporting{site=~\"$site\"}) or count by (site) (intent_device_present{site=~\"$site\"}) * 0) + (count by (site) (interface_oper_status{site=~\"$site\"} == 2 and interface_admin_status{site=~\"$site\"} == 1) or count by (site) (intent_device_present{site=~\"$site\"}) * 0) + (count by (site) (bgp_peer_state{site=~\"$site\"} != 6 and on (device, peer) bgp_peer_admin_status == 2) or count by (site) (intent_device_present{site=~\"$site\"}) * 0)",
           "refId": "A",
           "legendFormat": "{{site}}"
         }
@@ -459,7 +587,7 @@
         "justifyMode": "center",
         "textMode": "value_and_name"
       },
-      "id": 7
+      "id": 9
     },
     {
       "type": "stat",
@@ -467,8 +595,8 @@
       "description": "Every device with tunnel interfaces: how many are down. 'all up' = every tunnel operational.",
       "gridPos": {
         "h": 6,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 4
       },
       "datasource": {
@@ -527,7 +655,75 @@
         "justifyMode": "center",
         "textMode": "value_and_name"
       },
-      "id": 8
+      "id": 10
+    },
+    {
+      "type": "stat",
+      "title": "BGP sessions down per device",
+      "description": "Every BGP speaker: sessions configured up but not Established. 'all up' = every peer Established.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count by (device) (bgp_peer_state{device=~\"$device\", site=~\"$site\"} != 6 and on (device, peer) bgp_peer_admin_status == 2) or count by (device) (bgp_peer_state{device=~\"$device\", site=~\"$site\"}) * 0",
+          "refId": "A",
+          "legendFormat": "{{device}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "all up",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "id": 11
     },
     {
       "type": "table",
@@ -641,7 +837,7 @@
           }
         ]
       },
-      "id": 9
+      "id": 12
     },
     {
       "type": "bargauge",
@@ -680,7 +876,7 @@
           ]
         }
       },
-      "id": 10
+      "id": 13
     },
     {
       "type": "timeseries",
@@ -732,7 +928,7 @@
           "sort": "desc"
         }
       },
-      "id": 11
+      "id": 14
     },
     {
       "type": "timeseries",
@@ -779,7 +975,7 @@
           "sort": "desc"
         }
       },
-      "id": 12
+      "id": 15
     },
     {
       "type": "logs",
@@ -807,7 +1003,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 13
+      "id": 16
     },
     {
       "type": "timeseries",
@@ -858,7 +1054,7 @@
           "sort": "desc"
         }
       },
-      "id": 14
+      "id": 17
     },
     {
       "type": "logs",
@@ -886,7 +1082,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 15
+      "id": 18
     },
     {
       "type": "logs",
@@ -914,7 +1110,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 16
+      "id": 19
     }
   ]
 }

@@ -697,6 +697,235 @@
         }
       },
       "id": 12
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Intent vs reality",
+      "description": "Every device Infrahub holds as active, and whether it is actually reporting. A NOT reporting row is a device the business expects to see that the stack cannot hear.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 47
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "((intent_device_present{site=~\"$site\"} - 1) + on (device) group_left () group by (device) ({__name__=~\"device_uptime|interface_oper_status\"})) or (device:not_reporting{site=~\"$site\"} * 0)",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "host": true
+            },
+            "renameByName": {
+              "Value": "status"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "reporting",
+                        "color": "green"
+                      },
+                      "0": {
+                        "text": "NOT reporting",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "status",
+            "desc": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "BGP peers",
+      "description": "BGP4-MIB bgpPeerTable on platforms with bgp: true in platforms.yml.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 47
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "bgp_peer_state{device=~\"$device\", site=~\"$site\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "bgp_peer_established_seconds{device=~\"$device\", site=~\"$site\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "bgp_peer_remote_as{device=~\"$device\", site=~\"$site\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true,
+              "host": true,
+              "memory_kind": true,
+              "platform": true
+            },
+            "indexByName": {
+              "device": 0,
+              "peer": 1,
+              "Value #C": 2,
+              "Value #A": 3,
+              "Value #B": 4
+            },
+            "renameByName": {
+              "Value #A": "state",
+              "Value #B": "established for",
+              "Value #C": "remote AS"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "idle",
+                        "color": "red"
+                      },
+                      "2": {
+                        "text": "connect",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "active",
+                        "color": "orange"
+                      },
+                      "4": {
+                        "text": "opensent",
+                        "color": "orange"
+                      },
+                      "5": {
+                        "text": "openconfirm",
+                        "color": "orange"
+                      },
+                      "6": {
+                        "text": "established",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "established for"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "state",
+            "desc": false
+          }
+        ]
+      }
     }
   ],
   "links": [

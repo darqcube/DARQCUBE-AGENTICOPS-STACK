@@ -43,6 +43,26 @@ groups:
           summary: "No SNMP data from any device for 5 minutes"
           description: "Telegraf is being scraped but no device is answering."
 
+  - name: intent
+    rules:
+      # In Infrahub as active, but neither SNMP nor gNMI has heard from it.
+      # The source of truth names the device, so the alert does too.
+      - alert: DeviceNotReporting
+        expr: device:not_reporting
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.device }} ({{ $labels.site }}) is in Infrahub but not reporting"
+          description: "Active in the source of truth, no SNMP/gNMI data for 10 minutes. Check reachability, credentials and snmp_security."
+      # A BGP session configured up (adminStatus start) that is not Established.
+      - alert: BGPPeerDown
+        expr: bgp_peer_state != 6 and on (device, peer) bgp_peer_admin_status == 2
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "BGP peer {{ $labels.peer }} on {{ $labels.device }} is not established"
+          description: "bgpPeerState {{ $value }} (6 = established) for 5 minutes."
+
   - name: flows
     rules:
       # Flow is device-initiated, so silence is the only symptom of an exporter

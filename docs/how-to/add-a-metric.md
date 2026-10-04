@@ -32,6 +32,14 @@ ios_xe:
 Then teach the renderer to emit it — `source-of-truth/scripts/render-inventory.py`,
 in `resource_tables()`. Follow the pattern the `cpu` table already uses.
 
+### BGP sessions — `bgp: true`
+
+A platform with `snmp.bgp: true` in `platforms.yml` also gets the standard
+BGP4-MIB peer table (`bgp_peer_state`, `bgp_peer_admin_status`,
+`bgp_peer_remote_as`, `bgp_peer_established_seconds`, one series per peer,
+tag `peer`). Shipped on for `ios_xe` and `vrp`; RouterOS does not implement
+BGP4-MIB. Drives the `BGPPeerDown` alert and the BGP panels.
+
 ## The metric name is `<measurement>_<field>`
 
 This is the single thing to get right. Prometheus sees the Telegraf measurement
