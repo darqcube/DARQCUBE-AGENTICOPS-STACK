@@ -150,6 +150,15 @@ def test_standard_ports_toggle(inst, site):
     assert inst.site_to_env(site)["GRAFANA_PORT"] == "13000"
 
 
+def test_dedicated_flow_range_follows_the_standard_toggle(inst, site):
+    site["ports"]["standard"] = True
+    env = inst.site_to_env(site)
+    assert (env["FLOW_DEDICATED_FIRST"], env["FLOW_DEDICATED_LAST"]) == ("2056", "2105")
+    site["ports"]["standard"] = False
+    env = inst.site_to_env(site)
+    assert (env["FLOW_DEDICATED_FIRST"], env["FLOW_DEDICATED_LAST"]) == ("12056", "12105")
+
+
 def test_port_overrides_win(inst, site):
     site["ports"]["overrides"] = {"syslog": 514}
     env = inst.site_to_env(site)

@@ -39,6 +39,7 @@ devices:
     environment: production        # production (default) | staging | lab | demo
     telemetry_mode: snmp           # snmp (default) | gnmi — gnmi is ios_xe only
     flow_enabled: true             # does it export NetFlow/IPFIX?
+    # flow_port: 12056             # only behind NAT: its own listener — flow-behind-nat.md
     description: Second core router
 ```
 

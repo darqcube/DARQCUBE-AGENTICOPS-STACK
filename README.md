@@ -352,6 +352,7 @@ make config-put DEV=cr1 FILE=change.txt   # push, and report what changed
 | Fix a `show` output parse error | `automation/textfsm/` → [guide](docs/how-to/add-a-textfsm-template.md) |
 | Parse a device configuration | `automation/ttp/` → [guide](docs/how-to/add-a-ttp-template.md) |
 | Change a port | `.env` → [guide](docs/how-to/change-ports.md) |
+| NetFlow from devices behind NAT | device `flow_port` → [guide](docs/how-to/flow-behind-nat.md) |
 | Connect an AI platform | [guide](docs/how-to/connect-an-ai-platform.md) |
 | Deploy at a customer site | [guide](docs/how-to/deploy-on-customer-premises.md) |
 | Chase data loss that produces **no error** | [guide](docs/how-to/fix-silent-data-loss.md) |
@@ -367,7 +368,7 @@ seed` updates the source of truth, `make render` pushes it to the collectors.
 | [docs/INSTALL.md](docs/INSTALL.md) | install on a fresh VM — `install.py` or by hand |
 | [docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md) | sites and devices in Infrahub — UI or YAML — and verifying end to end |
 | [docs/scale.md](docs/scale.md) | the 400-device envelope and how to grow |
-| [docs/how-to/](docs/how-to/) | 19 task guides: add a device, change an alert, add a vendor… |
+| [docs/how-to/](docs/how-to/) | 20 task guides: add a device, change an alert, add a vendor… |
 | [docs/install/](docs/install/) | one page per component — config, ports, verify, problems |
 | [docs/devices/](docs/devices/) | device-side config per platform |
 | [docs/architecture.md](docs/architecture.md) | diagrams and the failure table |

@@ -99,7 +99,9 @@ doubt, use `management_ip`. Use it when the stack reaches devices by name — or
 when the name is reachable and the IP is not, as in some container labs. Set
 `management_ip` as well if the device exports NetFlow/IPFIX: flow records
 arrive from the device's IP address, and the renderer uses that IP to label
-them.
+them. If that address is NAT'd on the way to the stack, set `flow_port` instead:
+the device gets its own listener and is identified by port
+([../how-to/flow-behind-nat.md](../how-to/flow-behind-nat.md)).
 
 ### Adding a field
 

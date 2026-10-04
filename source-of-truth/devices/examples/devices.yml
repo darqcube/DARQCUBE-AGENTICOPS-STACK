@@ -30,6 +30,8 @@
 #   snmp_security    auth_priv (default) | auth_no_priv — only for images with no
 #                    SNMP privacy support (Cisco L2 IOL). Polled from separate inputs.
 #   flow_enabled     true if the device exports NetFlow/IPFIX
+#   flow_port        optional; a dedicated NetFlow listener for an exporter behind
+#                    NAT, within FLOW_DEDICATED_FIRST..LAST (docs/how-to/flow-behind-nat.md)
 #   status           active (default) | provisioning | maintenance | decommissioned
 #
 # The allowed fields come from source-of-truth/schema/darqcube.yml. A field

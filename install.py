@@ -275,15 +275,18 @@ SCALE_BANDS = [
 STANDARD_PORTS = {
     "grafana": 3000, "infrahub": 8000, "prometheus": 9090, "alertmanager": 9093,
     "loki": 3100, "automation": 8100, "syslog": 514, "netflow": 2055, "ipfix": 4739,
+    "flow_dedicated_first": 2056, "flow_dedicated_last": 2105,
 }
 OFFSET_PORTS = {
     "grafana": 13000, "infrahub": 18000, "prometheus": 19090, "alertmanager": 19093,
     "loki": 13100, "automation": 18100, "syslog": 1514, "netflow": 12055, "ipfix": 14739,
+    "flow_dedicated_first": 12056, "flow_dedicated_last": 12105,
 }
 PORT_VARS = {
     "grafana": "GRAFANA_PORT", "infrahub": "INFRAHUB_PORT", "prometheus": "PROMETHEUS_PORT",
     "alertmanager": "ALERTMANAGER_PORT", "loki": "LOKI_PORT", "automation": "AUTOMATION_PORT",
     "syslog": "SYSLOG_PORT", "netflow": "NETFLOW_PORT", "ipfix": "IPFIX_PORT",
+    "flow_dedicated_first": "FLOW_DEDICATED_FIRST", "flow_dedicated_last": "FLOW_DEDICATED_LAST",
 }
 
 

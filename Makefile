@@ -76,7 +76,8 @@ seed: ## Apply source-of-truth/devices/*.yml to Infrahub. BRANCH=x stages it for
 	$(COMPOSE) exec -T -e INFRAHUB_BRANCH=$(strip $(BRANCH)) infrahub-server python /scripts/seed.py
 
 render: ## Infrahub -> Telegraf + Logstash configs. Run after any device change.
-	$(SOT) python /scripts/render-inventory.py
+	$(COMPOSE) exec -T -e FLOW_DEDICATED_FIRST=$(strip $(FLOW_DEDICATED_FIRST)) \
+		-e FLOW_DEDICATED_LAST=$(strip $(FLOW_DEDICATED_LAST)) infrahub-server python /scripts/render-inventory.py
 
 # --- devices: get and put ------------------------------------------------
 # Every recipe that talks to the automation API fails loudly: --fail-with-body

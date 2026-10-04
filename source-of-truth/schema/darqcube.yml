@@ -154,6 +154,11 @@ nodes:
         default_value: false
         description: Device is expected to export NetFlow or IPFIX.
 
+      - name: flow_port
+        kind: Number
+        optional: true
+        description: Dedicated NetFlow port for an exporter behind NAT. Within FLOW_DEDICATED_FIRST..LAST.
+
       - name: description
         kind: Text
         optional: true

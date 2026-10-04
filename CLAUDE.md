@@ -154,6 +154,7 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | Telegraf | `--watch-config poll`, never inotify — inotify is unreliable across a volume mount |
 | Loki | labels are `device, site, role, severity` **only**. Message body and Cisco mnemonics stay fields — promoting a mnemonic to a label multiplies stream count by the number of message types. The mnemonic must stay in the stored log line, or it is not searchable at all |
 | Prometheus | never let per-flow IPs or ports become labels; the flow config drops them on purpose |
+| Flow behind NAT | every exporter arrives from the NAT address, so the source-IP lookup labels nothing. A device's `flow_port` renders its own listener tagged `flow_exporter`, which the lookup tries first. Ports must sit inside the compose-published `FLOW_DEDICATED_*` range or nothing arrives — the renderer refuses those |
 | TextFSM | an empty parse must **raise** — `[]` and "device has nothing to report" are indistinguishable, so a missing template silently returns a wrong answer |
 | Cisco syslog | IOS does **not** emit conformant RFC3164 (counter and hostname come before the timestamp). A strict parser drops every line silently |
 | Log time | Loki files a line under the device's timestamp only when it names its zone and is near arrival; otherwise arrival time, tagged `clock_skew`. Never widen the window past Loki's out-of-order and future limits |

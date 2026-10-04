@@ -2,7 +2,7 @@
 # GROUP: observability — answers "what IS happening?"
 #
 # Ingest ownership, which is deliberate and should not be blurred:
-#   Telegraf  SNMP (161) · gNMI (57400) · NetFlow/IPFIX (2055, 4739)  -> Prometheus
+#   Telegraf  SNMP (161) · gNMI (57400) · NetFlow/IPFIX (2055, 4739, dedicated range)  -> Prometheus
 #   Logstash  syslog (514)                                            -> Loki
 #
 # Telegraf and Logstash both read the identity table that render-inventory.py
@@ -192,6 +192,9 @@ services:
     ports:
       - "${NETFLOW_PORT:-2055}:2055/udp"   # NetFlow v5 / v9
       - "${IPFIX_PORT:-4739}:4739/udp"     # IPFIX
+      # Dedicated NetFlow listeners for exporters behind NAT (device flow_port).
+      # Same number on both sides: the renderer listens on the device's port.
+      - "${FLOW_DEDICATED_FIRST:-2056}-${FLOW_DEDICATED_LAST:-2105}:${FLOW_DEDICATED_FIRST:-2056}-${FLOW_DEDICATED_LAST:-2105}/udp"
     healthcheck:
       # Probe the running agent's own output, not `telegraf --test`: that
       # starts a second agent (which missed telegraf.d/ and so found "no

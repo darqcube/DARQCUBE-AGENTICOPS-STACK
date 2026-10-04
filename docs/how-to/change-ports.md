@@ -40,6 +40,8 @@ ports:
 | `SYSLOG_PORT` | 1514 | 514 |
 | `NETFLOW_PORT` | 12055 | 2055 |
 | `IPFIX_PORT` | 14739 | 4739 |
+| `FLOW_DEDICATED_FIRST` | 12056 | 2056 |
+| `FLOW_DEDICATED_LAST` | 12105 | 2105 |
 
 Non-standard values ship by default so the stack can run alongside something
 already using the usual ports.
@@ -47,7 +49,10 @@ already using the usual ports.
 ## Device-facing ports are different
 
 `SYSLOG_PORT`, `NETFLOW_PORT` and `IPFIX_PORT` are what your **devices send
-to**. Changing one means changing every device:
+to**. Changing one means changing every device. The dedicated range
+`FLOW_DEDICATED_FIRST`..`LAST` is the same kind of port: moving it means a new
+`flow_port` on each device that uses one, then `make render`
+([flow-behind-nat.md](flow-behind-nat.md)).
 
 ```
 ! Cisco

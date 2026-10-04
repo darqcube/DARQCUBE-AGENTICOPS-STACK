@@ -26,6 +26,7 @@ the boundary.
 | device mgmt subnet → VM | TCP + UDP 514 (or 1514) | syslog |
 | device mgmt subnet → VM | UDP 2055 (or 12055) | NetFlow |
 | device mgmt subnet → VM | UDP 4739 (or 14739) | IPFIX |
+| NAT'd exporters → VM | UDP 2056–2105 (or 12056–12105) | NetFlow, one port per device — only if any device has a `flow_port` |
 
 Two directions, usually two separate rules. Getting one and not the other gives
 a device that looks configured and is half working —

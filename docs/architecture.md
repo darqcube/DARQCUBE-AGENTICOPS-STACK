@@ -134,7 +134,10 @@ Everything except Grafana and Infrahub is unauthenticated. Anyone who can reach
 
 Device-facing listeners are not UIs, but for reference: syslog
 `SYSLOG_PORT` (shipped 1514, standard 514 — TCP and UDP), NetFlow `NETFLOW_PORT`
-(12055/udp, 2055), IPFIX `IPFIX_PORT` (14739/udp, 4739).
+(12055/udp, 2055), IPFIX `IPFIX_PORT` (14739/udp, 4739), and the dedicated
+NetFlow range `FLOW_DEDICATED_FIRST`..`FLOW_DEDICATED_LAST` (12056–12105/udp,
+2056–2105) for exporters behind NAT — see
+[how-to/flow-behind-nat.md](how-to/flow-behind-nat.md).
 
 ## Four ways in
 
@@ -331,6 +334,10 @@ Each feed has exactly one owner. No feed is collected twice.
 
 Telegraf never listens for syslog; Logstash never polls a device.
 
+Flow records are labelled from the identity table by source address — or, for
+an exporter behind NAT, by the dedicated listener it was sent to (device
+`flow_port`, [how-to/flow-behind-nat.md](how-to/flow-behind-nat.md)).
+
 ## Volumes and storage
 
 One rule decides where everything lives: **configuration comes from the
@@ -487,7 +494,7 @@ into the repo tree. Both are gitignored apart from a `.gitkeep`.
 
 | Host path | Written by | Read by | Holds |
 |---|---|---|---|
-| `observability/telegraf/generated/` | `infrahub-server` (`make render`); `config-init` writes empty `devices.json`/`devices.yml` only if none exist | `telegraf`, `logstash` | SNMP and gNMI shards, `devices.json`, `devices.yml` |
+| `observability/telegraf/generated/` | `infrahub-server` (`make render`); `config-init` writes empty `devices.json`/`devices.yml` only if none exist | `telegraf`, `logstash` | SNMP and gNMI shards, `netflow-dedicated.conf`, `devices.json`, `devices.yml` |
 | `automation/configs/` | `automation` | — | running configs fetched from devices |
 
 `generated/` is a bind mount rather than a volume on purpose: it is where every

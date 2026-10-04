@@ -123,6 +123,11 @@ interface GigabitEthernet0/0/1
 Apply the monitor to every interface you want visibility on. Set
 `flow_enabled: true` in `devices.yml`.
 
+If the router reaches the stack through NAT, its flows cannot be identified by
+source address: give it a `flow_port` in `devices.yml` and use that number in
+`transport udp` instead of 12055 — see
+[../how-to/flow-behind-nat.md](../how-to/flow-behind-nat.md).
+
 ## 5. NTP
 
 ```

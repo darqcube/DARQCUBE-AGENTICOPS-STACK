@@ -37,7 +37,8 @@ class Rel:
 class Device:
     """Stands in for an infrahub_sdk InfrahubNode."""
 
-    def __init__(self, name, platform, ip, site, role, mode="snmp", host=None, security=None):
+    def __init__(self, name, platform, ip, site, role, mode="snmp", host=None, security=None,
+                 flow=False, flow_port=None):
         self.name = Attr(name)
         self.platform = Attr(platform)
         self.management_ip = Attr(ip)
@@ -45,6 +46,8 @@ class Device:
         self.snmp_security = Attr(security)
         self.role = Attr(role)
         self.telemetry_mode = Attr(mode)
+        self.flow_enabled = Attr(flow)
+        self.flow_port = Attr(flow_port)
         self.site = Rel(site)
 
 
@@ -422,3 +425,80 @@ def test_identity_table_exists_before_the_collectors_start():
     for svc in ("telegraf", "logstash"):
         dep = services[svc]["depends_on"]["config-init"]
         assert dep["condition"] == "service_completed_successfully", svc
+
+
+# --- dedicated NetFlow listeners (exporters behind NAT) ---------------------
+
+def test_flow_port_renders_a_tagged_listener_per_device(monkeypatch, tmp_path):
+    """Behind NAT every exporter shares one source address, so the listener port
+    is the identity: one input per device, tagged with its name."""
+    devices = [
+        Device("edge-01", "ios_xe", "10.0.0.11", "branch-01", "wan", flow=True, flow_port=12057),
+        Device("edge-02", "ios_xe", "10.0.0.12", "branch-02", "wan", flow=True, flow_port=12056),
+        Device("core-01", "ios_xe", "10.0.0.21", "hq", "core", flow=True),   # shared listener
+    ]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    assert mod.main() == 0
+    body = (tmp_path / "netflow-dedicated.conf").read_text()
+    assert body.count("[[inputs.netflow]]") == 2
+    assert body.index("udp://:12056") < body.index("udp://:12057"), "sorted by port"
+    assert 'service_address = "udp://:12057"' in body and 'flow_exporter = "edge-01"' in body
+    assert 'flow_exporter = "edge-02"' in body and "core-01" not in body
+    # The tag value must be a key of the identity table, or the lookup finds nothing.
+    identity = json.loads((tmp_path / "devices.json").read_text())
+    assert identity["edge-01"]["site"] == "branch-01"
+
+
+def test_no_dedicated_file_without_flow_ports(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    assert not (tmp_path / "netflow-dedicated.conf").exists()
+
+
+def test_stale_dedicated_listeners_are_removed(monkeypatch, tmp_path):
+    """Dropping the last flow_port must also drop its listener file."""
+    (tmp_path / "netflow-dedicated.conf").write_text("stale")
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    assert not (tmp_path / "netflow-dedicated.conf").exists()
+
+
+def test_flow_port_without_flow_enabled_warns(monkeypatch, tmp_path, capsys):
+    devices = [Device("edge-01", "ios_xe", "10.0.0.11", "b1", "wan", flow=False, flow_port=12056)]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    mod.main()
+    assert "flow_enabled is false" in capsys.readouterr().err
+    assert not (tmp_path / "netflow-dedicated.conf").exists()
+
+
+def test_duplicate_flow_port_warns_and_keeps_the_first(monkeypatch, tmp_path, capsys):
+    devices = [
+        Device("edge-01", "ios_xe", "10.0.0.11", "b1", "wan", flow=True, flow_port=12056),
+        Device("edge-02", "ios_xe", "10.0.0.12", "b2", "wan", flow=True, flow_port=12056),
+    ]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    mod.main()
+    assert "already used by edge-01" in capsys.readouterr().err
+    assert "edge-02" not in (tmp_path / "netflow-dedicated.conf").read_text()
+
+
+def test_flow_port_outside_the_published_range_warns(monkeypatch, tmp_path, capsys):
+    """A listener on a port compose does not publish would receive nothing."""
+    monkeypatch.setenv("FLOW_DEDICATED_FIRST", "12056")
+    monkeypatch.setenv("FLOW_DEDICATED_LAST", "12060")
+    devices = [Device("edge-01", "ios_xe", "10.0.0.11", "b1", "wan", flow=True, flow_port=13000)]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    mod.main()
+    assert "outside the published range 12056-12060" in capsys.readouterr().err
+    assert not (tmp_path / "netflow-dedicated.conf").exists()
+
+
+def test_flow_lookup_prefers_the_dedicated_listener_tag():
+    """The NAT's source address must not win over the listener's device tag."""
+    body = (ROOT / "observability/telegraf/conf.d/outputs.conf").read_text()
+    assert """key = '{{ or (.Tag "flow_exporter") (.Tag "source") }}'""" in body
+
+
+def test_compose_publishes_the_dedicated_flow_range():
+    body = (ROOT / "compose/observability.yaml").read_text()
+    assert "${FLOW_DEDICATED_FIRST:-2056}-${FLOW_DEDICATED_LAST:-2105}:" in body

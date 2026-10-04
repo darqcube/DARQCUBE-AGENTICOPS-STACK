@@ -14,7 +14,7 @@ Four feeds, and a device needs all four to be fully visible:
 |---|---|---|---|
 | **SNMPv3** | stack polls the device | UDP 161 | CPU, memory, interfaces |
 | **Syslog** | device pushes to the stack | TCP or UDP `${SYSLOG_PORT}` | events |
-| **NetFlow / IPFIX** | device pushes to the stack | UDP `${NETFLOW_PORT}` | traffic volume |
+| **NetFlow / IPFIX** | device pushes to the stack | UDP `${NETFLOW_PORT}` (or its own `flow_port` behind NAT) | traffic volume |
 | **SSH** | stack connects to the device | TCP 22 | config and state, get and put |
 
 Plus the fifth, which is not on the device at all: a record in Infrahub saying
@@ -46,6 +46,7 @@ the stack stops touching it.
 | device | Logstash | TCP or UDP `${SYSLOG_PORT}` | syslog — TCP where the device supports it |
 | device | Telegraf | UDP `${NETFLOW_PORT}` | NetFlow |
 | device | Telegraf | UDP `${IPFIX_PORT}` | IPFIX |
+| device behind NAT | Telegraf | UDP its `flow_port` (`${FLOW_DEDICATED_FIRST}`–`${FLOW_DEDICATED_LAST}`) | NetFlow, identified by port — [../how-to/flow-behind-nat.md](../how-to/flow-behind-nat.md) |
 
 These are push feeds, so the device needs a route to **`SYSLOG_COLLECTOR_IP`** —
 the stack host's own routable address. Nothing tells you if this is missing:
@@ -83,6 +84,7 @@ The ports devices send to are configurable. Defaults ship non-standard:
 | syslog | 1514 | 514 |
 | NetFlow | 12055 | 2055 |
 | IPFIX | 14739 | 4739 |
+| NetFlow, dedicated (behind NAT) | 12056–12105 | 2056–2105 |
 
 Port 514 needs root on most Linux hosts, which is why 1514 is the default.
 Change them in `.env` **and** on every device —

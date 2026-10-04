@@ -90,6 +90,7 @@ running. Device-facing ports are the ones that matter:
 |---|---|---|---|
 | 1514 | TCP + UDP | device → VM | syslog |
 | 12055 / 14739 | UDP | device → VM | NetFlow / IPFIX |
+| 12056–12105 | UDP | device → VM | NetFlow, dedicated per device behind NAT (only if used) |
 | 161 | UDP | VM → device | SNMP poll |
 | 22 | TCP | VM → device | SSH |
 | 57400 | TCP | VM → device | gNMI (Cisco only) |
