@@ -62,3 +62,14 @@ groups:
         expr: count(device:not_reporting) or vector(0)
       - record: network:bgp_sessions_down:count
         expr: count(bgp_peer_state != 6 and on (device, peer) bgp_peer_admin_status == 2) or vector(0)
+      # IP SLA (platforms with ipsla: true). ipsla:ok is 1 when the latest
+      # operation succeeded; its average over a window is the success ratio
+      # (1 - loss). Jitter is the spread of the probe's RTT samples.
+      - record: ipsla:ok
+        expr: ipsla_sense == bool 1
+      - record: ipsla:success:ratio15m
+        expr: avg_over_time(ipsla:ok[15m])
+      - record: ipsla:rtt_ms:avg10m
+        expr: avg_over_time(ipsla_rtt_ms[10m]) and on (device, index) ipsla_sense == 1
+      - record: ipsla:jitter_ms:stddev10m
+        expr: stddev_over_time(ipsla_rtt_ms{rtt_type="1"}[10m])

@@ -93,6 +93,34 @@ or syslog leaves through the global routing table and is silently lost.
 > parser rejects every line and drops it silently. The Logstash pattern in this
 > stack handles it; nothing on the device needs changing.
 
+## 3b. IP SLA — WAN quality and application response time (optional)
+
+With `ipsla: true` on the platform (shipped on for `ios_xe`), the stack polls
+CISCO-RTTMON-MIB: the latest result of every IP SLA operation. Run probes
+from each site's LAN gateway toward what the site depends on, and name each
+one with `tag` — the tag is the probe's label in dashboards and alerts.
+
+```
+! WAN latency, loss and jitter to the data centre (ICMP)
+ip sla 10
+ icmp-echo <DC-SERVER-IP> source-interface <LAN-INTERFACE>
+ tag wan-rtt-dc
+ frequency 30
+ip sla schedule 10 life forever start-time now
+! Application response time: TCP connect to a business application
+ip sla 20
+ tcp-connect <APP-SERVER-IP> 443 source-ip <LAN-GATEWAY-IP> control disable
+ tag app-portal
+ frequency 60
+ip sla schedule 20 life forever start-time now
+```
+
+`control disable` is required for any target that is not a Cisco IP SLA
+responder (almost every application server) — without it the probe reports
+*No connection*. Jitter is computed from the ICMP probe's RTT samples
+(`ipsla:jitter_ms:stddev10m`); `path-jitter` results are not exposed in
+RTTMON, so they cannot be polled.
+
 ## 4. NetFlow
 
 ```

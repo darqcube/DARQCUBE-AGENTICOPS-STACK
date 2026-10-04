@@ -254,6 +254,19 @@ def resource_tables(platform: str, spec: dict) -> str:
             lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
             if tag:
                 lines.append('      is_tag = true')
+    if spec.get("ipsla"):
+        # CISCO-RTTMON-MIB: the latest result of every IP SLA operation the
+        # device runs. index = operation id (always unique); tag = the probe's
+        # name from `tag` in its config — label probes by it in dashboards.
+        # rtt_type 1 = icmp-echo, 6 = tcp-connect; sense 1 = ok.
+        lines += ['', '  [[inputs.snmp.table]]', '    name = "ipsla"', '    index_as_tag = true', '    inherit_tags = ["hostname"]']
+        for name, oid, tag in (("probe", "1.3.6.1.4.1.9.9.42.1.2.1.1.3", True),
+                               ("rtt_type", "1.3.6.1.4.1.9.9.42.1.2.1.1.4", True),
+                               ("rtt_ms", "1.3.6.1.4.1.9.9.42.1.2.10.1.1", False),
+                               ("sense", "1.3.6.1.4.1.9.9.42.1.2.10.1.2", False)):
+            lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
+            if tag:
+                lines.append('      is_tag = true')
     return "\n".join(lines)
 
 

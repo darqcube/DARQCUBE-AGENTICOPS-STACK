@@ -60,6 +60,10 @@ recording rule in `observability/prometheus/rules/recording.yml` is what makes t
 Infrahub, no SNMP/gNMI data for 10 min — names the device and site) and
 `BGPPeerDown` (a peer configured up that is not Established for 5 min).
 
+**WAN quality alerts shipped:** `IPSLAProbeFailing` (a probe below 80 %
+success over 15 min) and `WANLatencyHigh` (ICMP probe RTT above 150 ms for
+10 min — set the threshold to the WAN's SLA).
+
 **Flow alerts shipped:** `NoFlowsReceived` (no flow from anywhere for 15 min)
 and `CriticalApplicationSilent` (a `critical` application that had traffic in
 the last 6 h has had none for 15 min — needs services modelled in Infrahub).

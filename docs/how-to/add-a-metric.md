@@ -40,6 +40,15 @@ BGP4-MIB peer table (`bgp_peer_state`, `bgp_peer_admin_status`,
 tag `peer`). Shipped on for `ios_xe` and `vrp`; RouterOS does not implement
 BGP4-MIB. Drives the `BGPPeerDown` alert and the BGP panels.
 
+### IP SLA probes — `ipsla: true`
+
+`snmp.ipsla: true` (shipped on for `ios_xe`) polls CISCO-RTTMON-MIB:
+`ipsla_rtt_ms` and `ipsla_sense` per operation, tagged `probe` (the
+operation's `tag`), `rtt_type` (1 icmp-echo, 6 tcp-connect) and `index`
+(operation id). Recording rules: `ipsla:success:ratio15m`,
+`ipsla:rtt_ms:avg10m`, `ipsla:jitter_ms:stddev10m`. Device side:
+[../devices/cisco-ios-xe.md](../devices/cisco-ios-xe.md).
+
 ## The metric name is `<measurement>_<field>`
 
 This is the single thing to get right. Prometheus sees the Telegraf measurement

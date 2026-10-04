@@ -752,3 +752,24 @@ def test_prometheus_output_outlives_a_poll_cycle():
     seconds = int(m.group(1)) * (60 if m.group(2) == "m" else 1)
     assert seconds >= 2 * 60 + 20, "must outlive the longest SNMP_INTERVAL (60 s) plus a retry round"
 
+
+def test_ipsla_table_only_for_platforms_that_declare_it(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    platforms = yaml.safe_load((ROOT / "platforms.yml").read_text())
+    for platform in ("ios_xe", "vrp", "routeros"):
+        body = (tmp_path / f"snmp-{platform}.conf").read_text()
+        assert ('name = "ipsla"' in body) == bool(platforms[platform]["snmp"].get("ipsla")), platform
+    body = (tmp_path / "snmp-ios_xe.conf").read_text().split('name = "ipsla"', 1)[1]
+    assert "index_as_tag = true" in body.split("[[inputs.snmp.table.field]]", 1)[0], "operation id must keep probes apart"
+    for oid in ("1.3.6.1.4.1.9.9.42.1.2.1.1.3", "1.3.6.1.4.1.9.9.42.1.2.10.1.1", "1.3.6.1.4.1.9.9.42.1.2.10.1.2"):
+        assert oid in body
+
+
+def test_ipsla_rules_and_alerts_exist():
+    rules = (ROOT / "observability/prometheus/rules/recording.yml").read_text()
+    alerts = (ROOT / "observability/prometheus/rules/alerts.yml").read_text()
+    for rec in ("ipsla:ok", "ipsla:success:ratio15m", "ipsla:rtt_ms:avg10m", "ipsla:jitter_ms:stddev10m"):
+        assert f"record: {rec}" in rules
+    assert "IPSLAProbeFailing" in alerts and "WANLatencyHigh" in alerts
+

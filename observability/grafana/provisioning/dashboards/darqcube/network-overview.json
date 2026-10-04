@@ -727,13 +727,261 @@
     },
     {
       "type": "table",
+      "title": "WAN quality per probe (IP SLA)",
+      "description": "IP SLA probes run by the routers (platforms with ipsla: true). RTT and success over the last 10\u201315 min; jitter is the spread of ICMP RTT samples. Probe names come from each operation's `tag`.",
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "ipsla:rtt_ms:avg10m{device=~\"$device\", site=~\"$site\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "ipsla:jitter_ms:stddev10m{device=~\"$device\", site=~\"$site\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "ipsla:success:ratio15m{device=~\"$device\", site=~\"$site\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true,
+              "host": true,
+              "memory_kind": true,
+              "platform": true,
+              "role": true,
+              "index": true,
+              "rtt_type": true
+            },
+            "indexByName": {
+              "site": 0,
+              "device": 1,
+              "probe": 2,
+              "Value #A": 3,
+              "Value #B": 4,
+              "Value #C": 5
+            },
+            "renameByName": {
+              "Value #A": "RTT",
+              "Value #B": "jitter",
+              "Value #C": "success"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "success"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.9
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.99
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RTT"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 150
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "success",
+            "desc": false
+          }
+        ]
+      },
+      "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "WAN RTT (ICMP probes)",
+      "description": "Latest round-trip time of each ICMP probe \u2014 typically branch to data centre.",
+      "gridPos": {
+        "h": 8,
+        "w": 7,
+        "x": 10,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "ipsla_rtt_ms{device=~\"$device\", site=~\"$site\", rtt_type=\"1\"} and on (device, index) ipsla_sense == 1",
+          "legendFormat": "{{device}} {{probe}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "Application response time (TCP connect probes)",
+      "description": "Time to open a TCP connection to an application server, as each site experiences it.",
+      "gridPos": {
+        "h": 8,
+        "w": 7,
+        "x": 17,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "ipsla_rtt_ms{device=~\"$device\", site=~\"$site\", rtt_type=\"6\"} and on (device, index) ipsla_sense == 1",
+          "legendFormat": "{{device}} {{probe}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 14
+    },
+    {
+      "type": "table",
       "title": "Critical applications \u2014 now vs normal",
       "description": "Applications marked critical in Infrahub: traffic in the last 5 min against the 6 h average. A sharp drop is the first sign of an application problem.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 18
       },
       "datasource": {
         "type": "prometheus",
@@ -837,7 +1085,7 @@
           }
         ]
       },
-      "id": 12
+      "id": 15
     },
     {
       "type": "bargauge",
@@ -847,7 +1095,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 18
       },
       "datasource": {
         "type": "prometheus",
@@ -876,7 +1124,7 @@
           ]
         }
       },
-      "id": 13
+      "id": 16
     },
     {
       "type": "timeseries",
@@ -886,7 +1134,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "datasource": {
         "type": "prometheus",
@@ -928,7 +1176,7 @@
           "sort": "desc"
         }
       },
-      "id": 14
+      "id": 17
     },
     {
       "type": "timeseries",
@@ -938,7 +1186,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 26
       },
       "datasource": {
         "type": "prometheus",
@@ -975,7 +1223,7 @@
           "sort": "desc"
         }
       },
-      "id": 15
+      "id": 18
     },
     {
       "type": "logs",
@@ -985,7 +1233,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 26
+        "y": 34
       },
       "datasource": {
         "type": "loki",
@@ -1003,7 +1251,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 16
+      "id": 19
     },
     {
       "type": "timeseries",
@@ -1013,7 +1261,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 26
+        "y": 34
       },
       "datasource": {
         "type": "loki",
@@ -1054,7 +1302,7 @@
           "sort": "desc"
         }
       },
-      "id": 17
+      "id": 20
     },
     {
       "type": "logs",
@@ -1064,7 +1312,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 35
+        "y": 43
       },
       "datasource": {
         "type": "loki",
@@ -1082,7 +1330,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 18
+      "id": 21
     },
     {
       "type": "logs",
@@ -1092,7 +1340,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 35
+        "y": 43
       },
       "datasource": {
         "type": "loki",
@@ -1110,7 +1358,7 @@
         "wrapLogMessage": true,
         "showLabels": true
       },
-      "id": 19
+      "id": 22
     }
   ]
 }

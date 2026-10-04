@@ -63,6 +63,25 @@ groups:
           summary: "BGP peer {{ $labels.peer }} on {{ $labels.device }} is not established"
           description: "bgpPeerState {{ $value }} (6 = established) for 5 minutes."
 
+  - name: wan-quality
+    rules:
+      # IP SLA probes: a probe that keeps failing is a path (or service) that
+      # is down from that site's point of view.
+      - alert: IPSLAProbeFailing
+        expr: ipsla:success:ratio15m < 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "IP SLA {{ $labels.probe }} on {{ $labels.device }} succeeds {{ $value | humanizePercentage }}"
+          description: "Fewer than 80% of operations succeeded over 15 minutes — loss on the path, or the target is down."
+      - alert: WANLatencyHigh
+        expr: ipsla:rtt_ms:avg10m{rtt_type="1"} > 150
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "WAN RTT {{ $value | printf \"%.0f\" }} ms from {{ $labels.device }} ({{ $labels.probe }})"
+          description: "10-minute average ICMP probe RTT above 150 ms. Adjust the threshold to the WAN's SLA."
+
   - name: flows
     rules:
       # Flow is device-initiated, so silence is the only symptom of an exporter
