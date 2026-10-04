@@ -1,0 +1,712 @@
+{
+  "uid": "darqcube-devices",
+  "title": "Devices & Interfaces",
+  "tags": [
+    "darqcube",
+    "snmp",
+    "interfaces"
+  ],
+  "description": "SNMP: device inventory, interface status, throughput, utilisation, errors, CPU and memory.",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Site",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(device_uptime, site)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(device_uptime{site=~\"$site\"}, device)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "interface",
+        "label": "Interface",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(interface_oper_status{device=~\"$device\"}, ifName)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Devices reporting",
+      "description": "Devices answering SNMP in the last poll.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(device_uptime{device=~\"$device\", site=~\"$site\"}) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Interfaces up",
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(interface_oper_status{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"} == 1) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Interfaces down (admin up)",
+      "description": "Operationally down while administratively up \u2014 deliberately shut ports are excluded.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(interface_oper_status{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"} == 2 and interface_admin_status{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"} == 1) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Interface errors /s",
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(interface_in_errors{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m]) + rate(interface_out_errors{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m])) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "id": 4
+    },
+    {
+      "type": "table",
+      "title": "Devices",
+      "description": "Every polled device with the site, role and platform Infrahub holds for it. Uptime is SNMP sysUpTime.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "device_uptime{device=~\"$device\", site=~\"$site\"} / 100",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true
+            },
+            "renameByName": {
+              "Value": "uptime",
+              "device": "device",
+              "site": "site",
+              "role": "role",
+              "platform": "platform"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "uptime",
+            "desc": true
+          }
+        ]
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Throughput in (per interface)",
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(interface_in_octets{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m]) * 8",
+          "legendFormat": "{{device}} {{ifName}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Throughput out (per interface)",
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(interface_out_octets{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m]) * 8",
+          "legendFormat": "{{device}} {{ifName}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 7
+    },
+    {
+      "type": "table",
+      "title": "Top interfaces by utilisation (in+out, last 5 min)",
+      "description": "Utilisation against interface_speed (Mbit/s). Interfaces reporting speed 0 (tunnels, loopbacks) are left out.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "topk(15, (rate(interface_in_octets{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m]) + rate(interface_out_octets{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m])) * 8 / (interface_speed{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"} * 1e6 > 0))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true
+            },
+            "renameByName": {
+              "Value": "utilisation",
+              "ifName": "interface",
+              "ifAlias": "description",
+              "ifType": "type"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "utilisation",
+            "desc": true
+          }
+        ]
+      },
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Interface errors /s",
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(interface_in_errors{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m]) > 0",
+          "legendFormat": "{{device}} {{ifName}} in",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(interface_out_errors{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}[5m]) > 0",
+          "legendFormat": "{{device}} {{ifName}} out",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 9
+    },
+    {
+      "type": "table",
+      "title": "Interface status",
+      "description": "1 = up, 2 = down (IF-MIB ifOperStatus).",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "interface_oper_status{device=~\"$device\", site=~\"$site\", ifName=~\"$interface\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true
+            },
+            "renameByName": {
+              "Value": "oper (1=up 2=down)",
+              "ifName": "interface",
+              "ifAlias": "description",
+              "ifType": "type"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU usage",
+      "description": "Needs the platform's CPU MIB. Empty for images that do not implement it (e.g. Cisco IOL).",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 39
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "device:cpu_usage:max{device=~\"$device\", site=~\"$site\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 11
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory used",
+      "description": "Needs the platform's memory MIB. Empty for images that do not implement it (e.g. Cisco IOL).",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 39
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "device:memory_used_percent:max{device=~\"$device\", site=~\"$site\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 12
+    }
+  ],
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
+  ]
+}

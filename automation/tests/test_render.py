@@ -646,3 +646,34 @@ def test_snmp_timing_comes_from_env_with_a_bounded_worst_case():
     example = (ROOT / ".env.example").read_text()
     assert f"SNMP_TIMEOUT={timeout}s" in example and f"SNMP_RETRIES={retries}" in example
 
+
+DASHBOARDS = ROOT / "observability/grafana/provisioning/dashboards/darqcube"
+
+
+def test_dashboards_are_valid_and_point_at_provisioned_datasources():
+    """A wrong datasource uid or a duplicate dashboard uid fails silently in
+    Grafana: the panel just says No data, or one dashboard hides another."""
+    datasources = set()
+    for f in (ROOT / "observability/grafana/provisioning/datasources").glob("*.y*ml"):
+        datasources |= {d["uid"] for d in yaml.safe_load(f.read_text())["datasources"]}
+    uids = []
+    for f in DASHBOARDS.glob("*.json"):
+        d = json.loads(f.read_text())
+        uids.append(d["uid"])
+        assert d["uid"].startswith("darqcube-"), f.name
+        for p in d["panels"]:
+            ds = p.get("datasource", {}).get("uid")
+            assert ds in datasources, f"{f.name}: panel '{p['title']}' uses unknown datasource {ds}"
+        for v in d.get("templating", {}).get("list", []):
+            if v.get("type") == "query":
+                assert v["datasource"]["uid"] in datasources, f"{f.name}: variable {v['name']}"
+    assert len(uids) == len(set(uids)), f"duplicate dashboard uid: {uids}"
+    assert {"darqcube-network", "darqcube-devices", "darqcube-netflow", "darqcube-applications", "darqcube-logs"} <= set(uids)
+
+
+def test_grafana_opens_on_a_shipped_dashboard():
+    env = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]["grafana"]["environment"]
+    home = env["GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH"]
+    assert home.startswith("/etc/grafana/provisioning/dashboards/darqcube/")
+    assert (DASHBOARDS / home.rsplit("/", 1)[1]).exists(), "home dashboard file is not shipped"
+

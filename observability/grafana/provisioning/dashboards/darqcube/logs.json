@@ -1,0 +1,326 @@
+{
+  "uid": "darqcube-logs",
+  "title": "Logs",
+  "tags": [
+    "darqcube",
+    "logs",
+    "syslog"
+  ],
+  "description": "Syslog from every device (Logstash \u2192 Loki): volume by severity and device, top message types, errors, full log browser.",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Site",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "darqcube-loki"
+        },
+        "query": {
+          "label": "site",
+          "stream": "",
+          "type": 1,
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "darqcube-loki"
+        },
+        "query": {
+          "label": "device",
+          "stream": "",
+          "type": 1,
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "severity",
+        "label": "Severity",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "darqcube-loki"
+        },
+        "query": {
+          "label": "severity",
+          "stream": "",
+          "type": 1,
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "search",
+        "label": "Search (regex)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Log volume by severity",
+      "description": "",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "sum by (severity) (count_over_time({device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} [$__auto]))",
+          "legendFormat": "{{severity}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 1
+    },
+    {
+      "type": "timeseries",
+      "title": "Log volume by device",
+      "description": "",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "sum by (device) (count_over_time({device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} [$__auto]))",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 2
+    },
+    {
+      "type": "table",
+      "title": "Top message types (last hour)",
+      "description": "Cisco mnemonic (FACILITY-SEVERITY-MNEMONIC) extracted from the message at query time \u2014 it is deliberately not a Loki label.",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 7
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "topk(15, sum by (mnemonic) (count_over_time({device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} | regexp `%(?P<mnemonic>[A-Z0-9_]+-[0-7]-[A-Z0-9_]+)` [1h])))",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Field": "message type",
+              "Last *": "count",
+              "Last": "count"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "count",
+            "desc": true
+          }
+        ]
+      },
+      "id": 3
+    },
+    {
+      "type": "logs",
+      "title": "Errors and worse",
+      "description": "severity error, critical, alert or emergency.",
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 8,
+        "y": 7
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "{device=~\"$device\", site=~\"$site\", severity=~\"error|critical|alert|emergency\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "showLabels": true
+      },
+      "id": 4
+    },
+    {
+      "type": "logs",
+      "title": "All device logs",
+      "description": "Syslog via Logstash, labelled device / site / role / severity from Infrahub.",
+      "gridPos": {
+        "h": 20,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "darqcube-loki"
+      },
+      "targets": [
+        {
+          "expr": "{device=~\"$device\", site=~\"$site\", severity=~\"$severity\"} |~ \"(?i)$search\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "showLabels": true,
+        "enableLogDetails": true
+      },
+      "id": 5
+    }
+  ],
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
+  ]
+}

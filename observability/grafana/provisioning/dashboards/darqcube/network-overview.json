@@ -433,5 +433,15 @@
         "wrapLogMessage": true
       }
     }
+  ],
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
   ]
 }

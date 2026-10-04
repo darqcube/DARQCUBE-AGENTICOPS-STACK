@@ -18,9 +18,22 @@ The workflow that avoids hand-writing JSON:
 The UI will not let you *save*, which is the point. Copying the JSON is the
 save.
 
-Shipped dashboards: **Network Overview** (`darqcube-network`) and
-**Applications** (`darqcube-applications`, NetFlow by application —
-[label-flows-by-application.md](label-flows-by-application.md)).
+## Shipped dashboards
+
+All in the **DarqCube** folder, linked to each other from the top-right
+*DarqCube dashboards* menu. Grafana opens on **Network Overview**
+(`GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `compose/observability.yaml`).
+
+| Dashboard | uid | Source | Shows |
+|---|---|---|---|
+| **Network Overview** | `darqcube-network` | Prometheus + Loki | the one-page summary: devices, interfaces down, alerts, throughput, flow by protocol, recent logs |
+| **Devices & Interfaces** | `darqcube-devices` | Prometheus (SNMP) | device table (site, role, platform, uptime), interface status, throughput in/out, top utilisation, errors, CPU and memory |
+| **NetFlow** | `darqcube-netflow` | Prometheus (flow) | throughput and packets by exporter, protocol, site and direction |
+| **Applications** | `darqcube-applications` | Prometheus (flow) | flow traffic by application and criticality — needs services in Infrahub ([label-flows-by-application.md](label-flows-by-application.md)) |
+| **Logs** | `darqcube-logs` | Loki (syslog) | volume by severity and device, top Cisco message types, errors and worse, a full log browser with a search box |
+
+CPU and memory panels stay empty for images that do not implement the
+platform's CPU/memory MIB (for example Cisco IOL); real hardware fills them.
 
 ## Add a new dashboard
 

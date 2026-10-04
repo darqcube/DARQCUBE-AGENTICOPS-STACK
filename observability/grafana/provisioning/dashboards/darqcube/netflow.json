@@ -1,12 +1,12 @@
 {
-  "uid": "darqcube-applications",
-  "title": "Applications",
+  "uid": "darqcube-netflow",
+  "title": "NetFlow",
   "tags": [
     "darqcube",
     "flow",
-    "applications"
+    "netflow"
   ],
-  "description": "NetFlow traffic by application, from the services modelled in Infrahub (docs/how-to/label-flows-by-application.md).",
+  "description": "Flow traffic per exporter, protocol, site and direction. Per-flow addresses are not stored \u2014 see the Applications dashboard for traffic by application.",
   "timezone": "browser",
   "schemaVersion": 39,
   "refresh": "30s",
@@ -17,47 +17,66 @@
   "templating": {
     "list": [
       {
-        "name": "device",
-        "label": "Device (exporter)",
+        "name": "site",
+        "label": "Site",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "darqcube-prometheus"
         },
-        "query": "label_values(netflow_flow_bytes_total, device)",
+        "query": "label_values(netflow_flow_bytes_total, site)",
         "refresh": 2,
         "includeAll": true,
         "multi": true,
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "sort": 1
       },
       {
-        "name": "application",
-        "label": "Application",
+        "name": "device",
+        "label": "Exporter",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "darqcube-prometheus"
         },
-        "query": "label_values(netflow_flow_bytes_total, application)",
+        "query": "label_values(netflow_flow_bytes_total{site=~\"$site\"}, device)",
         "refresh": 2,
         "includeAll": true,
         "multi": true,
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "sort": 1
+      },
+      {
+        "name": "protocol",
+        "label": "Protocol",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(netflow_flow_bytes_total, protocol)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
       }
     ]
   },
   "panels": [
     {
-      "id": 1,
       "type": "stat",
-      "title": "Applications seen",
-      "description": "Modelled applications with flows in the last window.",
+      "title": "Flow throughput",
+      "description": "Every exporter on a flow's path reports it: summing several devices counts a flow more than once. Pick one device per path for totals.",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -70,13 +89,13 @@
       },
       "targets": [
         {
-          "expr": "count(count by (application) (netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\", application!=\"other\"})) or vector(0)",
+          "expr": "sum(avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "bps",
           "decimals": 1
         },
         "overrides": []
@@ -89,13 +108,13 @@
         },
         "colorMode": "value",
         "graphMode": "area"
-      }
+      },
+      "id": 1
     },
     {
-      "id": 2,
       "type": "stat",
-      "title": "Unclassified share",
-      "description": "Traffic matching no service in Infrahub (application=\"other\"). High means unmodelled servers, or internet traffic.",
+      "title": "Packets /s",
+      "description": "",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -108,13 +127,13 @@
       },
       "targets": [
         {
-          "expr": "sum(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\", application=\"other\"}) / sum(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"})",
+          "expr": "sum(avg_over_time(netflow_flow_packets_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) / 60",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "pps",
           "decimals": 1
         },
         "overrides": []
@@ -127,13 +146,13 @@
         },
         "colorMode": "value",
         "graphMode": "area"
-      }
+      },
+      "id": 2
     },
     {
-      "id": 3,
       "type": "stat",
-      "title": "Critical application traffic",
-      "description": "Throughput to and from applications marked critical in Infrahub.",
+      "title": "Exporters reporting",
+      "description": "",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -146,14 +165,30 @@
       },
       "targets": [
         {
-          "expr": "sum by (criticality) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\", criticality=\"critical\"}[5m])) * 8 / 60",
+          "expr": "count(count by (device) (netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"})) or vector(0)",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bps",
-          "decimals": 1
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -165,13 +200,13 @@
         },
         "colorMode": "value",
         "graphMode": "area"
-      }
+      },
+      "id": 3
     },
     {
-      "id": 4,
       "type": "stat",
-      "title": "Silent critical applications",
-      "description": "Critical applications that carried traffic in the last 6 h and none in the last 15 min.",
+      "title": "Volume (last hour)",
+      "description": "Every exporter on a flow's path reports it: summing several devices counts a flow more than once. Pick one device per path for totals.",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -184,13 +219,13 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=\"CriticalApplicationSilent\", alertstate=\"firing\"}) or vector(0)",
+          "expr": "sum(avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[1h])) * 60",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "decbytes",
           "decimals": 1
         },
         "overrides": []
@@ -203,16 +238,16 @@
         },
         "colorMode": "value",
         "graphMode": "area"
-      }
+      },
+      "id": 4
     },
     {
-      "id": 5,
       "type": "timeseries",
-      "title": "Throughput by application",
-      "description": "Every exporter on a flow's path reports it, so summing several devices counts a flow more than once. Pick one device per path (e.g. the branch routers) for totals.",
+      "title": "Throughput by exporter",
+      "description": "Every exporter on a flow's path reports it: summing several devices counts a flow more than once. Pick one device per path for totals.",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 4
       },
@@ -222,8 +257,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (application) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m])) * 8 / 60",
-          "legendFormat": "{{application}}",
+          "expr": "sum by (device) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -232,6 +267,54 @@
           "unit": "bps",
           "custom": {
             "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Throughput by protocol",
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "legendFormat": "{{protocol}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never",
             "stacking": {
               "mode": "normal"
             }
@@ -252,13 +335,13 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "id": 6
     },
     {
-      "id": 6,
       "type": "timeseries",
-      "title": "Throughput by criticality",
-      "description": "Every exporter on a flow's path reports it, so summing several devices counts a flow more than once. Pick one device per path (e.g. the branch routers) for totals.",
+      "title": "Throughput by site",
+      "description": "The exporter's site (from Infrahub).",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -271,8 +354,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (criticality) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m])) * 8 / 60",
-          "legendFormat": "{{criticality}}",
+          "expr": "sum by (site) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "legendFormat": "{{site}}",
           "refId": "A"
         }
       ],
@@ -281,9 +364,7 @@
           "unit": "bps",
           "custom": {
             "fillOpacity": 20,
-            "stacking": {
-              "mode": "normal"
-            }
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -301,13 +382,13 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "id": 7
     },
     {
-      "id": 7,
       "type": "timeseries",
-      "title": "Throughput by application and protocol",
-      "description": "Every exporter on a flow's path reports it, so summing several devices counts a flow more than once. Pick one device per path (e.g. the branch routers) for totals.",
+      "title": "Throughput by direction",
+      "description": "",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -320,8 +401,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (application, protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m])) * 8 / 60",
-          "legendFormat": "{{application}} {{protocol}}",
+          "expr": "sum by (direction) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "legendFormat": "{{direction}}",
           "refId": "A"
         }
       ],
@@ -330,6 +411,7 @@
           "unit": "bps",
           "custom": {
             "fillOpacity": 20,
+            "showPoints": "never",
             "stacking": {
               "mode": "normal"
             }
@@ -350,15 +432,15 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "id": 8
     },
     {
-      "id": 8,
-      "type": "bargauge",
-      "title": "Volume by application (last hour)",
-      "description": "Every exporter on a flow's path reports it, so summing several devices counts a flow more than once. Pick one device per path (e.g. the branch routers) for totals.",
+      "type": "timeseries",
+      "title": "Packets /s by exporter",
+      "description": "",
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
         "x": 0,
         "y": 20
@@ -369,35 +451,43 @@
       },
       "targets": [
         {
-          "expr": "sort_desc(sum by (application) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[1h])) * 60)",
-          "legendFormat": "{{application}}",
-          "refId": "A",
-          "instant": true
+          "expr": "sum by (device) (avg_over_time(netflow_flow_packets_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) / 60",
+          "legendFormat": "{{device}}",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "decbytes"
+          "unit": "pps",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
         },
         "overrides": []
       },
       "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "reduceOptions": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
           "calcs": [
-            "lastNotNull"
+            "mean",
+            "max"
           ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
-      }
+      },
+      "id": 9
     },
     {
-      "id": 9,
       "type": "table",
-      "title": "Which devices carry each application (last 15 min)",
-      "description": "Average throughput per device and application \u2014 where an application's traffic actually flows.",
+      "title": "Exporter \u00d7 protocol (last 15 min)",
+      "description": "",
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
         "x": 12,
         "y": 20
@@ -408,10 +498,28 @@
       },
       "targets": [
         {
-          "expr": "sum by (device, application, criticality) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[15m])) * 8 / 60",
+          "expr": "sum by (device, site, role, protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[15m])) * 8 / 60",
           "format": "table",
           "instant": true,
           "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true
+            },
+            "renameByName": {
+              "Value": "throughput"
+            }
+          }
         }
       ],
       "fieldConfig": {
@@ -420,19 +528,6 @@
         },
         "overrides": []
       },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "renameByName": {
-              "Value": "throughput"
-            }
-          }
-        }
-      ],
       "options": {
         "sortBy": [
           {
@@ -440,7 +535,8 @@
             "desc": true
           }
         ]
-      }
+      },
+      "id": 10
     }
   ],
   "links": [
