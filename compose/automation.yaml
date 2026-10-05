@@ -35,16 +35,11 @@ services:
       # Results at /metrics (scraped by Prometheus) and /assurance/latest.
       ASSURANCE_INTERVAL_MINUTES: ${ASSURANCE_INTERVAL_MINUTES:-0}
       LOKI_URL: http://loki:3100
-      # Network Map topology (automation/service/network_map.py), rewritten
-      # when it changes; Grafana serves the folder at /public/darqcube-map/.
-      PROMETHEUS_URL: http://prometheus:9090
-      MAP_INTERVAL_SECONDS: ${MAP_INTERVAL_SECONDS:-60}
     volumes:
       # Mounted rather than baked in, so a template or task can be edited and
       # retried without a rebuild — this is the layer that gets iterated most.
       - ../automation:/app/automation
       - ../platforms.yml:/app/platforms.yml:ro
-      - ../observability/grafana/map:/map
     ports:
       - "${AUTOMATION_PORT:-8100}:8100"
     healthcheck:

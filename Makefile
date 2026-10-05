@@ -81,9 +81,10 @@ auto-render: ## Register the Infrahub webhook for auto-render (needs the auto-re
 auto-render-off: ## Deactivate the auto-render webhook (back to make render by hand)
 	$(COMPOSE) exec -T infrahub-server python /scripts/render-hook.py --unregister
 
-render: ## Infrahub -> Telegraf + Logstash configs. Run after any device change.
+render: ## Infrahub -> Telegraf + Logstash configs, and the Network Map dashboard. Run after any device or drawing change.
 	$(COMPOSE) exec -T -e FLOW_DEDICATED_FIRST=$(strip $(FLOW_DEDICATED_FIRST)) \
 		-e FLOW_DEDICATED_LAST=$(strip $(FLOW_DEDICATED_LAST)) infrahub-server python /scripts/render-inventory.py
+	$(COMPOSE) exec -T infrahub-server python /scripts/render-network-map.py
 
 # --- devices: get and put ------------------------------------------------
 # Every recipe that talks to the automation API fails loudly: --fail-with-body
@@ -138,7 +139,7 @@ verify: ## Run exactly what docs/INSTALL.md tells you to verify
 # Telegraf and Logstash, and fetched running configs (credentials included)
 # outlived the reset. Files are root-owned, but deleting them needs only write
 # access to the folder, which is yours. .gitkeep stays so the folders exist.
-CLEAN_DIRS := observability/telegraf/generated automation/configs observability/grafana/map
+CLEAN_DIRS := observability/telegraf/generated automation/configs observability/grafana/provisioning/dashboards/generated
 
 clean: ## Stop the stack and DELETE ALL DATA — volumes, rendered config, fetched configs
 	@read -p "Delete all volumes, rendered config and fetched device configs? [y/N] " ok; \

@@ -351,7 +351,7 @@ def test_the_output_directories_exist_in_a_fresh_clone():
 # into the repo are bind mounts, so `make clean` has to empty them itself —
 # otherwise the last install's rendered config keeps driving the collectors.
 
-WRITTEN = ("observability/telegraf/generated", "automation/configs", "observability/grafana/map")
+WRITTEN = ("observability/telegraf/generated", "automation/configs", "observability/grafana/provisioning/dashboards/generated")
 
 
 def _clean_sandbox(tmp_path):
@@ -670,8 +670,7 @@ def test_dashboards_are_valid_and_point_at_provisioned_datasources():
             if v.get("type") == "query":
                 assert v["datasource"]["uid"] in datasources, f"{f.name}: variable {v['name']}"
     assert len(uids) == len(set(uids)), f"duplicate dashboard uid: {uids}"
-    assert {"darqcube-network", "darqcube-devices", "darqcube-netflow", "darqcube-applications", "darqcube-logs",
-            "darqcube-network-map"} <= set(uids)
+    assert {"darqcube-network", "darqcube-devices", "darqcube-netflow", "darqcube-applications", "darqcube-logs"} <= set(uids)
 
 
 def test_grafana_opens_on_a_shipped_dashboard():
@@ -702,8 +701,7 @@ def test_intent_lists_every_rendered_device_with_its_labels(monkeypatch, tmp_pat
     lines = (tmp_path / "intent.influx").read_text().splitlines()
     assert len(lines) == 3
     cr1 = next(l for l in lines if l.startswith("intent_device,device=cr1,"))
-    assert cr1.startswith("intent_device,device=cr1,site=hq,role=core,platform=ios_xe,telemetry=snmp,lat=")
-    assert cr1.endswith(" present=1i,rank=0i")
+    assert cr1 == "intent_device,device=cr1,site=hq,role=core,platform=ios_xe,telemetry=snmp present=1i,rank=0i"
     conf = (tmp_path / "intent.conf").read_text()
     assert "/etc/telegraf/telegraf.d/generated/intent.influx" in conf and 'data_format = "influx"' in conf
 
@@ -778,11 +776,7 @@ def test_ipsla_rules_and_alerts_exist():
 
 
 
-# --- network map (LLDP + BGP links, ESnet Network Map Panel) ------------------
-
-def _rec(device, site, pos=(None, None), site_pos=(None, None)):
-    return {"device": device, "site": site, "_pos": pos, "_site_pos": site_pos}
-
+# --- discovered links (LLDP + BGP) ---------------------------------------------
 
 def test_intent_rank_follows_name_order(monkeypatch, tmp_path):
     """The map draws each link once by comparing ranks — PromQL cannot compare
@@ -793,25 +787,6 @@ def test_intent_rank_follows_name_order(monkeypatch, tmp_path):
     names = [re.search(r"device=([^,]+)", l).group(1) for l in lines]
     ranks = [int(re.search(r"rank=(\d+)i", l).group(1)) for l in lines]
     assert names == sorted(names) and ranks == list(range(len(lines)))
-    assert all(re.search(r",lat=-?[0-9.]+,lng=-?[0-9.]+ ", l) for l in lines), "every device gets a map position"
-
-
-def test_map_position_precedence(monkeypatch, tmp_path):
-    """Device coordinates win; otherwise the site's, spread so devices do not
-    cover each other; a site with no coordinates still gets a place."""
-    mod = load_renderer(monkeypatch, THREE, tmp_path)
-    pos = mod.map_positions([
-        _rec("r1", "hq", pos=(10.0, 20.0), site_pos=(1.0, 2.0)),
-        _rec("r2", "hq", site_pos=(1.0, 2.0)),
-        _rec("r3", "hq", site_pos=(1.0, 2.0)),
-        _rec("b1", "branch", site_pos=(-5.0, -5.0)),
-        _rec("x1", "nowhere"),
-    ])
-    assert pos["r1"] == (10.0, 20.0)
-    assert pos["b1"] == (-5.0, -5.0), "a site's only spread device sits on the site"
-    assert pos["r2"] != pos["r3"] and all(abs(pos[d][0] - 1.0) <= 2 for d in ("r2", "r3"))
-    assert pos["x1"] is not None
-    assert len(set(pos.values())) == len(pos), "no two devices on one spot"
 
 
 def test_neighbor_tables_only_for_platforms_that_declare_them(monkeypatch, tmp_path):
@@ -861,36 +836,6 @@ def test_shared_segments_counted_by_neighbour_name():
     lldp = next(r for g in rules["groups"] for r in g["rules"]
                 if r.get("record") == "link:end:info" and r.get("labels", {}).get("kind") == "lldp")
     assert "group by (device, port, neighbor_name)" in lldp["expr"]
-
-
-def test_network_map_panel_is_wired_for_esnet():
-    """Each of these broke the panel silently: autodetect topology loses the
-    traffic colours (v3.1.0), the panel reads all three layer slots, fields are
-    read by real name, and without a viewport Leaflet throws before the file loads."""
-    d = json.loads((DASHBOARDS / "network-map.json").read_text())
-    p = next(p for p in d["panels"] if p["title"].startswith("Network map"))
-    assert p["type"] == "esnet-networkmap-panel"
-    o = p["options"]
-    assert o["topologySource"] == "url"
-    assert o["configurationUrl"].startswith("/public/darqcube-map/network-map.json?v=${__to")
-    assert len(o["layers"]) == 3 and all("mapjson" in l for l in o["layers"])
-    layer = o["layers"][0]
-    assert (layer["srcField"], layer["dstField"], layer["inboundValueField"], layer["outboundValueField"]) == \
-        ("src", "dst", "in_bits", "out_bits")
-    aliases = {t["options"]["alias"]: t["options"] for t in p["transformations"] if t["id"] == "calculateField"}
-    assert {"in_bits", "out_bits"} <= set(aliases) and all(a["timeSeries"] is False for a in aliases.values())
-    assert all(k in o["viewport"] for k in ("top", "left", "bottom", "right"))
-
-
-def test_grafana_installs_the_map_plugin_and_serves_the_topology():
-    compose = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]["grafana"]
-    env = compose["environment"]
-    assert "esnet-networkmap-panel" in env["GF_PLUGINS_PREINSTALL"]
-    assert env["GF_PLUGINS_PREINSTALL_ASYNC"] == "false", "a provisioned dashboard must not meet a missing plugin"
-    assert any(v.endswith(":/usr/share/grafana/public/darqcube-map:ro") for v in compose["volumes"])
-    auto = yaml.safe_load((ROOT / "compose/automation.yaml").read_text())["services"]["automation"]
-    assert any(v.startswith("../observability/grafana/map:/map") for v in auto["volumes"])
-    assert "observability/grafana/map/*" in (ROOT / ".gitignore").read_text()
 
 
 def test_link_rules_behave(tmp_path):

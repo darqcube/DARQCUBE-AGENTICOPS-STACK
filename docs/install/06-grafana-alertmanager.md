@@ -19,7 +19,7 @@ graphs.
 
 ### Plugins
 
-The Network Map dashboard uses the ESnet Network Map Panel. Grafana installs
+The Network Map dashboard uses Network Weathermap NG. Grafana installs
 `GRAFANA_PLUGINS` (`.env`) before it starts serving; air-gapped installs:
 [../how-to/change-dashboards.md](../how-to/change-dashboards.md).
 

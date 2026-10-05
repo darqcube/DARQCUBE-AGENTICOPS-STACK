@@ -325,14 +325,13 @@ names every device that is in Infrahub but silent, the `DeviceNotReporting`
 alert fires on it, and the dashboards show it — "is everything we own
 monitored?" answered from the source of truth, not from guesswork.
 
-**The network map.** Devices and their positions come from Infrahub
-(`latitude` / `longitude` on a site or device). Links come from the devices
-themselves: LLDP for physical links, and BGP sessions for tunnels, which carry
-no LLDP — each session's addresses resolve to the interfaces that own them.
-Prometheus joins both to interface counters (`links` recording rules), the
-automation service writes the topology file the ESnet Network Map Panel
-loads, and the panel's query colours every link live. There is no topology
-file to maintain by hand.
+**The network map.** The Network Map dashboard is drawn, not guessed: a
+drawing in `source-of-truth/map/` (nodes, positions, which interface each
+link uses) becomes a Weathermap panel at `make render`, and each link shows
+the live SNMP traffic of the interface the drawing names. Separately, the
+devices report their own links — LLDP for physical links, BGP sessions for
+tunnels, which carry no LLDP — and the `links` recording rules join both to
+interface counters, so links appear (and go down) without anyone drawing them.
 
 **Assurance as metrics.** With `ASSURANCE_INTERVAL_MINUTES` set, the
 automation service runs the assurance rules on every device on a schedule
@@ -515,6 +514,7 @@ host, then restart or reload the service.
 | `source-of-truth/schema/` | `infrahub-server` | `/schema` |
 | `source-of-truth/devices/` | `infrahub-server` | `/devices` |
 | `source-of-truth/scripts/` | `infrahub-server` | `/scripts` — seed and render run here |
+| `source-of-truth/map/` | `infrahub-server` | `/map` — the network drawing (per deployment, gitignored) |
 | `observability/telegraf/profiles/` | `infrahub-server` | `/profiles` — SNMP templates the renderer expands per shard |
 | `observability/prometheus/` | `prometheus` | config and rules |
 | `observability/loki/` | `loki` | `loki.yml` |
@@ -532,7 +532,7 @@ into the repo tree. All are gitignored apart from a `.gitkeep`.
 |---|---|---|---|
 | `observability/telegraf/generated/` | `infrahub-server` (`make render`); `config-init` writes empty `devices.json`/`devices.yml` only if none exist | `telegraf`, `logstash` | SNMP and gNMI shards, `netflow-dedicated.conf`, `devices.json`, `devices.yml` |
 | `automation/configs/` | `automation` | — | running configs fetched from devices |
-| `observability/grafana/map/` | `automation` (`network_map.py`, every `MAP_INTERVAL_SECONDS`) | `grafana`, served at `/public/darqcube-map/` | `network-map.json` — the Network Map topology |
+| `observability/grafana/provisioning/dashboards/generated/` | `infrahub-server` (`make render`: `render-network-map.py`) | `grafana` | `network-map.json` — the Network Map dashboard, from `source-of-truth/map/` |
 
 `generated/` is a bind mount rather than a volume on purpose: it is where every
 doc, `verify.sh` and the wiring test look for rendered output, and you can read
@@ -551,7 +551,7 @@ writes `automation/configs/`.
 1. `docker compose down -v` — deletes **every named volume** above.
 2. Deletes every file except `.gitkeep` in the three **written** bind mounts,
    `observability/telegraf/generated/`, `automation/configs/` and
-   `observability/grafana/map/`.
+   `observability/grafana/provisioning/dashboards/generated/`.
 
 So after a clean:
 

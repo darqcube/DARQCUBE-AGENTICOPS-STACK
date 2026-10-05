@@ -1,0 +1,48 @@
+# EXAMPLE network drawing for the Network Map dashboard. Never read from here —
+# copy it first:
+#
+#   cp source-of-truth/map/examples/topology.yml source-of-truth/map/
+#
+# then edit the copy and run `make render`. Every *.yml in source-of-truth/map/
+# is read (and gitignored: it is your network), so a large map can be split.
+#
+# MAP (optional)
+#   scale        multiply positions: one number, or {x: 1, y: 1.5}. The panel fits
+#                the drawing to its width, so a larger y spreads nodes apart (the
+#                panel grows taller); a larger x only makes everything smaller
+#   animation_seconds  one cycle of the moving dashes on links (default 1; lower = faster)
+#   background   panel colour (default #111217)
+#
+# NODES — one box each
+#   name    an inventory device name (gets live traffic and up/down colour), or
+#           anything else you want drawn: a host, a provider cloud
+#   x, y    position in pixels; y grows downwards. Any origin — the map is
+#           shifted so the top-left node sits at the margin
+#   icon    router | switch | server | pc | cloud | firewall (default router),
+#           or any icon path under the panel's icons/, e.g. cisco/asa-5500
+#   label   optional text under the icon (default: name)
+#
+# LINKS — one line each
+#   a, z       <node>:<interface>. On an inventory device the interface is the
+#              SNMP ifName (what Devices & Interfaces shows, e.g. Gi0/0/1),
+#              because that is whose traffic the link shows. On other nodes
+#              it is only a label.
+#   bandwidth  optional, e.g. 1G or 100M — utilisation is traffic / bandwidth.
+#              Default: the device interface's ifSpeed.
+#
+# Each link shows the traffic of whichever end is an inventory device; a link
+# between two non-device nodes is drawn without data.
+
+map:
+  scale: 1.0
+
+nodes:
+  - {name: core-01,   x: 400, y: 100, icon: router}
+  - {name: branch-01, x: 200, y: 300, icon: router}
+  - {name: branch-02, x: 600, y: 300, icon: router}
+  - {name: internet,  x: 400, y: -60, icon: cloud}
+
+links:
+  - {a: core-01:Gi0/0/1, z: branch-01:Gi0/0/0}
+  - {a: core-01:Gi0/0/2, z: branch-02:Gi0/0/0, bandwidth: 100M}
+  - {a: core-01:Gi0/0/0, z: internet:uplink}

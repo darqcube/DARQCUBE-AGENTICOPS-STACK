@@ -180,6 +180,10 @@ services:
       # Without this, render fails, and Telegraf and Logstash — which refuse
       # to start without the rendered identity table — restart-loop with it.
       - ../observability/telegraf/profiles:/profiles:ro
+      # The network drawing (per deployment) and the dashboard render-network-map.py
+      # builds from it — `make render` runs both renderers here.
+      - ../source-of-truth/map:/map:ro
+      - ../observability/grafana/provisioning/dashboards/generated:/grafana-dashboards
       # A HOST directory, not a named volume: every doc, test and verify.sh
       # reads observability/telegraf/generated/ on the host. With a named
       # volume the renderer wrote somewhere none of them could see, and a

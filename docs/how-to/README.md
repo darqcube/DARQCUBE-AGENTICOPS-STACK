@@ -23,6 +23,7 @@ files and commands. If you are looking for *what a component is*, see
 | Add or change an alert | [change-alerts.md](change-alerts.md) |
 | Add a metric from a new OID | [add-a-metric.md](add-a-metric.md) |
 | Add a dashboard or a panel | [change-dashboards.md](change-dashboards.md) |
+| Draw the network map (live traffic on every link) | [draw-the-network-map.md](draw-the-network-map.md) |
 | Send alerts somewhere (AI platform, Slack, email) | [change-alerts.md](change-alerts.md#sending-alerts-somewhere) |
 
 ## The stack itself

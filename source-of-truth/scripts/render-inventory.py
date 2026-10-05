@@ -25,7 +25,6 @@ Run with: make render   (after every `make seed` or Infrahub change)
 from __future__ import annotations
 
 import json
-import math
 import os
 import sys
 from collections import defaultdict
@@ -209,58 +208,6 @@ def fetch_devices(client):
     )
 
 
-def _coord(node, attr: str) -> float | None:
-    """An optional latitude/longitude attribute as a float (they are Text in
-    the schema: Infrahub has no decimal kind)."""
-    value = getattr(getattr(node, attr, None), "value", None)
-    try:
-        return float(value) if value not in (None, "") else None
-    except ValueError:
-        return None
-
-
-# Radius (degrees) of the circle a site's devices are spread on. Empty: a tenth
-# of the distance between the furthest site centres, at least 0.6.
-MAP_SPREAD = os.environ.get("MAP_SPREAD", "")
-
-
-def map_positions(intended: list[dict]) -> dict[str, tuple[float, float]]:
-    """Where each device sits on the network map.
-
-    A device's own latitude/longitude wins; otherwise its site's, with the
-    site's devices spread on a small circle so they do not cover each other;
-    a site with no coordinates gets a place on a ring around 0,0 — a usable
-    logical layout before anyone enters a coordinate.
-    """
-    sites = sorted({r["site"] for r in intended})
-    unplaced = [s for s in sites if not any(r["site"] == s and r["_site_pos"][0] is not None for r in intended)]
-    ring = {s: (round(8 * math.sin(2 * math.pi * i / len(unplaced)), 4), round(8 * math.cos(2 * math.pi * i / len(unplaced)), 4))
-            for i, s in enumerate(unplaced)}
-    centres = {}
-    for site in sites:
-        members = [r for r in intended if r["site"] == site]
-        centres[site] = next((r["_site_pos"] for r in members if r["_site_pos"][0] is not None and r["_site_pos"][1] is not None),
-                             ring.get(site, (0.0, 0.0)))
-    span = max((max(c[i] for c in centres.values()) - min(c[i] for c in centres.values()) for i in (0, 1)), default=0)
-    radius = float(MAP_SPREAD) if MAP_SPREAD else max(0.6, round(span / 10, 2))
-    pos: dict[str, tuple[float, float]] = {}
-    for site in sites:
-        members = sorted((r for r in intended if r["site"] == site), key=lambda r: r["device"])
-        centre = centres[site]
-        spread = [r for r in members if r["_pos"][0] is None or r["_pos"][1] is None]
-        for r in members:
-            if r not in spread:
-                pos[r["device"]] = r["_pos"]
-        for i, r in enumerate(spread):
-            if len(spread) == 1:
-                pos[r["device"]] = centre
-            else:
-                angle = 2 * math.pi * i / len(spread)
-                pos[r["device"]] = (round(centre[0] + radius * math.cos(angle), 4),
-                                    round(centre[1] + radius * math.sin(angle), 4))
-    return pos
-
-
 def resource_tables(platform: str, spec: dict) -> str:
     """Build the CPU and memory tables for one platform.
 
@@ -427,10 +374,7 @@ def main() -> int:
         identity[name] = record
         if ip_of(dev):
             identity[ip_of(dev)] = record
-        intended.append({**record, "telemetry": mode,
-                         "_pos": (_coord(dev, "latitude"), _coord(dev, "longitude")),
-                         "_site_pos": (_coord(dev.site.peer, "latitude"), _coord(dev.site.peer, "longitude"))
-                         if dev.site.peer else (None, None)})
+        intended.append({**record, "telemetry": mode})
 
         # Before the telemetry branch: flow is independent of SNMP vs gNMI.
         port = flow_port_of(dev)
@@ -572,13 +516,9 @@ def main() -> int:
         path = os.path.join(OUT_DIR, "intent.influx")
         with open(path, "w") as fh:
             # rank: the device's position in name order. PromQL cannot compare
-            # strings, and the network map needs it to draw each link once.
-            # lat/lng: where the network map draws the device (map_positions).
-            positions = map_positions(intended)
+            # strings, and the link rules need it to keep each link once.
             for rank, rec in enumerate(sorted(intended, key=lambda r: r["device"])):
-                lat, lng = positions[rec["device"]]
-                rec = {**rec, "lat": f"{lat:g}", "lng": f"{lng:g}"}
-                tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "site", "role", "platform", "telemetry", "lat", "lng"))
+                tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "site", "role", "platform", "telemetry"))
                 fh.write(f"intent_device,{tags} present=1i,rank={rank}i\n")
         _readable(path)
         written.append("intent.influx")

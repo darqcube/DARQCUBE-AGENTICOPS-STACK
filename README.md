@@ -371,7 +371,7 @@ seed` updates the source of truth, `make render` pushes it to the collectors.
 | [docs/INSTALL.md](docs/INSTALL.md) | install on a fresh VM — `install.py` or by hand |
 | [docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md) | sites and devices in Infrahub — UI or YAML — and verifying end to end |
 | [docs/scale.md](docs/scale.md) | the 400-device envelope and how to grow |
-| [docs/how-to/](docs/how-to/) | 23 task guides: add a device, change an alert, add a vendor… |
+| [docs/how-to/](docs/how-to/) | 24 task guides: add a device, change an alert, add a vendor… |
 | [docs/install/](docs/install/) | one page per component — config, ports, verify, problems |
 | [docs/devices/](docs/devices/) | device-side config per platform |
 | [docs/architecture.md](docs/architecture.md) | diagrams and the failure table |
