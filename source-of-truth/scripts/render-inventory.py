@@ -25,6 +25,7 @@ Run with: make render   (after every `make seed` or Infrahub change)
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 from collections import defaultdict
@@ -208,6 +209,58 @@ def fetch_devices(client):
     )
 
 
+def _coord(node, attr: str) -> float | None:
+    """An optional latitude/longitude attribute as a float (they are Text in
+    the schema: Infrahub has no decimal kind)."""
+    value = getattr(getattr(node, attr, None), "value", None)
+    try:
+        return float(value) if value not in (None, "") else None
+    except ValueError:
+        return None
+
+
+# Radius (degrees) of the circle a site's devices are spread on. Empty: a tenth
+# of the distance between the furthest site centres, at least 0.6.
+MAP_SPREAD = os.environ.get("MAP_SPREAD", "")
+
+
+def map_positions(intended: list[dict]) -> dict[str, tuple[float, float]]:
+    """Where each device sits on the network map.
+
+    A device's own latitude/longitude wins; otherwise its site's, with the
+    site's devices spread on a small circle so they do not cover each other;
+    a site with no coordinates gets a place on a ring around 0,0 — a usable
+    logical layout before anyone enters a coordinate.
+    """
+    sites = sorted({r["site"] for r in intended})
+    unplaced = [s for s in sites if not any(r["site"] == s and r["_site_pos"][0] is not None for r in intended)]
+    ring = {s: (round(8 * math.sin(2 * math.pi * i / len(unplaced)), 4), round(8 * math.cos(2 * math.pi * i / len(unplaced)), 4))
+            for i, s in enumerate(unplaced)}
+    centres = {}
+    for site in sites:
+        members = [r for r in intended if r["site"] == site]
+        centres[site] = next((r["_site_pos"] for r in members if r["_site_pos"][0] is not None and r["_site_pos"][1] is not None),
+                             ring.get(site, (0.0, 0.0)))
+    span = max((max(c[i] for c in centres.values()) - min(c[i] for c in centres.values()) for i in (0, 1)), default=0)
+    radius = float(MAP_SPREAD) if MAP_SPREAD else max(0.6, round(span / 10, 2))
+    pos: dict[str, tuple[float, float]] = {}
+    for site in sites:
+        members = sorted((r for r in intended if r["site"] == site), key=lambda r: r["device"])
+        centre = centres[site]
+        spread = [r for r in members if r["_pos"][0] is None or r["_pos"][1] is None]
+        for r in members:
+            if r not in spread:
+                pos[r["device"]] = r["_pos"]
+        for i, r in enumerate(spread):
+            if len(spread) == 1:
+                pos[r["device"]] = centre
+            else:
+                angle = 2 * math.pi * i / len(spread)
+                pos[r["device"]] = (round(centre[0] + radius * math.cos(angle), 4),
+                                    round(centre[1] + radius * math.sin(angle), 4))
+    return pos
+
+
 def resource_tables(platform: str, spec: dict) -> str:
     """Build the CPU and memory tables for one platform.
 
@@ -246,11 +299,14 @@ def resource_tables(platform: str, spec: dict) -> str:
     if spec.get("bgp"):
         # BGP4-MIB bgpPeerTable — standard, so one definition serves every
         # platform that sets `bgp: true`. One series per peer: bounded.
+        # local_addr (the session's own address) places the session on an
+        # interface — the network map draws tunnel links from it.
         # state 6 = established; admin_status 2 = start (configured up).
         lines += ['', '  [[inputs.snmp.table]]', '    name = "bgp_peer"', '    inherit_tags = ["hostname"]']
         for name, oid, tag in (("peer", "1.3.6.1.2.1.15.3.1.7", True), ("state", "1.3.6.1.2.1.15.3.1.2", False),
                                ("admin_status", "1.3.6.1.2.1.15.3.1.3", False), ("remote_as", "1.3.6.1.2.1.15.3.1.9", False),
-                               ("established_seconds", "1.3.6.1.2.1.15.3.1.16", False)):
+                               ("established_seconds", "1.3.6.1.2.1.15.3.1.16", False),
+                               ("local_addr", "1.3.6.1.2.1.15.3.1.5", True)):
             lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
             if tag:
                 lines.append('      is_tag = true')
@@ -267,6 +323,46 @@ def resource_tables(platform: str, spec: dict) -> str:
             lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
             if tag:
                 lines.append('      is_tag = true')
+    if spec.get("neighbors"):
+        if spec["neighbors"] != "lldp":
+            raise ValueError(f"{platform}: snmp.neighbors must be 'lldp' (got {spec['neighbors']!r})")
+        # LLDP-MIB (standard): who is on the other end of each physical link.
+        # lldpRemTable index = <timeMark>.<localPortNum>.<remIndex>; the local
+        # port's name comes from lldpLocPortTable (its id is the ifName where
+        # lldpLocPortIdSubtype is 5, interfaceName). neighbor_name is the
+        # neighbour's sysName, matched to the `hostname` label of the device
+        # that reports it. `seen` (lldpRemChassisIdSubtype) is only there
+        # because a series needs a numeric field: its existence is the link.
+        lines += ['', '  [[inputs.snmp.table]]', '    name = "neighbor"', '    index_as_tag = true',
+                  '    inherit_tags = ["hostname"]']
+        for name, oid, tag in (("neighbor_name", "1.0.8802.1.1.2.1.4.1.1.9", True),
+                               ("neighbor_port", "1.0.8802.1.1.2.1.4.1.1.7", True),
+                               ("seen", "1.0.8802.1.1.2.1.4.1.1.4", False)):
+            lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
+            if tag:
+                lines.append('      is_tag = true')
+        lines += ['', '  [[inputs.snmp.table]]', '    name = "lldp_port"', '    index_as_tag = true',
+                  '    inherit_tags = ["hostname"]',
+                  '', '    [[inputs.snmp.table.field]]', '      name = "ifName"',
+                  '      oid = "1.0.8802.1.1.2.1.3.7.1.3"', '      is_tag = true',
+                  '', '    [[inputs.snmp.table.field]]', '      name = "id_subtype"',
+                  '      oid = "1.0.8802.1.1.2.1.3.7.1.2"']
+        # Tunnels carry no LLDP, so the map takes overlay links from routing:
+        # each BGP session's local address (bgp_peer local_addr) and the peer
+        # address resolve to interfaces through ipAddrTable (IP -> ifIndex)
+        # and ifIndex -> ifName.
+        lines += ['', '  [[inputs.snmp.table]]', '    name = "ip_address"', '    index_as_tag = true',
+                  '    inherit_tags = ["hostname"]',
+                  '', '    [[inputs.snmp.table.field]]', '      name = "ifindex"',
+                  '      oid = "1.3.6.1.2.1.4.20.1.2"', '      is_tag = true',
+                  '', '    [[inputs.snmp.table.field]]', '      name = "seen"',
+                  '      oid = "1.3.6.1.2.1.4.20.1.4"',
+                  '', '  [[inputs.snmp.table]]', '    name = "if_index"', '    index_as_tag = true',
+                  '    inherit_tags = ["hostname"]',
+                  '', '    [[inputs.snmp.table.field]]', '      name = "ifName"',
+                  '      oid = "1.3.6.1.2.1.31.1.1.1.1"', '      is_tag = true',
+                  '', '    [[inputs.snmp.table.field]]', '      name = "value"',
+                  '      oid = "1.3.6.1.2.1.2.2.1.1"']
     return "\n".join(lines)
 
 
@@ -331,7 +427,10 @@ def main() -> int:
         identity[name] = record
         if ip_of(dev):
             identity[ip_of(dev)] = record
-        intended.append({**record, "telemetry": mode})
+        intended.append({**record, "telemetry": mode,
+                         "_pos": (_coord(dev, "latitude"), _coord(dev, "longitude")),
+                         "_site_pos": (_coord(dev.site.peer, "latitude"), _coord(dev.site.peer, "longitude"))
+                         if dev.site.peer else (None, None)})
 
         # Before the telemetry branch: flow is independent of SNMP vs gNMI.
         port = flow_port_of(dev)
@@ -472,9 +571,15 @@ def main() -> int:
             return str(v).replace("\\", "\\\\").replace(",", "\\,").replace("=", "\\=").replace(" ", "\\ ")
         path = os.path.join(OUT_DIR, "intent.influx")
         with open(path, "w") as fh:
-            for rec in sorted(intended, key=lambda r: r["device"]):
-                tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "site", "role", "platform", "telemetry"))
-                fh.write(f"intent_device,{tags} present=1i\n")
+            # rank: the device's position in name order. PromQL cannot compare
+            # strings, and the network map needs it to draw each link once.
+            # lat/lng: where the network map draws the device (map_positions).
+            positions = map_positions(intended)
+            for rank, rec in enumerate(sorted(intended, key=lambda r: r["device"])):
+                lat, lng = positions[rec["device"]]
+                rec = {**rec, "lat": f"{lat:g}", "lng": f"{lng:g}"}
+                tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "site", "role", "platform", "telemetry", "lat", "lng"))
+                fh.write(f"intent_device,{tags} present=1i,rank={rank}i\n")
         _readable(path)
         written.append("intent.influx")
         write("intent.conf",

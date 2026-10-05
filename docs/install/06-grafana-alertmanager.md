@@ -17,6 +17,12 @@ graphs.
 | `.env` → `GRAFANA_ADMIN_USER` / `_PASSWORD` | login |
 | `.env` → `GRAFANA_PORT` | published port (default 13000) |
 
+### Plugins
+
+The Network Map dashboard uses the ESnet Network Map Panel. Grafana installs
+`GRAFANA_PLUGINS` (`.env`) before it starts serving; air-gapped installs:
+[../how-to/change-dashboards.md](../how-to/change-dashboards.md).
+
 ### Dashboards are read-only in the UI
 
 `allowUiUpdates: false`, deliberately: what is in the repo is what is deployed.

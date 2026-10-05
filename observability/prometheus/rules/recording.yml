@@ -65,11 +65,6 @@ groups:
       # IP SLA (platforms with ipsla: true). ipsla:ok is 1 when the latest
       # operation succeeded; its average over a window is the success ratio
       # (1 - loss). Jitter is the spread of the probe's RTT samples.
-      # Scheduled assurance (automation service, ASSURANCE_INTERVAL_MINUTES > 0)
-      - record: network:assurance_failing:count
-        expr: count(assurance_rule_state{state=~"fail|error"} == 1) or vector(0)
-      - record: network:assurance_passing:count
-        expr: count(assurance_rule_state{state="pass"} == 1) or vector(0)
       - record: ipsla:ok
         expr: ipsla_sense == bool 1
       - record: ipsla:success:ratio15m
@@ -78,3 +73,132 @@ groups:
         expr: avg_over_time(ipsla_rtt_ms[10m]) and on (device, index) ipsla_sense == 1
       - record: ipsla:jitter_ms:stddev10m
         expr: stddev_over_time(ipsla_rtt_ms{rtt_type="1"}[10m])
+      # Scheduled assurance (automation service, ASSURANCE_INTERVAL_MINUTES > 0)
+      - record: network:assurance_failing:count
+        expr: count(assurance_rule_state{state=~"fail|error"} == 1) or vector(0)
+      - record: network:assurance_passing:count
+        expr: count(assurance_rule_state{state="pass"} == 1) or vector(0)
+
+  # Network map: links between inventory devices, joined to interface
+  # traffic, for platforms with snmp.neighbors. Two kinds:
+  #   lldp — physical links, from each device's LLDP table
+  #   bgp  — routing adjacencies, e.g. over GRE/DMVPN tunnels, which carry no
+  #          LLDP: a BGP session's local and peer addresses resolve to the
+  #          interfaces that own them
+  # Rules in a group run in order, so each one can use those above it.
+  - name: links
+    interval: 30s
+    rules:
+      # Every address an inventory device owns, with its interface. An address
+      # two devices claim (a VIP, overlapping VRFs) cannot name one end of a
+      # link, so it is left out.
+      - record: ip:address:info
+        expr: >-
+          (
+            group by (device, address, ifName) (
+              label_replace(ip_address_seen, "address", "$1", "index", "(.*)")
+              * on (device, ifindex) group_left (ifName)
+              group by (device, ifindex, ifName) (label_replace(if_index_value, "ifindex", "$1", "index", "(.*)"))
+            )
+          )
+          unless on (address)
+          (count by (address) (group by (device, address) (label_replace(ip_address_seen, "address", "$1", "index", "(.*)"))) > 1)
+      # LLDP link ends: device, ifName (local), neighbor, neighbor_port.
+      # - local port: lldpRemTable index is <timeMark>.<localPortNum>.<remIndex>
+      # - neighbor: the LLDP system name matched to a device's sysName
+      # - 30 min memory, so a link that just disappeared is drawn as down
+      # - an interface with several neighbours is a shared segment, not a link.
+      #   Counted by name: a re-learned neighbour gets a new remIndex, so one
+      #   neighbour can have two entries inside the 30 min window
+      - record: link:end:info
+        labels: { kind: lldp }
+        expr: >-
+            (
+              group by (device, port, neighbor_name, neighbor_port) (
+                label_replace(max_over_time(neighbor_seen[30m]), "port", "$1", "index", "[0-9]+[.]([0-9]+)[.][0-9]+")
+              )
+              unless on (device, port)
+              (count by (device, port) (group by (device, port, neighbor_name) (
+                label_replace(max_over_time(neighbor_seen[30m]), "port", "$1", "index", "[0-9]+[.]([0-9]+)[.][0-9]+")
+              )) > 1)
+            )
+            * on (device, port) group_left (ifName)
+              group by (device, port, ifName) (label_replace(lldp_port_id_subtype, "port", "$1", "index", "(.*)"))
+            * on (neighbor_name) group_left (neighbor)
+              group by (neighbor, neighbor_name) (
+                label_replace(label_replace(device_uptime, "neighbor", "$1", "device", "(.*)"), "neighbor_name", "$1", "hostname", "(.*)")
+              )
+      # BGP link ends: a configured session whose local address is on one of
+      # this device's interfaces and whose peer address belongs to another
+      # inventory device. Keeps `peer` so the link's state can follow the session.
+      - record: link:end:info
+        labels: { kind: bgp }
+        expr: >-
+            group by (device, peer, local_addr) (max_over_time(bgp_peer_admin_status[30m]))
+            * on (device, local_addr) group_left (ifName)
+              label_replace(ip:address:info, "local_addr", "$1", "address", "(.*)")
+            * on (peer) group_left (neighbor, neighbor_port)
+              group by (peer, neighbor, neighbor_port) (
+                label_replace(label_replace(label_replace(ip:address:info,
+                  "peer", "$1", "address", "(.*)"), "neighbor", "$1", "device", "(.*)"), "neighbor_port", "$1", "ifName", "(.*)")
+              )
+      # Traffic leaving / entering each link end's interface, bits per second.
+      # Link ends on the left: a multipoint tunnel hub has several on one
+      # interface, and each gets that interface's (shared) rate.
+      - record: link:end:out_bps
+        expr: >-
+          group by (device, ifName, neighbor, neighbor_port, kind) (link:end:info)
+          * on (device, ifName) group_left () (sum by (device, ifName) (rate(interface_out_octets[5m])) * 8)
+      - record: link:end:in_bps
+        expr: >-
+          group by (device, ifName, neighbor, neighbor_port, kind) (link:end:info)
+          * on (device, ifName) group_left () (sum by (device, ifName) (rate(interface_in_octets[5m])) * 8)
+      # 1 = up, 0 = down: LLDP links by the local interface's oper status, BGP
+      # links by the session (6 = established).
+      - record: link:end:up
+        labels: { kind: lldp }
+        expr: >-
+          group by (device, ifName, neighbor, neighbor_port) (link:end:info{kind="lldp"})
+          * on (device, ifName) group_left () max by (device, ifName) (interface_oper_status == bool 1)
+      - record: link:end:up
+        labels: { kind: bgp }
+        expr: >-
+          max by (device, ifName, neighbor, neighbor_port) (
+            group by (device, peer, ifName, neighbor, neighbor_port) (link:end:info{kind="bgp"})
+            * on (device, peer) group_left () max by (device, peer) (bgp_peer_state == bool 6)
+          )
+      # One series per LINK. Both ends usually report it; keep the end with the
+      # lower score — ends sharing their interface with other links of the same
+      # kind (a multipoint tunnel hub) score higher, so traffic is read from
+      # the dedicated end; ties go to the device that sorts first
+      # (intent_device_rank: PromQL cannot compare strings). A link only one
+      # end reports is kept as it is.
+      - record: link:end:score
+        expr: >-
+          group by (device, ifName, neighbor, neighbor_port, kind) (link:end:info) * 0
+          + on (device, ifName, kind) group_left ()
+            (count by (device, ifName, kind) (group by (device, ifName, neighbor, kind) (link:end:info)) * 1000)
+          + on (device) group_left () max by (device) (intent_device_rank)
+      - record: link:info
+        expr: >-
+          (
+            link:end:score
+            and on (device, neighbor, kind)
+            (
+              min by (device, neighbor, kind) (link:end:score)
+              < on (device, neighbor, kind)
+              label_replace(label_replace(label_replace(min by (device, neighbor, kind) (link:end:score),
+                "swap", "$1", "device", "(.*)"), "device", "$1", "neighbor", "(.*)"), "neighbor", "$1", "swap", "(.*)")
+            )
+          )
+          or
+          (
+            link:end:score
+            unless on (device, neighbor, kind)
+            label_replace(label_replace(label_replace(group by (device, neighbor, kind) (link:end:score),
+              "swap", "$1", "device", "(.*)"), "device", "$1", "neighbor", "(.*)"), "neighbor", "$1", "swap", "(.*)")
+          )
+      - record: network:links:count
+        expr: count(link:info) or vector(0)
+      - record: network:links_down:count
+        expr: count((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info) or vector(0)

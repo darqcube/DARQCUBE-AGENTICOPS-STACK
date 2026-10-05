@@ -1,0 +1,56 @@
+# Rule unit tests for the network map (group links in rules/recording.yml).
+#   docker run --rm -v "$PWD/observability/prometheus:/p:ro" --entrypoint promtool prom/prometheus test rules /p/tests/links.test.yml
+# Also run by automation/tests/test_render.py when Docker is available.
+rule_files: [../rules/recording.yml]
+evaluation_interval: 30s
+tests:
+  - interval: 30s
+    input_series:
+      # LLDP a<->b; a's entry was re-learned (two remIndex values in the window)
+      - {series: 'neighbor_seen{device="a",index="0.2.1",neighbor_name="b.lab",neighbor_port="Et0/1"}', values: '4x5 _x15'}
+      - {series: 'neighbor_seen{device="a",index="0.2.2",neighbor_name="b.lab",neighbor_port="Et0/1"}', values: '_x5 4x15'}
+      - {series: 'neighbor_seen{device="b",index="0.1.1",neighbor_name="a.lab",neighbor_port="Et0/2"}', values: '4x20'}
+      - {series: 'lldp_port_id_subtype{device="a",index="2",ifName="Et0/2"}', values: '5x20'}
+      - {series: 'lldp_port_id_subtype{device="b",index="1",ifName="Et0/1"}', values: '5x20'}
+      # BGP: hub h (Tu0, multipoint) with spokes s1, s2 (dedicated tunnels)
+      - {series: 'bgp_peer_admin_status{device="h",peer="10.0.0.11",local_addr="10.0.0.1"}', values: '2x20'}
+      - {series: 'bgp_peer_admin_status{device="h",peer="10.0.0.12",local_addr="10.0.0.1"}', values: '2x20'}
+      - {series: 'bgp_peer_admin_status{device="s1",peer="10.0.0.1",local_addr="10.0.0.11"}', values: '2x20'}
+      - {series: 'bgp_peer_admin_status{device="s2",peer="10.0.0.1",local_addr="10.0.0.12"}', values: '2x20'}
+      - {series: 'bgp_peer_state{device="h",peer="10.0.0.11"}', values: '6x20'}
+      - {series: 'bgp_peer_state{device="h",peer="10.0.0.12"}', values: '6x20'}
+      - {series: 'bgp_peer_state{device="s1",peer="10.0.0.1"}', values: '6x20'}
+      - {series: 'bgp_peer_state{device="s2",peer="10.0.0.1"}', values: '6x10 1x10'}
+      - {series: 'ip_address_seen{device="h",index="10.0.0.1",ifindex="7"}', values: '1x20'}
+      - {series: 'ip_address_seen{device="s1",index="10.0.0.11",ifindex="5"}', values: '1x20'}
+      - {series: 'ip_address_seen{device="s2",index="10.0.0.12",ifindex="5"}', values: '1x20'}
+      - {series: 'if_index_value{device="h",index="7",ifName="Tu0"}', values: '7x20'}
+      - {series: 'if_index_value{device="s1",index="5",ifName="Tu1"}', values: '5x20'}
+      - {series: 'if_index_value{device="s2",index="5",ifName="Tu1"}', values: '5x20'}
+      - {series: 'device_uptime{device="a",hostname="a.lab"}', values: '1x20'}
+      - {series: 'device_uptime{device="b",hostname="b.lab"}', values: '1x20'}
+      # ranks: hub sorts first, so only the multipoint score keeps the spoke end
+      - {series: 'intent_device_rank{device="a"}', values: '1x20'}
+      - {series: 'intent_device_rank{device="b"}', values: '2x20'}
+      - {series: 'intent_device_rank{device="h"}', values: '0x20'}
+      - {series: 'intent_device_rank{device="s1"}', values: '3x20'}
+      - {series: 'intent_device_rank{device="s2"}', values: '4x20'}
+      - {series: 'interface_oper_status{device="a",ifName="Et0/2"}', values: '1x20'}
+      - {series: 'interface_oper_status{device="b",ifName="Et0/1"}', values: '1x20'}
+    promql_expr_test:
+      - expr: count by (kind) (link:info)
+        eval_time: 4m
+        exp_samples:
+          - {labels: '{kind="lldp"}', value: 1}
+          - {labels: '{kind="bgp"}', value: 2}
+      - expr: group by (device, ifName, neighbor, kind) (link:info{kind="bgp"})
+        eval_time: 4m
+        exp_samples:
+          - {labels: '{device="s1",ifName="Tu1",neighbor="h",kind="bgp"}', value: 1}
+          - {labels: '{device="s2",ifName="Tu1",neighbor="h",kind="bgp"}', value: 1}
+      - expr: network:links_down:count
+        eval_time: 4m
+        exp_samples: [{labels: 'network:links_down:count', value: 0}]
+      - expr: network:links_down:count
+        eval_time: 8m
+        exp_samples: [{labels: 'network:links_down:count', value: 1}]

@@ -121,6 +121,29 @@ responder (almost every application server) — without it the probe reports
 (`ipsla:jitter_ms:stddev10m`); `path-jitter` results are not exposed in
 RTTMON, so they cannot be polled.
 
+## 3c. LLDP — links for the Network Map (optional)
+
+The Network Map draws physical links from LLDP and tunnel links from BGP.
+IOS runs CDP by default and LLDP not at all:
+
+```
+no cdp run
+lldp run
+! not on the management interface: a shared management segment shows every
+! device as every other's neighbour (the map leaves such ports out anyway)
+interface <MGMT-INTERFACE>
+ no lldp transmit
+ no lldp receive
+! not toward a provider or any network you do not want discovered
+interface <WAN-INTERFACE>
+ no lldp transmit
+ no lldp receive
+```
+
+IOS has no LLDP on tunnel interfaces (`lldp transmit` there is rejected), so
+GRE/DMVPN links come from the BGP sessions that run over them — nothing to
+configure beyond BGP itself.
+
 ## 4. NetFlow
 
 ```

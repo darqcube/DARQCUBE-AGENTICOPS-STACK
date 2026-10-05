@@ -14,6 +14,8 @@
 #   site_type    hq | branch | datacenter | pop | lab   (default branch)
 #   region       optional free text, e.g. north
 #   description  optional
+#   latitude     optional, decimal degrees as a string ('24.86') — Network Map
+#   longitude    position; any values work for a logical map
 #
 # TAGS are free-form labels for grouping devices in the Infrahub UI. A device
 # may only use a tag listed here (or already created in Infrahub), so a typo

@@ -84,6 +84,7 @@ ios_xe:
       mib: CISCO-ENHANCED-MEMPOOL-MIB
     bgp: true                                   # BGP4-MIB bgpPeerTable -> bgp_peer_*
     ipsla: true                                 # CISCO-RTTMON-MIB, IP SLA probes -> ipsla_*
+    neighbors: lldp                             # LLDP-MIB + ipAddrTable -> network map (links from LLDP and BGP)
 
 vrp:
   display_name: Huawei VRP

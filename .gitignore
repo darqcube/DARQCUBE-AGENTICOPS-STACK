@@ -6,6 +6,10 @@
 observability/telegraf/generated/*
 !observability/telegraf/generated/.gitkeep
 
+# Network Map topology, written by the automation service (network_map.py)
+observability/grafana/map/*
+!observability/grafana/map/.gitkeep
+
 # Device configs retrieved by the automation layer
 automation/configs/*
 !automation/configs/.gitkeep

@@ -12,6 +12,8 @@ config file, listed below.
 | `SNMP_INTERVAL` | `30s` | how often devices are polled |
 | `SNMP_TIMEOUT` / `SNMP_RETRIES` | `5s` / `3` | per SNMP request; their product + 1 attempt is a dead device's cost (20 s) — [../scale.md](../scale.md) |
 | `AUTOMATION_CONCURRENCY` | `8` | devices talked to at once |
+| `MAP_INTERVAL_SECONDS` | `60` | how often the Network Map topology file is refreshed (0 = off) |
+| `GRAFANA_PLUGINS` | `esnet-networkmap-panel@3.1.0` | plugins Grafana installs at start (the Network Map panel) |
 | `ASSURANCE_INTERVAL_MINUTES` | `0` (off) | scheduled assurance on every device — [../install/07-automation.md](../install/07-automation.md#scheduled-assurance) |
 | `MAX_CONFIG_LINES` | `200` | cap on a single config push |
 | `INFRAHUB_BRANCH` | `main` | which Infrahub branch is read |

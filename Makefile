@@ -138,7 +138,7 @@ verify: ## Run exactly what docs/INSTALL.md tells you to verify
 # Telegraf and Logstash, and fetched running configs (credentials included)
 # outlived the reset. Files are root-owned, but deleting them needs only write
 # access to the folder, which is yours. .gitkeep stays so the folders exist.
-CLEAN_DIRS := observability/telegraf/generated automation/configs
+CLEAN_DIRS := observability/telegraf/generated automation/configs observability/grafana/map
 
 clean: ## Stop the stack and DELETE ALL DATA — volumes, rendered config, fetched configs
 	@read -p "Delete all volumes, rendered config and fetched device configs? [y/N] " ok; \

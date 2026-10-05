@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 # installed libraries if this package is imported any other way.
 from automation.assurance import normalise
 from automation.nornir import tasks
-from automation.service import scheduler
+from automation.service import network_map, scheduler
 from automation.textfsm import parse as textfsm_parse
 from automation.ttp import parse as ttp_parse
 
@@ -55,12 +55,23 @@ def healthz():
 def start_scheduled_assurance():
     # Off unless ASSURANCE_INTERVAL_MINUTES > 0 — see automation/service/scheduler.py.
     scheduler.start()
+    # Writes the Network Map topology for Grafana — see network_map.py.
+    network_map.start()
 
 
 @app.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)
 def metrics():
     """Scheduled assurance results in Prometheus text format."""
     return scheduler.metrics()
+
+
+@app.get("/map/topology")
+def map_topology():
+    """The Network Map panel configuration: devices, positions and links."""
+    try:
+        return network_map.current()
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail=f"Prometheus unreachable: {exc}")
 
 
 @app.get("/assurance/latest")

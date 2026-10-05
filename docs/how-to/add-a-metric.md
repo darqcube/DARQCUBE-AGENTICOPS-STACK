@@ -49,6 +49,35 @@ operation's `tag`), `rtt_type` (1 icmp-echo, 6 tcp-connect) and `index`
 `ipsla:rtt_ms:avg10m`, `ipsla:jitter_ms:stddev10m`. Device side:
 [../devices/cisco-ios-xe.md](../devices/cisco-ios-xe.md).
 
+### Links between devices — `neighbors: lldp`
+
+`snmp.neighbors: lldp` (shipped on for `ios_xe`) polls what the Network Map
+needs:
+
+| Table | From | Series |
+|---|---|---|
+| LLDP neighbours | LLDP-MIB `lldpRemTable` | `neighbor_seen{neighbor_name, neighbor_port, index=<timeMark>.<localPort>.<remIndex>}` |
+| Local LLDP ports | `lldpLocPortTable` | `lldp_port_id_subtype{index=<localPort>, ifName}` |
+| Interface addresses | IP-MIB `ipAddrTable` | `ip_address_seen{index=<address>, ifindex}` |
+| ifIndex → ifName | IF-MIB | `if_index_value{index=<ifIndex>, ifName}` |
+
+plus `local_addr` on `bgp_peer_*` (platforms with `bgp: true`). The `links`
+recording rules turn them into two kinds of link:
+
+- **lldp** — physical links. The neighbour's system name is matched to a
+  device's sysName (`hostname` label), so only inventory devices appear.
+- **bgp** — routing adjacencies. Tunnels (GRE, DMVPN, IPsec VTI) carry no
+  LLDP, so a BGP session's local and peer addresses are resolved to the
+  interfaces that own them.
+
+Output: `link:info` (one series per link), `link:end:out_bps` /
+`link:end:in_bps`, `link:end:up` (interface oper status for lldp, session
+established for bgp), `network:links:count`, `network:links_down:count`.
+Unit tests: `observability/prometheus/tests/links.test.yml`.
+
+The port join assumes `lldpLocPortId` is the ifName (`lldpLocPortIdSubtype`
+5, as on IOS). Check that on a platform before setting `neighbors: lldp` on it.
+
 ## The metric name is `<measurement>_<field>`
 
 This is the single thing to get right. Prometheus sees the Telegraf measurement

@@ -1,0 +1,711 @@
+{
+  "uid": "darqcube-network-map",
+  "title": "Network Map",
+  "tags": [
+    "darqcube",
+    "snmp",
+    "topology"
+  ],
+  "description": "Live topology: devices and positions from Infrahub, links from LLDP and BGP, activity from interface counters.",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Site",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(intent_device_present, site)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1,
+        "description": "Links with at least one end at these sites."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Links",
+      "description": "Links between inventory devices: physical (LLDP) and routing adjacencies (BGP, e.g. over GRE tunnels), each counted once.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "network:links:count",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Links down",
+      "description": "Physical links whose interface is down, BGP links whose session is not established — or that vanished in the last 30 min.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "network:links_down:count",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Devices not reporting",
+      "description": "In Infrahub but no SNMP data.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "network:devices_not_reporting:count",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Busiest link now",
+      "description": "Highest one-way rate on any link.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(link:end:out_bps and on (device, ifName, neighbor, kind) link:info) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": null,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 5,
+      "type": "esnet-networkmap-panel",
+      "title": "Network map — live link activity",
+      "description": "ESnet Network Map Panel. Devices are placed by their Infrahub coordinates (Site or Device latitude/longitude; devices sharing a site are spread around it). Links come from LLDP (physical) and BGP sessions (routing adjacencies, e.g. GRE tunnels, which carry no LLDP). Each link is two lanes, one per direction, coloured by bits/s; red = down. Hover a link for its rates. The topology file is written by the automation service every minute (/public/darqcube-map/network-map.json); the query colours it live.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 22,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "expr": "label_replace(label_replace(((((sum by (device, neighbor) (link:end:out_bps and on (device, ifName, neighbor, kind) link:info)) unless on (device, neighbor) (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) or (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) * 0 - 1)) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or (((sum by (device, neighbor) (link:end:out_bps and on (device, ifName, neighbor, kind) link:info)) unless on (device, neighbor) (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) or (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) * 0 - 1)) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\")), \"src\", \"$1\", \"device\", \"(.*)\"), \"dst\", \"$1\", \"neighbor\", \"(.*)\")"
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "expr": "label_replace(label_replace(((((sum by (device, neighbor) (link:end:in_bps and on (device, ifName, neighbor, kind) link:info)) unless on (device, neighbor) (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) or (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) * 0 - 1)) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or (((sum by (device, neighbor) (link:end:in_bps and on (device, ifName, neighbor, kind) link:info)) unless on (device, neighbor) (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) or (group by (device, neighbor) ((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info)) * 0 - 1)) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\")), \"src\", \"$1\", \"device\", \"(.*)\"), \"dst\", \"$1\", \"neighbor\", \"(.*)\")"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "alias": "in_bits",
+            "timeSeries": false,
+            "reduce": {
+              "reducer": "sum",
+              "include": [
+                "Value #A"
+              ]
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "alias": "out_bits",
+            "timeSeries": false,
+            "reduce": {
+              "reducer": "sum",
+              "include": [
+                "Value #B"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Value #A": true,
+              "Value #B": true
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "#8AB8FF",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 10000
+              },
+              {
+                "color": "#FADE2A",
+                "value": 1000000
+              },
+              {
+                "color": "orange",
+                "value": 100000000
+              },
+              {
+                "color": "purple",
+                "value": 1000000000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "topologySource": "url",
+        "layerLimit": 1,
+        "configurationUrl": "/public/darqcube-map/network-map.json?v=${__to:date:YYYYMMDDHHmm}",
+        "layers": [
+          {
+            "visible": true,
+            "name": "Links",
+            "legend": true,
+            "color": "grey",
+            "edgeWidth": 4,
+            "pathOffset": 3,
+            "nodeWidth": 7,
+            "nodeHighlight": "dark-blue",
+            "endpointId": "names",
+            "mapjson": "{\"edges\":[],\"nodes\":[]}",
+            "srcField": "src",
+            "dstField": "dst",
+            "inboundValueField": "in_bits",
+            "outboundValueField": "out_bits",
+            "srcFieldLabel": "From:",
+            "dstFieldLabel": "To:",
+            "dataFieldLabel": "Traffic:",
+            "dashboardNodeVar": "node",
+            "dashboardEdgeSrcVar": "source",
+            "dashboardEdgeDstVar": "dest"
+          },
+          {
+            "visible": false,
+            "name": "Layer 2",
+            "mapjson": "{\"edges\":[],\"nodes\":[]}",
+            "endpointId": "names"
+          },
+          {
+            "visible": false,
+            "name": "Layer 3",
+            "mapjson": "{\"edges\":[],\"nodes\":[]}",
+            "endpointId": "names"
+          }
+        ],
+        "tileset": {
+          "geographic": null,
+          "boundaries": null,
+          "labels": null
+        },
+        "background": "#EDEDED",
+        "initialViewStrategy": "viewport",
+        "viewport": {
+          "top": 6,
+          "left": -9,
+          "bottom": -6,
+          "right": 9,
+          "center": {
+            "lat": 0,
+            "lng": 0
+          },
+          "zoom": 5
+        },
+        "showSidebar": false,
+        "showLegend": true,
+        "showViewControls": true,
+        "enableScrolling": true,
+        "enableEditing": false,
+        "enableEdgeAnimation": true,
+        "enableNodeAnimation": true,
+        "legendPosition": "bottomleft",
+        "legendColumnLength": 3,
+        "legendDefaultBehavior": "visible",
+        "zIndexBase": 200
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Links — traffic each way",
+      "description": "Every link once. A → B leaves the A end's interface, B → A arrives on it. Kind: lldp = physical, bgp = routing adjacency (tunnel). Utilisation is the busier direction against ifSpeed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(((link:end:out_bps and on (device, ifName, neighbor, kind) link:info) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or (link:end:out_bps and on (device, ifName, neighbor, kind) link:info) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\"))) * 1",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "(((link:end:in_bps and on (device, ifName, neighbor, kind) link:info) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or (link:end:in_bps and on (device, ifName, neighbor, kind) link:info) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\"))) * 1",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "(((link:end:up and on (device, ifName, neighbor, kind) link:info) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or (link:end:up and on (device, ifName, neighbor, kind) link:info) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\"))) * 1",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "(((100 * (link:end:out_bps > link:end:in_bps or link:end:in_bps) / on (device, ifName) group_left () (max by (device, ifName) (interface_speed) * 1e6 > 0) and on (device, ifName, neighbor, kind) link:info) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or (100 * (link:end:out_bps > link:end:in_bps or link:end:in_bps) / on (device, ifName) group_left () (max by (device, ifName) (interface_speed) * 1e6 > 0) and on (device, ifName, neighbor, kind) link:info) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\"))) * 1",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "indexByName": {
+              "device": 0,
+              "ifName": 1,
+              "kind": 2,
+              "neighbor": 3,
+              "neighbor_port": 4,
+              "Value #C": 5,
+              "Value #A": 6,
+              "Value #B": 7,
+              "Value #D": 8
+            },
+            "renameByName": {
+              "device": "A",
+              "ifName": "A interface",
+              "kind": "Kind",
+              "neighbor": "B",
+              "neighbor_port": "B interface",
+              "Value #A": "A → B",
+              "Value #B": "B → A",
+              "Value #C": "State",
+              "Value #D": "Utilisation"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "A → B",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "A → B|B → A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Utilisation"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "up",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "0": {
+                        "text": "down",
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open device",
+                    "url": "/d/darqcube-devices?var-device=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Busiest links",
+      "description": "Top 10 links by traffic, both directions together.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{device}} {{ifName}} ↔ {{neighbor}} ({{kind}})",
+          "expr": "topk(10, ((((link:end:out_bps + link:end:in_bps) and on (device, ifName, neighbor, kind) link:info) and on (device) group by (device) (intent_device_present{site=~\"$site\"}) or ((link:end:out_bps + link:end:in_bps) and on (device, ifName, neighbor, kind) link:info) and on (neighbor) label_replace(group by (device) (intent_device_present{site=~\"$site\"}), \"neighbor\", \"$1\", \"device\", \"(.*)\"))) * 1)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ]
+}

@@ -53,6 +53,16 @@ nodes:
         kind: Text
         optional: true
         description: Free-text grouping, e.g. north. Used for onboarding batches and views, not as a label.
+      - name: latitude
+        kind: Text
+        optional: true
+        regex: '^-?[0-9]{1,2}([.][0-9]+)?$'
+        description: Site latitude on the network map (decimal degrees, -90..90). Any values work for a logical map.
+      - name: longitude
+        kind: Text
+        optional: true
+        regex: '^-?[0-9]{1,3}([.][0-9]+)?$'
+        description: Site longitude on the network map (decimal degrees, -180..180).
     relationships:
       - name: devices
         peer: NetworkDevice
@@ -172,6 +182,16 @@ nodes:
       - name: description
         kind: Text
         optional: true
+      - name: latitude
+        kind: Text
+        optional: true
+        regex: '^-?[0-9]{1,2}([.][0-9]+)?$'
+        description: Device latitude on the network map. Leave empty to place it around its site.
+      - name: longitude
+        kind: Text
+        optional: true
+        regex: '^-?[0-9]{1,3}([.][0-9]+)?$'
+        description: Device longitude on the network map. Leave empty to place it around its site.
 
     relationships:
       - name: site

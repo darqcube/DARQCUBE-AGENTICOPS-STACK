@@ -33,6 +33,8 @@
 #   flow_port        optional; a dedicated NetFlow listener for an exporter behind
 #                    NAT, within FLOW_DEDICATED_FIRST..LAST (docs/how-to/flow-behind-nat.md)
 #   status           active (default) | provisioning | maintenance | decommissioned
+#   latitude         optional Network Map position ('24.86'); empty = placed
+#   longitude        around its site
 #
 # The allowed fields come from source-of-truth/schema/darqcube.yml. A field
 # added there is accepted here after `make schema` — no code change. A field

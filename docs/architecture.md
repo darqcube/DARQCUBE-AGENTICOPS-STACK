@@ -325,6 +325,15 @@ names every device that is in Infrahub but silent, the `DeviceNotReporting`
 alert fires on it, and the dashboards show it — "is everything we own
 monitored?" answered from the source of truth, not from guesswork.
 
+**The network map.** Devices and their positions come from Infrahub
+(`latitude` / `longitude` on a site or device). Links come from the devices
+themselves: LLDP for physical links, and BGP sessions for tunnels, which carry
+no LLDP — each session's addresses resolve to the interfaces that own them.
+Prometheus joins both to interface counters (`links` recording rules), the
+automation service writes the topology file the ESnet Network Map Panel
+loads, and the panel's query colours every link live. There is no topology
+file to maintain by hand.
+
 **Assurance as metrics.** With `ASSURANCE_INTERVAL_MINUTES` set, the
 automation service runs the assurance rules on every device on a schedule
 and exposes `assurance_rule_state` at `/metrics`; Prometheus scrapes it like
@@ -495,7 +504,7 @@ the source of truth for the source of truth only if it is backed up.
 ### Bind mounts — the configuration
 
 Folders in the repository, mounted into containers. `make clean` does **not**
-touch the read-only ones; it empties the two written ones.
+touch the read-only ones; it empties the three written ones.
 
 **Read-only** — containers consume these and never write them. Edit on the
 host, then restart or reload the service.
@@ -516,13 +525,14 @@ host, then restart or reload the service.
 | `observability/telegraf/telegraf.conf` | `telegraf` | agent settings |
 | `observability/telegraf/conf.d/` | `telegraf` | netflow, gNMI, outputs |
 
-**Written by a container** — the two exceptions, where a container writes back
-into the repo tree. Both are gitignored apart from a `.gitkeep`.
+**Written by a container** — the three exceptions, where a container writes back
+into the repo tree. All are gitignored apart from a `.gitkeep`.
 
 | Host path | Written by | Read by | Holds |
 |---|---|---|---|
 | `observability/telegraf/generated/` | `infrahub-server` (`make render`); `config-init` writes empty `devices.json`/`devices.yml` only if none exist | `telegraf`, `logstash` | SNMP and gNMI shards, `netflow-dedicated.conf`, `devices.json`, `devices.yml` |
 | `automation/configs/` | `automation` | — | running configs fetched from devices |
+| `observability/grafana/map/` | `automation` (`network_map.py`, every `MAP_INTERVAL_SECONDS`) | `grafana`, served at `/public/darqcube-map/` | `network-map.json` — the Network Map topology |
 
 `generated/` is a bind mount rather than a volume on purpose: it is where every
 doc, `verify.sh` and the wiring test look for rendered output, and you can read
@@ -539,8 +549,9 @@ writes `automation/configs/`.
 `make clean` asks first, then does two things:
 
 1. `docker compose down -v` — deletes **every named volume** above.
-2. Deletes every file except `.gitkeep` in the two **written** bind mounts,
-   `observability/telegraf/generated/` and `automation/configs/`.
+2. Deletes every file except `.gitkeep` in the three **written** bind mounts,
+   `observability/telegraf/generated/`, `automation/configs/` and
+   `observability/grafana/map/`.
 
 So after a clean:
 

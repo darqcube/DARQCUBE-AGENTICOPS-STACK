@@ -145,9 +145,18 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       # Land on the stack's overview, not Grafana's empty welcome page.
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/darqcube/network-overview.json
+      # Panel plugins the shipped dashboards use (Network Map: ESnet Network
+      # Map Panel), added to Grafana's own preinstall list. Not async: they
+      # install before Grafana serves, so a provisioned dashboard never meets
+      # a missing plugin. Needs internet at first start (kept in grafana-data
+      # after that); air-gapped: docs/how-to/change-dashboards.md.
+      GF_PLUGINS_PREINSTALL: ${GRAFANA_PLUGINS:-esnet-networkmap-panel@3.1.0}
+      GF_PLUGINS_PREINSTALL_ASYNC: "false"
     volumes:
       - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
+      # Network Map topology, written by the automation service.
+      - ../observability/grafana/map:/usr/share/grafana/public/darqcube-map:ro
     ports:
       - "${GRAFANA_PORT:-3000}:3000"
     depends_on:
