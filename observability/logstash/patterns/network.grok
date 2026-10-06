@@ -3,7 +3,7 @@
 
 # --- Cisco IOS / IOS-XE ---------------------------------------------------
 # IOS DOES NOT EMIT CONFORMANT RFC3164. A real line looks like:
-#   <189>264: cr1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: message
+#   <189>264: router1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: message
 # The sequence number and origin-id hostname come BEFORE the timestamp, where
 # RFC3164 expects "Mmm dd hh:mm:ss HOSTNAME TAG:". A strict RFC3164 parser
 # rejects every line and drops the packet with no error anywhere. The leading

@@ -34,7 +34,7 @@ applications.
 ## Worked example
 
 Start from the shipped examples — they extend the device examples (sites
-`hq` and `branch-01`, devices `cr1` and `mt-01`):
+`hq` and `branch-01`, devices `router1` and `mt-01`):
 
 ```sh
 cp source-of-truth/devices/examples/{prefixes,hosts,applications,services}.yml source-of-truth/devices/
@@ -49,7 +49,7 @@ prefixes:
     purpose: servers
     vlan_id: 20
     site: hq
-    gateway: cr1
+    gateway: router1
 ```
 
 `hosts.yml` — the servers, placed in a prefix:

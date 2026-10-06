@@ -22,7 +22,7 @@ prefixes:
     purpose: servers
     vlan_id: 20
     site: hq
-    gateway: cr1
+    gateway: router1
 
   - name: branch-01-users
     prefix: 10.0.11.0/24

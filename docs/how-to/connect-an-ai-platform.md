@@ -134,7 +134,7 @@ no authentication of its own, so anything that can reach port 8100 can call it
 directly regardless of the flag:
 
 ```bash
-curl -X POST http://vm:8100/device/cr1/config -d '{"lines":["..."]}'
+curl -X POST http://vm:8100/device/router1/config -d '{"lines":["..."]}'
 ```
 
 That is a different threat model — not "my AI did something unexpected" but

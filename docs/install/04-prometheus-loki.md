@@ -85,7 +85,7 @@ quietly filling the index.
 The message body stays searchable as content:
 
 ```logql
-{device="cr1"} |= "LINK_STATE"
+{device="router1"} |= "LINK_STATE"
 {site="hq", severity="error"}
 ```
 

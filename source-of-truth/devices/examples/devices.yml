@@ -44,7 +44,7 @@
 # The three below are made up. Replace them with your real devices.
 # ---------------------------------------------------------------------------
 devices:
-  - name: cr1
+  - name: router1
     site: hq
     role: core
     platform: ios_xe

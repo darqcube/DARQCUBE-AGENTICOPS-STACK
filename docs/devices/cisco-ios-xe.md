@@ -3,7 +3,7 @@
 ## 1. Hostname and SSH
 
 ```
-hostname cr1                             ! MUST equal the name in devices.yml
+hostname router1                         ! MUST equal the name in devices.yml
 !
 ip domain name lab
 username darqcube privilege 15 secret <PASSWORD>
@@ -47,7 +47,7 @@ Check what an image supports before configuring it — `?` lists the options
 without executing anything:
 
 ```
-cs1(config)# snmp-server user x x v3 auth sha y priv ?
+switch1(config)# snmp-server user x x v3 auth sha y priv ?
 % Unrecognized command                   ! no privacy on this image
 ```
 
@@ -87,7 +87,7 @@ If the management interface is in a VRF, name it —
 or syslog leaves through the global routing table and is silently lost.
 
 > **IOS does not emit conformant RFC3164.** The real wire format is
-> `<189>264: cr1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: <text>` — a
+> `<189>264: router1: *Jul 27 18:45:22.658 UTC: %SSH-5-SSH2_SESSION: <text>` — a
 > sequence counter and the origin-id hostname arrive *before* the timestamp, and
 > a leading `*` means the clock is not yet NTP-synchronised. A strict RFC3164
 > parser rejects every line and drops it silently. The Logstash pattern in this
@@ -219,7 +219,7 @@ reports `Clock is synchronized` after a few polls — typically 5–15 minutes.
 
 ```
 conf t
- hostname cr1
+ hostname router1
  ip domain name lab
  username darqcube privilege 15 secret <PASSWORD>
  ip ssh version 2
@@ -244,7 +244,7 @@ write memory
 
 ```yaml
 # source-of-truth/devices/devices.yml
-  - name: cr1
+  - name: router1
     site: hq
     role: core
     platform: ios_xe
@@ -261,10 +261,10 @@ make seed && make render
 ```bash
 source .env
 docker compose exec telegraf nc -zvu 10.0.0.11 161
-curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=device_uptime{device=\"cr1\"}"
-curl -sSG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={device="cr1"}'
-make state DEV=cr1
-make check DEV=cr1          # interface rules via TextFSM, BGP via pyATS learn("bgp")
+curl -sS "localhost:${PROMETHEUS_PORT}/api/v1/query?query=device_uptime{device=\"router1\"}"
+curl -sSG "localhost:${LOKI_PORT}/loki/api/v1/query_range" --data-urlencode 'query={device="router1"}'
+make state DEV=router1
+make check DEV=router1      # interface rules via TextFSM, BGP via pyATS learn("bgp")
 ```
 
 ## gNMI (optional)

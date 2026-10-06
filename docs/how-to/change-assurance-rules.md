@@ -15,7 +15,7 @@ the dashboards, and what to restart after each kind of change:
 [../install/07-automation.md](../install/07-automation.md#how-an-assurance-check-runs--and-where-the-code-is).
 
 ```bash
-make check DEV=cr1
+make check DEV=router1
 ```
 
 ## Add a rule
@@ -127,9 +127,9 @@ A new platform needs a normaliser function, or its rules cannot run. See
 ## Comparing before and after a change
 
 ```bash
-make snapshot DEV=cr1 > /tmp/before.json
-make config-put DEV=cr1 FILE=change.txt      # reports what changed
-make snapshot DEV=cr1 > /tmp/after.json
+make snapshot DEV=router1 > /tmp/before.json
+make config-put DEV=router1 FILE=change.txt  # reports what changed
+make snapshot DEV=router1 > /tmp/after.json
 ```
 
 `config-put` takes its own snapshot on both sides and reports the difference,

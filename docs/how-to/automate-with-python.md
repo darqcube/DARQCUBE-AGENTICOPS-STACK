@@ -68,9 +68,9 @@ calls never share a device session.
 ### Pre/post change
 
 ```python
-before = call("/device/cr1/snapshot")
-# ... make the change: call("/device/cr1/config", "POST") with a body, or by hand
-after = call("/device/cr1/snapshot")
+before = call("/device/router1/snapshot")
+# ... make the change: call("/device/router1/config", "POST") with a body, or by hand
+after = call("/device/router1/snapshot")
 ```
 
 Compare the two with any diff tool; the stack's own `make snapshot` output is
@@ -81,7 +81,7 @@ To push configuration, send a JSON body:
 
 ```python
 body = json.dumps({"lines": ["interface Loopback100", "description set-by-script"]}).encode()
-req = urllib.request.Request(API + "/device/cr1/config", data=body, method="POST",
+req = urllib.request.Request(API + "/device/router1/config", data=body, method="POST",
                              headers={"Content-Type": "application/json"})
 print(json.load(urllib.request.urlopen(req, timeout=300)))
 ```

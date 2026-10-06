@@ -29,13 +29,13 @@ both: `make seed` overwrites any device that is also in the YAML.
 
 ```yaml
 devices:
-  - name: cr2                      # == the device's hostname / sysname / identity
+  - name: router2                  # == the device's hostname / sysname / identity
     site: hq                       # must exist in sites.yml
     role: core                     # core | distribution | access | wan | edge | firewall
                                    # | core-wan | core-dc | internet-edge | branch-wan
     platform: ios_xe               # ios_xe | vrp | routeros  (see platforms.yml)
     management_ip: 10.0.0.12
-    # management_host: cr2.example.net   # optional DNS name, used instead of the IP
+    # management_host: router2.example.net   # optional DNS name, used instead of the IP
     environment: production        # production (default) | staging | lab | demo
     telemetry_mode: snmp           # snmp (default) | gnmi — gnmi is ios_xe only
     flow_enabled: true             # does it export NetFlow/IPFIX?
@@ -78,17 +78,17 @@ Logstash re-reads the device table within 60 seconds. No restart needed.
 curl -sS localhost:${INFRAHUB_PORT:-8000}/graphql \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query":"{NetworkDevice(name__value:\"cr2\"){edges{node{name{value}}}}}"}'
+  -d '{"query":"{NetworkDevice(name__value:\"router2\"){edges{node{name{value}}}}}"}'
 
 # Being polled (allow one SNMP interval)
-curl -sS "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=device_uptime{device=\"cr2\"}"
+curl -sS "localhost:${PROMETHEUS_PORT:-9090}/api/v1/query?query=device_uptime{device=\"router2\"}"
 
 # Sending logs (generate one on the device first)
 curl -sSG localhost:${LOKI_PORT:-3100}/loki/api/v1/query_range \
-  --data-urlencode 'query={device="cr2"}'
+  --data-urlencode 'query={device="router2"}'
 
 # Reachable for automation
-make state DEV=cr2
+make state DEV=router2
 ```
 
 If metrics do not appear, see [troubleshooting.md](troubleshooting.md#a-device-is-not-appearing-in-prometheus).
@@ -98,7 +98,7 @@ If metrics do not appear, see [troubleshooting.md](troubleshooting.md#a-device-i
 Set its status rather than deleting it, so history is kept:
 
 ```yaml
-  - name: cr2
+  - name: router2
     status: decommissioned      # active | provisioning | maintenance | decommissioned
 ```
 

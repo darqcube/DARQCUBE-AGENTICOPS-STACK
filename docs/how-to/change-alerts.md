@@ -86,7 +86,7 @@ interface_oper_status == 2 and interface_admin_status == 1
 interface_oper_status{ifType="6"} == 2
 
 # A device that was being polled and has stopped
-absent_over_time(device_uptime{device="cr1"}[10m])
+absent_over_time(device_uptime{device="router1"}[10m])
 
 # Only alert on core devices
 device:cpu_usage:max{role="core"} > 85

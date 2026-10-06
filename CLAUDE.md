@@ -48,7 +48,15 @@ split is deliberate; don't merge them.
   add per-tool variants; they drift apart and then nobody knows which one is real.
 - **Device credentials never go in Infrahub.** `.env` only.
 - **The inventory is per deployment, never in the repo** — gitignored like `site.yml`; `make seed`
-  never reads `devices/examples/`. No real site, device or lab names in docs, tests or examples.
+  never reads `devices/examples/`.
+- **This repo is public: nothing from a specific network or lab.** No real site, device or lab
+  names, addresses or hostnames in code, docs, tests, samples or examples — and no references to a
+  particular lab's topology, its layout or tool files, or how one lab is built. Examples use
+  neutral names: devices `router1`, `router2`, `switch1`, `mt-01`; sites `hq`, `branch-01`;
+  documentation addresses (`192.0.2.0/24`, `10.0.0.0/8`). Naming a tool as a way to *run* the stack
+  (OrbStack, containerlab, Docker Desktop) is fine; describing one lab built with it is not.
+  Before committing, search the change for every name and address of the networks you test
+  against.
 - **Adding a vendor is six edits**: `platforms.yml`, a Logstash grok file, a TextFSM template (if
   `ntc-templates` has none), a normaliser in `automation/assurance/normalise.py`, the `platform`
   dropdown in the Infrahub schema, and an onboarding doc. All six, or the vendor is

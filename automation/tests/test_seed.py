@@ -79,7 +79,7 @@ def check(seed, tmp_path, *docs: dict) -> list[str]:
 
 
 SITE = {"name": "hq", "site_type": "hq"}
-DEVICE = {"name": "cr1", "site": "hq", "role": "core", "platform": "ios_xe", "management_ip": "10.0.0.11"}
+DEVICE = {"name": "router1", "site": "hq", "role": "core", "platform": "ios_xe", "management_ip": "10.0.0.11"}
 
 
 EXAMPLES = ROOT / "source-of-truth/devices/examples"
@@ -170,12 +170,12 @@ def test_device_needs_an_address(seed, tmp_path):
 
 
 def test_fqdn_alone_is_enough(seed, tmp_path):
-    fqdn_only = {**{k: v for k, v in DEVICE.items() if k != "management_ip"}, "management_host": "cr1.lab"}
+    fqdn_only = {**{k: v for k, v in DEVICE.items() if k != "management_ip"}, "management_host": "router1.lab"}
     assert check(seed, tmp_path, {"sites": [SITE], "devices": [fqdn_only]}) == []
 
 
 def test_bad_values_are_caught_before_any_write(seed, tmp_path):
-    bad = {**DEVICE, "management_ip": "cr1.lab", "flow_enabled": "yes", "tags": "lab"}
+    bad = {**DEVICE, "management_ip": "router1.lab", "flow_enabled": "yes", "tags": "lab"}
     errors = check(seed, tmp_path, {"sites": [SITE], "devices": [bad]})
     assert any("is not an IP address" in e for e in errors)
     assert any("flow_enabled" in e for e in errors)
@@ -212,23 +212,23 @@ def test_merged_branch_is_refused_before_any_write(seed, monkeypatch, tmp_path, 
     """Infrahub makes a merged branch read-only. Reusing its name used to
     fail on the first save with a GraphQL traceback."""
     (tmp_path / "devices.yml").write_text(yaml.safe_dump({"sites": [SITE], "devices": [DEVICE]}))
-    client = _Client({"main": _Branch("OPEN"), "cs1-snmp": _Branch("MERGED")})
+    client = _Client({"main": _Branch("OPEN"), "switch1-snmp": _Branch("MERGED")})
     monkeypatch.setattr(seed, "InfrahubClientSync", lambda **kw: client)
     monkeypatch.setattr(seed, "DEVICES_DIR", str(tmp_path))
     monkeypatch.setattr(seed, "TOKEN", "test")
-    monkeypatch.setattr(seed, "BRANCH", "cs1-snmp")
+    monkeypatch.setattr(seed, "BRANCH", "switch1-snmp")
     monkeypatch.setattr(seed, "PLATFORMS_FILE", str(ROOT / "platforms.yml"))
 
     assert seed.main() == 1
     err = capsys.readouterr().err
     assert "merged and read-only" in err
-    assert "BRANCH=cs1-snmp-2" in err
+    assert "BRANCH=switch1-snmp-2" in err
     assert client.created == []
 
 
 # --- hosts, applications, services, prefixes --------------------------------
 
-PREFIX = {"name": "hq-servers", "prefix": "10.0.10.0/24", "purpose": "servers", "site": "hq", "gateway": "cr1"}
+PREFIX = {"name": "hq-servers", "prefix": "10.0.10.0/24", "purpose": "servers", "site": "hq", "gateway": "router1"}
 HOST = {"name": "srv-01", "site": "hq", "address": "10.0.10.11", "prefix": "hq-servers"}
 APP = {"name": "erp", "category": "database", "criticality": "critical"}
 SERVICE = {"name": "srv-01-pg", "host": "srv-01", "application": "erp", "protocol": "tcp", "port": 5432}

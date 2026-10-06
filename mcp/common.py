@@ -99,7 +99,7 @@ def flatten(node: Any) -> Any:
     """Strip Infrahub's {"value": x} envelope, recursively.
 
     Infrahub wraps every attribute, so an 11-device query becomes thousands of
-    characters of {"name": {"value": "cr1"}} noise. A model reading that
+    characters of {"name": {"value": "router1"}} noise. A model reading that
     miscounts and misquotes; flattened, it reads what is actually there.
     """
     if isinstance(node, dict):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Standalone: fetch the running configuration of one device, or all of them.
 
-    python -m automation.netmiko.get_config --device cr1
+    python -m automation.netmiko.get_config --device router1
     python -m automation.netmiko.get_config --all
 
 Configs are archived under automation/configs/<device>.cfg either way.

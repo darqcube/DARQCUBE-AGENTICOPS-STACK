@@ -26,8 +26,8 @@ That is what TTP is for.
 ## 1. Capture a real config
 
 ```bash
-make config-get DEV=cr1
-# saved to automation/configs/cr1.cfg
+make config-get DEV=router1
+# saved to automation/configs/router1.cfg
 ```
 
 Never write a template against remembered syntax.
@@ -66,7 +66,7 @@ different feature sets.
 ## 3. Test it
 
 ```bash
-make config-parsed DEV=cr1
+make config-parsed DEV=router1
 ```
 
 Or offline, against a saved config:
@@ -74,7 +74,7 @@ Or offline, against a saved config:
 ```bash
 docker compose exec automation python -c "
 from automation.ttp import parse
-cfg = open('/app/automation/configs/cr1.cfg').read()
+cfg = open('/app/automation/configs/router1.cfg').read()
 import json; print(json.dumps(parse.parse_config('ios_xe', cfg), indent=2))
 "
 ```
@@ -106,7 +106,7 @@ Templates are keyed `<platform>-<kind>.txt`, so adding `ios_xe-acls.txt` makes
 this work with no code change:
 
 ```bash
-curl -sS "localhost:${AUTOMATION_PORT}/device/cr1/config/structured?kind=acls"
+curl -sS "localhost:${AUTOMATION_PORT}/device/router1/config/structured?kind=acls"
 ```
 
 Add the same `kind` for every platform you support, or the endpoint works for

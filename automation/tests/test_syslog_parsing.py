@@ -79,7 +79,7 @@ def parsed(tmp_path_factory):
 
     # The identity table render-inventory.py would produce for these devices.
     (work / "devices.yml").write_text(
-        "cr1: cr1|hq|core|ios_xe\n"
+        "router1: router1|hq|core|ios_xe\n"
         "sw-hw-01: sw-hw-01|hq|access|vrp\n"
         "mt-01: mt-01|branch-01|wan|routeros\n"
         "late: late|hq|core|ios_xe\n"
@@ -121,7 +121,7 @@ def test_every_sample_produces_an_event(parsed):
 
 def test_cisco_is_parsed(parsed):
     """IOS is not RFC3164: counter and hostname precede the timestamp."""
-    e = parsed["cr1"]
+    e = parsed["router1"]
     assert e["platform"] == "ios_xe"
     assert e["facility"] == "SSH"
     assert e["mnemonic"] == "SSH2_SESSION"
@@ -148,8 +148,8 @@ def test_mikrotik_is_parsed(parsed):
 
 def test_source_of_truth_labels_are_attached(parsed):
     """The interconnect: labels come from Infrahub, not from the log line."""
-    assert parsed["cr1"]["site"] == "hq"
-    assert parsed["cr1"]["role"] == "core"
+    assert parsed["router1"]["site"] == "hq"
+    assert parsed["router1"]["role"] == "core"
     assert parsed["mt-01"]["site"] == "branch-01"
     assert parsed["mt-01"]["role"] == "wan"
 
@@ -179,7 +179,7 @@ def test_high_cardinality_fields_never_become_labels():
 # although the event had arrived. The line now carries it, in vendor notation.
 
 def test_cisco_line_keeps_the_mnemonic(parsed):
-    assert parsed["cr1"]["line"] == "%SSH-5-SSH2_SESSION: SSH2 Session request from 10.0.0.5"
+    assert parsed["router1"]["line"] == "%SSH-5-SSH2_SESSION: SSH2 Session request from 10.0.0.5"
 
 
 def test_huawei_line_keeps_the_mnemonic(parsed):
@@ -267,8 +267,8 @@ def test_implausible_device_time_keeps_arrival_and_is_tagged(parsed):
 
 
 def test_sample_from_months_ago_is_tagged_not_backdated(parsed):
-    assert "clock_skew" in parsed["cr1"]["tags"]
-    assert _age_minutes(parsed["cr1"]) < 5
+    assert "clock_skew" in parsed["router1"]["tags"]
+    assert _age_minutes(parsed["router1"]) < 5
 
 
 def test_zoneless_timestamp_keeps_arrival_time(parsed):

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Standalone: push configuration lines to one device.
 
-    python -m automation.netmiko.put_config --device cr1 --file change.txt
-    echo "interface Lo99" | python -m automation.netmiko.put_config --device cr1 -
+    python -m automation.netmiko.put_config --device router1 --file change.txt
+    echo "interface Lo99" | python -m automation.netmiko.put_config --device router1 -
 
 The running config is archived to automation/configs/<device>.cfg BEFORE
 anything is sent, so there is always something to compare against and restore

@@ -64,10 +64,10 @@ Move things in the drawing instead.
   scaling x (or both) only makes everything smaller.
 - `map: {animation_seconds: 1}` sets the speed of the moving dashes (seconds
   per cycle, lower is faster).
-- Draw from a tool that already has positions. For a containerlab lab, the
-  VS Code extension saves its layout next to the topology
-  (`<lab>.clab.yml.annotations.json`); converting that plus the topology's
-  `links:` gives an exact copy of the lab diagram.
+- Start from positions you already have. If your network already has a
+  diagram — from a drawing or topology tool — its node coordinates and
+  cabling convert directly into `nodes` and `links`, so the map matches the
+  picture your team already knows.
 
 ## Underneath
 

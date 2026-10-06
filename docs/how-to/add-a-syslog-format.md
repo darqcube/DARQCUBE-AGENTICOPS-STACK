@@ -92,7 +92,7 @@ and expensive to undo. A test enforces this list.
 The message body and mnemonics stay searchable as content:
 
 ```logql
-{device="cr1"} |= "LINK_STATE"
+{device="router1"} |= "LINK_STATE"
 ```
 
 That works only because the pipeline's **Line** stage puts the mnemonic back

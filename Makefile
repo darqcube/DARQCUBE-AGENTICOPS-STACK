@@ -92,7 +92,7 @@ render: ## Infrahub -> Telegraf + Logstash configs, and the Network Map dashboar
 # target even when its output is piped into jq. Without both, an API error
 # printed nothing and `make state` still reported success.
 
-config-get: ## Fetch a running config:  make config-get DEV=cr1
+config-get: ## Fetch a running config:  make config-get DEV=router1
 	@mkdir -p automation/configs
 	@curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/config \
 	    > automation/configs/$(DEV).cfg.part \
@@ -100,7 +100,7 @@ config-get: ## Fetch a running config:  make config-get DEV=cr1
 	  && cat automation/configs/$(DEV).cfg \
 	  || { cat automation/configs/$(DEV).cfg.part; echo; rm -f automation/configs/$(DEV).cfg.part; exit 1; }
 
-config-put: ## Push config lines:  make config-put DEV=cr1 FILE=change.txt
+config-put: ## Push config lines:  make config-put DEV=router1 FILE=change.txt
 	@set -o pipefail; jq -Rs '{lines: split("\n") | map(select(length > 0))}' < $(FILE) \
 	  | curl -sS --fail-with-body -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/config \
 	      -H 'Content-Type: application/json' -d @-
@@ -108,13 +108,13 @@ config-put: ## Push config lines:  make config-put DEV=cr1 FILE=change.txt
 state: ## Parsed operational state:  make state DEV=mt-01
 	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/state | jq .
 
-check: ## Run the assurance rules:  make check DEV=cr1
+check: ## Run the assurance rules:  make check DEV=router1
 	@set -o pipefail; curl -sS --fail-with-body -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/check | jq .
 
-snapshot: ## Point-in-time state, for pre/post comparison:  make snapshot DEV=cr1
+snapshot: ## Point-in-time state, for pre/post comparison:  make snapshot DEV=router1
 	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/snapshot | jq .
 
-config-parsed: ## Running config parsed with TTP:  make config-parsed DEV=cr1
+config-parsed: ## Running config parsed with TTP:  make config-parsed DEV=router1
 	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/config/structured | jq .
 
 # --- tests ---------------------------------------------------------------

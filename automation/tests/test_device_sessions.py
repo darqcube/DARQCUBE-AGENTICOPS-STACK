@@ -94,7 +94,7 @@ def stub(monkeypatch, tmp_path):
 
     def fake_build():
         built["count"] += 1
-        nr = FakeNornir({"cr1": FakeHost("cr1")})
+        nr = FakeNornir({"router1": FakeHost("router1")})
         built["instance"] = nr
         return nr
 
@@ -110,7 +110,7 @@ def stub(monkeypatch, tmp_path):
 
 def test_config_push_builds_the_inventory_once(stub):
     """Was four. Each build is a full Infrahub fetch."""
-    tasks.put_config("cr1", ["interface Lo99", "description test"])
+    tasks.put_config("router1", ["interface Lo99", "description test"])
     assert stub["count"] == 1, (
         f"built the inventory {stub['count']} times for one config push — "
         f"each one is a full GraphQL fetch of every device"
@@ -119,7 +119,7 @@ def test_config_push_builds_the_inventory_once(stub):
 
 def test_config_push_uses_one_session_and_closes_it(stub):
     """All four device operations must share one SSH connection."""
-    tasks.put_config("cr1", ["interface Lo99"])
+    tasks.put_config("router1", ["interface Lo99"])
     nr = stub["instance"]
     # get_config, pre-snapshot, the push itself, post-snapshot
     assert len(nr.runs) == 4, f"expected 4 operations, saw {nr.runs}"
@@ -127,23 +127,23 @@ def test_config_push_uses_one_session_and_closes_it(stub):
 
 
 def test_inventory_is_cached_across_calls(stub):
-    tasks.get_nornir("cr1")
-    tasks.get_nornir("cr1")
+    tasks.get_nornir("router1")
+    tasks.get_nornir("router1")
     tasks.get_nornir()
     assert stub["count"] == 1, "the inventory cache is not being used"
 
 
 def test_fresh_bypasses_the_cache(stub):
     """Needed straight after a seed, or a new device is invisible for the TTL."""
-    tasks.get_nornir("cr1")
-    tasks.get_nornir("cr1", fresh=True)
+    tasks.get_nornir("router1")
+    tasks.get_nornir("router1", fresh=True)
     assert stub["count"] == 2
 
 
 def test_invalidate_forces_a_rebuild(stub):
-    tasks.get_nornir("cr1")
+    tasks.get_nornir("router1")
     tasks.invalidate_inventory()
-    tasks.get_nornir("cr1")
+    tasks.get_nornir("router1")
     assert stub["count"] == 2
 
 
@@ -155,13 +155,13 @@ def test_unknown_device_says_what_to_do(stub):
 def test_oversized_push_is_refused_before_connecting(stub):
     """The cap must be enforced before a device is touched."""
     with pytest.raises(tasks.DeviceError, match="exceeds MAX_CONFIG_LINES"):
-        tasks.put_config("cr1", [f"line {i}" for i in range(500)])
+        tasks.put_config("router1", [f"line {i}" for i in range(500)])
     assert stub["count"] == 0, "connected to the device before rejecting the request"
 
 
 def test_empty_push_is_refused(stub):
     with pytest.raises(tasks.DeviceError, match="no configuration lines"):
-        tasks.put_config("cr1", [])
+        tasks.put_config("router1", [])
 
 
 # --- concurrency ----------------------------------------------------------
@@ -193,7 +193,7 @@ def test_concurrent_reads_on_one_device_are_serialised(stub, monkeypatch):
 
     monkeypatch.setattr(tasks, "_get_state", watched)
 
-    threads = [threading.Thread(target=tasks.get_state, args=("cr1",)) for _ in range(8)]
+    threads = [threading.Thread(target=tasks.get_state, args=("router1",)) for _ in range(8)]
     for t in threads:
         t.start()
     for t in threads:
@@ -211,7 +211,7 @@ def test_different_devices_still_run_in_parallel(stub, monkeypatch):
     import time as _t
 
     def two_hosts():
-        nr = FakeNornir({"cr1": FakeHost("cr1"), "cr2": FakeHost("cr2")})
+        nr = FakeNornir({"router1": FakeHost("router1"), "router2": FakeHost("router2")})
         stub["count"] += 1
         stub["instance"] = nr
         return nr
@@ -236,7 +236,7 @@ def test_different_devices_still_run_in_parallel(stub, monkeypatch):
 
     monkeypatch.setattr(tasks, "_get_state", watched)
 
-    threads = [threading.Thread(target=tasks.get_state, args=(d,)) for d in ("cr1", "cr2")]
+    threads = [threading.Thread(target=tasks.get_state, args=(d,)) for d in ("router1", "router2")]
     for t in threads:
         t.start()
     for t in threads:
@@ -247,8 +247,8 @@ def test_different_devices_still_run_in_parallel(stub, monkeypatch):
 
 def test_a_device_lock_is_reused_not_recreated():
     """A fresh lock per call would lock nothing at all."""
-    assert tasks.device_lock("cr1") is tasks.device_lock("cr1")
-    assert tasks.device_lock("cr1") is not tasks.device_lock("cr2")
+    assert tasks.device_lock("router1") is tasks.device_lock("router1")
+    assert tasks.device_lock("router1") is not tasks.device_lock("router2")
 
 
 # --- where automation connects ----------------------------------------------
@@ -266,8 +266,8 @@ class _Node:
 
 @pytest.mark.parametrize("node, expected", [
     (_Node(ip="10.0.0.11/24"), "10.0.0.11"),
-    (_Node(ip="10.0.0.11", host="cr1.lab.example"), "cr1.lab.example"),
-    (_Node(host="cr1.lab.example"), "cr1.lab.example"),
+    (_Node(ip="10.0.0.11", host="router1.lab.example"), "router1.lab.example"),
+    (_Node(host="router1.lab.example"), "router1.lab.example"),
     (_Node(), ""),
 ])
 def test_management_address_matches_the_renderer(node, expected):

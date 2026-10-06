@@ -121,6 +121,6 @@ Everything else — the message, Cisco mnemonics, RouterOS topics — is content
 matched with `|=`:
 
 ```logql
-{device="cr1"} |= "LINK_STATE"
+{device="router1"} |= "LINK_STATE"
 {site="hq", severity="error"}
 ```

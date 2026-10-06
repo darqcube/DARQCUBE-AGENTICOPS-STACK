@@ -329,12 +329,12 @@ dashboards and alerts work unchanged; only CPU and memory need vendor OIDs.
 > `platforms.yml` under `pyats:`.
 
 ```bash
-make state DEV=mt-01          # parsed operational state
-make check DEV=mt-01          # assurance — TextFSM everywhere, pyATS where supported
-make snapshot DEV=cr1         # comparable state, for pre/post comparison
-make config-get DEV=cr1       # running config
-make config-parsed DEV=cr1    # running config, parsed with TTP
-make config-put DEV=cr1 FILE=change.txt   # push, and report what changed
+make state DEV=mt-01            # parsed operational state
+make check DEV=mt-01            # assurance — TextFSM everywhere, pyATS where supported
+make snapshot DEV=router1       # comparable state, for pre/post comparison
+make config-get DEV=router1     # running config
+make config-parsed DEV=router1  # running config, parsed with TTP
+make config-put DEV=router1 FILE=change.txt   # push, and report what changed
 ```
 
 ## Changing things

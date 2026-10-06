@@ -22,10 +22,10 @@ Work down the chain — each step rules out one link.
 curl -sS localhost:${INFRAHUB_PORT:-8000}/graphql \
   -H "X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query":"{NetworkDevice(name__value:\"cr1\"){edges{node{name{value} status{value}}}}}"}'
+  -d '{"query":"{NetworkDevice(name__value:\"router1\"){edges{node{name{value} status{value}}}}}"}'
 
 # 2. Did it reach the collector config?   (did you run `make render`?)
-grep -r cr1 observability/telegraf/generated/
+grep -r router1 observability/telegraf/generated/
 
 # 3. Is SNMP reachable and are the credentials right?
 docker compose exec telegraf nc -zvu 10.0.0.11 161

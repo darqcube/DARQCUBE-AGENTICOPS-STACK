@@ -81,9 +81,9 @@ Every way of asking for assurance ends in one function, `run_assurance()` in
 AI agent or the scheduler asked:
 
 ```
-        make check DEV=cr1 ─┐
-    POST /device/cr1/check ─┤
- mcp-assurance (AI agents) ─┼─> run_assurance("cr1")        automation/nornir/tasks.py
+    make check DEV=router1 ─┐
+POST /device/router1/check ─┤
+ mcp-assurance (AI agents) ─┼─> run_assurance("router1")    automation/nornir/tasks.py
 scheduler, every N minutes ─┘     │  holds the device lock across both engines
                                   ├─ Netmiko + TextFSM ─> normalise.py      ─> rules, source: interfaces
                                   └─ pyATS / Genie ─────> pyats/checks.py   ─> rules, source: pyats
@@ -149,19 +149,19 @@ Rules, checks and examples in detail:
 Or from the Makefile:
 
 ```bash
-make config-get DEV=cr1
+make config-get DEV=router1
 make state DEV=mt-01
-make config-parsed DEV=cr1
-make snapshot DEV=cr1
-make config-put DEV=cr1 FILE=change.txt
-make check DEV=cr1
+make config-parsed DEV=router1
+make snapshot DEV=router1
+make config-put DEV=router1 FILE=change.txt
+make check DEV=router1
 ```
 
 Or as scripts, which take the same path through the same functions:
 
 ```bash
 docker compose exec automation python -m automation.netmiko.get_state --device mt-01
-docker compose exec automation python -m automation.netmiko.put_config --device cr1 --file /tmp/c.txt --dry-run
+docker compose exec automation python -m automation.netmiko.put_config --device router1 --file /tmp/c.txt --dry-run
 ```
 
 ## Assurance is declarative

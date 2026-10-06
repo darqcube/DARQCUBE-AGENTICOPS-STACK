@@ -80,7 +80,7 @@ def load_renderer(monkeypatch, devices, out_dir, services=()):
 
 
 THREE = [
-    Device("cr1", "ios_xe", "10.0.0.11/24", "hq", "core"),
+    Device("router1", "ios_xe", "10.0.0.11/24", "hq", "core"),
     Device("sw-hw-01", "vrp", "10.0.0.21", "hq", "access"),
     Device("mt-01", "routeros", "10.0.0.31", "branch-01", "wan"),
 ]
@@ -129,37 +129,37 @@ def test_identity_table_keyed_by_both_ip_and_name(monkeypatch, tmp_path):
     mod = load_renderer(monkeypatch, THREE, tmp_path)
     mod.main()
     identity = json.loads((tmp_path / "devices.json").read_text())
-    assert identity["10.0.0.11"]["device"] == "cr1"
-    assert identity["cr1"]["device"] == "cr1"
-    assert identity["cr1"]["site"] == "hq"
+    assert identity["10.0.0.11"]["device"] == "router1"
+    assert identity["router1"]["device"] == "router1"
+    assert identity["router1"]["site"] == "hq"
     assert identity["mt-01"]["role"] == "wan"
 
 
 def test_management_host_is_polled_instead_of_the_ip(monkeypatch, tmp_path):
-    devices = [Device("cr1", "ios_xe", "10.0.0.11", "hq", "core-wan", host="cr1.lab.example")]
+    devices = [Device("router1", "ios_xe", "10.0.0.11", "hq", "core-wan", host="router1.lab.example")]
     mod = load_renderer(monkeypatch, devices, tmp_path)
     mod.main()
     body = (tmp_path / "snmp-interfaces.conf").read_text()
-    assert '"udp://cr1.lab.example:161"' in body
+    assert '"udp://router1.lab.example:161"' in body
     assert "10.0.0.11" not in body
 
 
 def test_polled_by_name_still_resolves_flows_by_ip(monkeypatch, tmp_path):
     """SNMP metrics key on the agent (the DNS name); flow records key on the
     exporter's source address. Both must find the same identity."""
-    devices = [Device("cr1", "ios_xe", "10.0.0.11/24", "hq", "core-wan", host="cr1.lab.example")]
+    devices = [Device("router1", "ios_xe", "10.0.0.11/24", "hq", "core-wan", host="router1.lab.example")]
     mod = load_renderer(monkeypatch, devices, tmp_path)
     mod.main()
     identity = json.loads((tmp_path / "devices.json").read_text())
-    assert identity["cr1.lab.example"]["device"] == "cr1"
-    assert identity["10.0.0.11"]["device"] == "cr1"
+    assert identity["router1.lab.example"]["device"] == "router1"
+    assert identity["10.0.0.11"]["device"] == "router1"
 
 
 def test_device_with_only_a_management_host(monkeypatch, tmp_path):
-    devices = [Device("cr1", "ios_xe", None, "hq", "core-wan", host="cr1.lab.example")]
+    devices = [Device("router1", "ios_xe", None, "hq", "core-wan", host="router1.lab.example")]
     mod = load_renderer(monkeypatch, devices, tmp_path)
     assert mod.main() == 0
-    assert '"udp://cr1.lab.example:161"' in (tmp_path / "snmp-interfaces.conf").read_text()
+    assert '"udp://router1.lab.example:161"' in (tmp_path / "snmp-interfaces.conf").read_text()
 
 
 def test_default_security_is_auth_priv_with_no_placeholder_left(monkeypatch, tmp_path):
@@ -176,7 +176,7 @@ def test_auth_no_priv_device_gets_its_own_inputs(monkeypatch, tmp_path):
     """Telegraf has one sec_level per input. A device that cannot encrypt must
     be polled from a separate authNoPriv input — never by lowering the rest."""
     devices = [
-        Device("cr1", "ios_xe", "10.0.0.11", "hq", "core-wan"),
+        Device("router1", "ios_xe", "10.0.0.11", "hq", "core-wan"),
         Device("sw1", "ios_xe", "10.0.0.31", "hq", "core-dc", security="auth_no_priv"),
     ]
     mod = load_renderer(monkeypatch, devices, tmp_path)
@@ -222,7 +222,7 @@ def test_memory_kind_reaches_the_config(monkeypatch, tmp_path):
 
 def test_gnmi_device_is_not_also_polled_by_snmp(monkeypatch, tmp_path):
     """telemetry_mode is exclusive — collecting both would double-count."""
-    devices = [Device("cr1", "ios_xe", "10.0.0.11", "hq", "core", mode="gnmi")]
+    devices = [Device("router1", "ios_xe", "10.0.0.11", "hq", "core", mode="gnmi")]
     mod = load_renderer(monkeypatch, devices, tmp_path)
     mod.main()
     assert (tmp_path / "gnmi.conf").exists()
@@ -700,8 +700,8 @@ def test_intent_lists_every_rendered_device_with_its_labels(monkeypatch, tmp_pat
     assert mod.main() == 0
     lines = (tmp_path / "intent.influx").read_text().splitlines()
     assert len(lines) == 3
-    cr1 = next(l for l in lines if l.startswith("intent_device,device=cr1,"))
-    assert cr1 == "intent_device,device=cr1,site=hq,role=core,platform=ios_xe,telemetry=snmp present=1i,rank=0i"
+    router1 = next(l for l in lines if l.startswith("intent_device,device=router1,"))
+    assert router1 == "intent_device,device=router1,site=hq,role=core,platform=ios_xe,telemetry=snmp present=1i,rank=1i"  # rank is name order: mt-01 comes first
     conf = (tmp_path / "intent.conf").read_text()
     assert "/etc/telegraf/telegraf.d/generated/intent.influx" in conf and 'data_format = "influx"' in conf
 
