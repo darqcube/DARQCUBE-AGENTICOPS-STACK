@@ -74,6 +74,63 @@ The per-vendor mappings and how to add a rule:
 | `.env` → `MAX_CONFIG_LINES` | cap on a single push (default 200) |
 | `.env` → `AUTOMATION_PORT` | published port (default 18100) |
 
+## How an assurance check runs — and where the code is
+
+Every way of asking for assurance ends in one function, `run_assurance()` in
+`automation/nornir/tasks.py`, so a rule behaves the same whether a person, an
+AI agent or the scheduler asked:
+
+```
+        make check DEV=cr1 ─┐
+    POST /device/cr1/check ─┤
+ mcp-assurance (AI agents) ─┼─> run_assurance("cr1")        automation/nornir/tasks.py
+scheduler, every N minutes ─┘     │  holds the device lock across both engines
+                                  ├─ Netmiko + TextFSM ─> normalise.py      ─> rules, source: interfaces
+                                  └─ pyATS / Genie ─────> pyats/checks.py   ─> rules, source: pyats
+                                  │
+                                  v
+                one result per rule: pass | fail | error | skipped
+                                  │
+    API and make check return it  │  the scheduler also publishes it:
+                                  v
+          /metrics ─> Prometheus ─> Grafana assurance panels + alerts
+          /assurance/latest      ─> JSON, with each failure's detail
+```
+
+| File | What it is | Change it to |
+|---|---|---|
+| `automation/assurance/rules.yml` | the rules: name, severity, platforms, which check, its options | add, remove or tune a rule — the usual change |
+| `automation/assurance/engine.py` | runs the rules (`run_rules`); the interface checks, registered in `CHECKS`; pre/post snapshots | add a new kind of interface check |
+| `automation/assurance/normalise.py` | turns each vendor's interface rows into `{interface, admin_up, oper_up}` | support a new platform's interface output |
+| `automation/pyats/checks.py` | collects Genie data (`collect`) and the pyATS checks, registered in `CHECKS` | add a pyATS-backed check |
+| `automation/pyats/testbed.py` | builds the pyATS testbed from the cached Infrahub inventory — there is no testbed file | rarely: connection settings |
+| `automation/pyats/samples/` | Genie's own golden output, for the offline tests | add the fixture a new pyATS check is tested against |
+| `platforms.yml` → `pyats:` | which Genie features each platform supports | enable a pyATS rule on a platform |
+| `automation/nornir/tasks.py` → `run_assurance()` | the single entry point; gathers both engines' data under the device lock | rarely |
+| `automation/service/main.py` | the HTTP API, including `POST /device/{name}/check` | a new endpoint |
+| `automation/service/scheduler.py` | scheduled assurance: runs every device, serves `/metrics` and `/assurance/latest` | the published metrics |
+| `mcp/servers/assurance.py` | the `mcp-assurance` tools AI agents call (`run_device_checks` and others) — through the API above | what agents can ask |
+| `observability/prometheus/rules/` | `network:assurance_*` counts and the `AssuranceCheckFailing` / `AssuranceStale` alerts | alerting on results |
+
+### Common changes, step by step
+
+| You want to | Edit | Then | Prove it |
+|---|---|---|---|
+| Add or tune a rule using an existing check | `automation/assurance/rules.yml` | nothing — it is read on every run | `make check DEV=<device>` |
+| Add a new kind of interface check | `automation/assurance/engine.py` (function + `CHECKS`), then a rule in `automation/assurance/rules.yml` | `docker compose restart automation` | `.venv/bin/pytest automation/tests/test_assurance.py` |
+| Add a pyATS check | `automation/pyats/checks.py` (function + `CHECKS`), a fixture in `automation/pyats/samples/`, a rule with `source: pyats` | `docker compose restart automation` | `.venv/bin/pytest automation/tests/test_pyats.py` |
+| Run it on another platform | `platforms.yml` → that platform's `pyats:` block | `docker compose restart automation` — `platforms.yml` is a single-file mount, and a running container keeps the old copy | `make check DEV=<device>` |
+| Cover a new vendor's interfaces | `automation/assurance/normalise.py` + a TextFSM template ([../how-to/add-a-platform.md](../how-to/add-a-platform.md)) | `docker compose restart automation` | `.venv/bin/pytest automation/tests/test_assurance.py` |
+| See results on the dashboards | `.env` → `ASSURANCE_INTERVAL_MINUTES` | `docker compose up -d automation` | Network Overview → assurance row |
+
+Python changes need the restart because the API does not reload code; the
+`automation/` folder is mounted, so no image rebuild is needed. Only a new
+Python dependency (`automation/service/requirements.txt`) needs a rebuild:
+`docker compose build automation && docker compose up -d automation`.
+
+Rules, checks and examples in detail:
+[../how-to/change-assurance-rules.md](../how-to/change-assurance-rules.md).
+
 ## API
 
 | Endpoint | Does |

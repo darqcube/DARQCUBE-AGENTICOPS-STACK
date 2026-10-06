@@ -10,6 +10,10 @@ Rules live in `automation/assurance/rules.yml`. Each one names its **source**:
 A `pyats` rule on a platform that cannot support it comes back **`skipped`**
 with the reason — never `pass`, never `fail`.
 
+Which file does what, how a check flows from `make check` or the scheduler to
+the dashboards, and what to restart after each kind of change:
+[../install/07-automation.md](../install/07-automation.md#how-an-assurance-check-runs--and-where-the-code-is).
+
 ```bash
 make check DEV=cr1
 ```
