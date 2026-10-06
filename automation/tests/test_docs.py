@@ -150,6 +150,36 @@ def test_stated_counts_match_reality():
     )
 
 
+def test_nothing_depends_on_mcp():
+    """README says MCP sits at the bottom of the dependency graph with no
+    inbound edges, so dropping the `mcp` profile loses no other feature. Two
+    kinds of edge would break that: a service that waits for an MCP container,
+    and code or config outside mcp/ that calls one."""
+    services = {}
+    for path in (ROOT / "compose").glob("*.yaml"):
+        services |= (yaml.safe_load(path.read_text()) or {}).get("services") or {}
+    mcp = {name for name in services if name.startswith("mcp-")}
+    assert mcp, "no mcp-* services found — test is not looking in the right place"
+
+    waits = [f"{name} -> {dep}" for name, spec in services.items() if name not in mcp
+             for dep in (spec.get("depends_on") or []) if dep in mcp]
+    assert not waits, f"services depend on MCP: {waits}"
+
+    # An address (mcp-loki:9003), not a name in a comment.
+    address = re.compile(r"\bmcp-[a-z]+:\d+")
+    calls = []
+    for path in ROOT.rglob("*"):
+        rel = path.relative_to(ROOT)
+        if (not path.is_file() or rel.parts[0] in {"mcp", ".git", ".venv", "docs"}
+                or "tests" in rel.parts or "__pycache__" in rel.parts
+                or path.suffix not in {".py", ".yml", ".yaml", ".conf", ".json", ".tmpl"}
+                or rel == Path("compose/mcp.yaml")):
+            continue
+        if address.search(path.read_text(errors="ignore")):
+            calls.append(str(rel))
+    assert not calls, f"outside mcp/, these call an MCP server: {calls}"
+
+
 def test_readme_and_claude_cover_the_current_toolchain():
     """Both are entry points. A tool that is in the stack but in neither file
     is a tool the next person will not know exists."""
