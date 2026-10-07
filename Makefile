@@ -27,7 +27,7 @@ AUTOMATION_PORT := $(strip $(AUTOMATION_PORT))
 # pytest for anyone who set up their own environment.
 PYTEST := $(if $(wildcard .venv/bin/pytest),.venv/bin/pytest,pytest)
 
-.PHONY: install help preflight up down restart ps logs schema seed render \
+.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check schema seed render \
         config-get config-put state check snapshot config-parsed \
         test test-templates test-devices verify clean
 
@@ -61,6 +61,15 @@ ps: ## Show container status, grouped by function
 
 logs: ## Follow logs, optionally for one service:  make logs SVC=logstash
 	$(COMPOSE) logs -f --tail=100 $(SVC)
+
+MCP_SERVICES := mcp-infrahub mcp-prometheus mcp-loki mcp-grafana mcp-netmiko mcp-assurance mcp-pyats
+
+mcp-apply: ## Rebuild and recreate the MCP servers — after a pull, or an ai-platform change in .env
+	$(COMPOSE) build mcp-infrahub
+	$(COMPOSE) up -d --wait --force-recreate $(MCP_SERVICES)
+
+mcp-check: ## List every MCP server's tools through a real client handshake
+	@python3 scripts/mcp-check.py
 
 # --- source of truth -----------------------------------------------------
 

@@ -114,6 +114,7 @@ def test_mcp_servers_expose_their_tools(env, compose_ps):
     expected = {
         "mcp-infrahub": 9001, "mcp-prometheus": 9002, "mcp-loki": 9003,
         "mcp-grafana": 9004, "mcp-netmiko": 9005, "mcp-assurance": 9006,
+        "mcp-pyats": 9007,
     }
     for name, port in expected.items():
         out = subprocess.run(
@@ -124,3 +125,23 @@ def test_mcp_servers_expose_their_tools(env, compose_ps):
             cwd=ROOT, capture_output=True, text=True, timeout=30,
         )
         assert out.returncode == 0, f"{name} did not answer /healthz: {out.stderr[-200:]}"
+
+
+def test_mcp_servers_answer_a_real_client(env, compose_ps):
+    """/healthz is outside the MCP app: it once stayed green while every MCP
+    call was refused with 421. This does what a client does — initialize, then
+    tools/list — on every server, through the published port."""
+    requires_profile(env, "mcp")
+    import subprocess
+    import sys
+
+    if env.get("MCP_AUTH_MODE", "token") == "oidc":
+        pytest.skip("MCP_AUTH_MODE=oidc accepts only user JWTs — check from the ai-platform "
+                    "host with scripts/mcp-check.py --token-file, or use mode 'both'")
+    host = env.get("MCP_BIND_IP") or "127.0.0.1"
+    out = subprocess.run([sys.executable, str(ROOT / "scripts/mcp-check.py"), "--host", host],
+                         cwd=ROOT, capture_output=True, text=True, timeout=180)
+    assert out.returncode == 0, f"an MCP server refused a real client:\n{out.stdout}{out.stderr}"
+    netmiko = next(l for l in out.stdout.splitlines() if "mcp-netmiko" in l)
+    write_on = env.get("MCP_ALLOW_WRITE", "false") == "true"
+    assert ("push_device_config" in netmiko) == write_on, netmiko

@@ -23,6 +23,9 @@ Common options:
     --fix-sysctl     apply the kernel settings and stop (needs sudo)
     --skip-tests     stop after step 5
     --step N         run one step only
+    --ai-platform F  connect an ai-platform on another host: apply the file
+                     scripts/ai-platform-connect.py generated there
+                     (default: sites/ai-platform.yml, if present)
 """
 from __future__ import annotations
 
@@ -46,6 +49,9 @@ ENV = ROOT / ".env"
 ENV_EXAMPLE = ROOT / ".env.example"
 SITE = ROOT / "site.yml"
 SITE_EXAMPLE = ROOT / "site.example.yml"
+# Generated on the ai-platform host by scripts/ai-platform-connect.py and copied
+# here. Gitignored (sites/*.yml): it names this deployment's addresses.
+AI_PLATFORM_OVERLAY = ROOT / "sites" / "ai-platform.yml"
 VENV = ROOT / ".venv"
 
 # Secrets that only need to be unguessable. Each gets its own value: one string
@@ -290,6 +296,143 @@ PORT_VARS = {
 }
 
 
+AUTH_MODES = ("token", "oidc", "both")
+AI_PLATFORM_KEYS = {
+    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb"},
+    "publish": {"enabled", "bind_ip"},
+    "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role"},
+}
+
+
+def ai_platform_env(site: dict, collector_ip: str, grafana_port: str) -> dict[str, str]:
+    """The MCP settings an ai-platform on another machine needs.
+
+    Separate from site_to_env because it is also applied to an EXISTING .env
+    (an install done without a site file): only these keys change there.
+    """
+    env: dict[str, str] = {}
+    publish = as_bool(dig(site, "ai_platform.publish.enabled"), "ai_platform.publish.enabled")
+    # Empty bind_ip means the address devices already use for this host.
+    bind = str(dig(site, "ai_platform.publish.bind_ip", "") or "").strip() or collector_ip
+    env["MCP_BIND_IP"] = bind if publish else "127.0.0.1"
+    # The MCP SDK answers only Host headers it was told about (421 otherwise).
+    env["MCP_ALLOWED_HOSTS"] = f"{bind}:*" if publish else ""
+
+    env["MCP_AUTH_MODE"] = str(dig(site, "ai_platform.auth.mode", "token") or "token").strip().lower()
+    env["MCP_OIDC_ISSUER"] = str(dig(site, "ai_platform.auth.issuer", "") or "").strip()
+    env["MCP_OIDC_JWKS_URL"] = str(dig(site, "ai_platform.auth.jwks_url", "") or "").strip()
+    audiences = dig(site, "ai_platform.auth.audiences", "") or ""
+    if isinstance(audiences, list):
+        audiences = ",".join(str(a).strip() for a in audiences if str(a).strip())
+    env["MCP_OIDC_AUDIENCES"] = str(audiences).strip()
+    env["MCP_WRITE_ROLE"] = str(dig(site, "ai_platform.auth.write_role", "") or "darqcube-write").strip()
+    env["MCP_MAX_RESPONSE_BYTES"] = str(
+        as_int(dig(site, "ai_platform.max_response_kb"), "ai_platform.max_response_kb", 512) * 1024
+    )
+    # Links mcp-grafana hands a person must open in a browser, not resolve only
+    # inside the compose network.
+    known_ip = collector_ip and collector_ip != "CHANGEME"
+    env["GRAFANA_PUBLIC_URL"] = f"http://{collector_ip}:{grafana_port}" if known_ip else ""
+    return env
+
+
+def validate_ai_platform(site: dict) -> list[str]:
+    """Problems in the ai_platform block — from site.yml or the overlay."""
+    problems: list[str] = []
+    block = dig(site, "ai_platform", {}) or {}
+    if not isinstance(block, dict):
+        return ["ai_platform must be a mapping"]
+    for section, allowed in AI_PLATFORM_KEYS.items():
+        node = block if not section else (block.get(section) or {})
+        if not isinstance(node, dict):
+            problems.append(f"ai_platform.{section} must be a mapping")
+            continue
+        for key in node:
+            if key not in allowed:
+                where = f"ai_platform.{section}" if section else "ai_platform"
+                problems.append(f"unknown key '{key}' in {where} — expected one of {sorted(allowed)}")
+
+    try:
+        publish = as_bool(dig(site, "ai_platform.publish.enabled"), "ai_platform.publish.enabled")
+    except SiteError as exc:
+        problems.append(str(exc))
+        publish = False
+    bind = str(dig(site, "ai_platform.publish.bind_ip", "") or "").strip()
+    if publish and bind and bind != "CHANGEME":
+        try:
+            if ipaddress.ip_address(bind).is_loopback:
+                problems.append(f"ai_platform.publish.bind_ip {bind} is loopback — "
+                                f"another machine cannot reach it; leave it empty to use site.collector_ip")
+            else:
+                local = local_addresses()
+                if local and bind not in local:
+                    problems.append(f"ai_platform.publish.bind_ip {bind} is not an address on this machine "
+                                    f"(found: {', '.join(sorted(local))})")
+        except ValueError:
+            problems.append(f"ai_platform.publish.bind_ip '{bind}' is not an IP address")
+    elif publish and bind == "CHANGEME":
+        problems.append("ai_platform.publish.bind_ip is CHANGEME — set this machine's address, "
+                        "or leave it empty to use site.collector_ip")
+
+    mode = str(dig(site, "ai_platform.auth.mode", "token") or "token").strip().lower()
+    if mode not in AUTH_MODES:
+        problems.append(f"ai_platform.auth.mode '{mode}' — expected one of {', '.join(AUTH_MODES)}")
+    elif mode in ("oidc", "both"):
+        for field in ("issuer", "jwks_url"):
+            value = str(dig(site, f"ai_platform.auth.{field}", "") or "")
+            if not re.match(r"^https?://\S+$", value):
+                problems.append(
+                    f"ai_platform.auth.{field} is required for mode {mode} — an http(s) URL "
+                    f"(generate it on the ai-platform host: scripts/ai-platform-connect.py)"
+                )
+
+    try:
+        kb = as_int(dig(site, "ai_platform.max_response_kb"), "ai_platform.max_response_kb", 512)
+        if not 16 <= kb <= 4096:
+            problems.append(f"ai_platform.max_response_kb {kb} — expected 16 to 4096")
+    except SiteError as exc:
+        problems.append(str(exc))
+    return problems
+
+
+def merge_overlay(site: dict, overlay: dict, name: str) -> dict:
+    """Deep-merge an ai-platform overlay over the site file.
+
+    The overlay may only speak for `ai_platform` — it is generated on another
+    machine, and must not be able to change device credentials or ports.
+    """
+    extra = set(overlay) - {"ai_platform"}
+    if extra:
+        raise SiteError(f"{name} may only contain 'ai_platform' — found {sorted(extra)}")
+
+    def merge(base: dict, top: dict) -> dict:
+        out = dict(base)
+        for key, value in top.items():
+            out[key] = merge(out.get(key) or {}, value) if isinstance(value, dict) else value
+        return out
+
+    return merge(site, overlay)
+
+
+def set_env_values(text: str, values: dict[str, str]) -> str:
+    """Set KEY=value lines in .env text, appending any that are missing.
+
+    An .env from an older .env.example lacks the newer keys; appending them is
+    what lets an existing install take an ai-platform overlay.
+    """
+    missing = []
+    for key, value in values.items():
+        pattern = re.compile(rf"^{key}=.*$", re.M)
+        if pattern.search(text):
+            text = pattern.sub(lambda _m, k=key, v=value: f"{k}={v}", text)
+        else:
+            missing.append(f"{key}={value}")
+    if missing:
+        text = text.rstrip("\n") + "\n\n# --- ai-platform on another host (added by install.py) ---\n"
+        text += "\n".join(missing) + "\n"
+    return text
+
+
 def site_to_env(site: dict) -> dict[str, str]:
     """Site file -> the .env variables it determines.
 
@@ -336,6 +479,7 @@ def site_to_env(site: dict) -> dict[str, str]:
     env["MCP_ALLOW_WRITE"] = str(
         as_bool(dig(site, "ai_platform.allow_write"), "ai_platform.allow_write")
     ).lower()
+    env.update(ai_platform_env(site, env["SYSLOG_COLLECTOR_IP"], env["GRAFANA_PORT"]))
 
     return env
 
@@ -402,6 +546,8 @@ def validate_site(site: dict) -> list[str]:
             as_bool(dig(site, field), field, default)
         except SiteError as exc:
             problems.append(str(exc))
+
+    problems.extend(validate_ai_platform(site))
 
     try:
         count = as_int(dig(site, "scale.expected_devices"), "scale.expected_devices", 50)
@@ -706,16 +852,73 @@ def configure(args) -> None:
     head(2, "Configure")
 
     site_path = Path(args.from_site) if args.from_site else (SITE if SITE.exists() else None)
+    overlay = ai_platform_overlay_path(args)
     if site_path:
-        configure_from_site(site_path, args)
+        configure_from_site(site_path, args, overlay)
         return
 
     info(f"no site file — using prompts. For a repeatable install, "
          f"cp {SITE_EXAMPLE.name} {SITE.name} and fill it in.")
     configure_interactive(args)
+    if overlay:
+        apply_ai_platform_to_env(overlay)
 
 
-def configure_from_site(site_path: Path, args) -> None:
+def ai_platform_overlay_path(args) -> Path | None:
+    explicit = getattr(args, "ai_platform", None)
+    if explicit:
+        path = Path(explicit)
+        if not path.exists():
+            bad(f"{path} not found — generate it on the ai-platform host with "
+                f"scripts/ai-platform-connect.py")
+            return None
+        return path
+    return AI_PLATFORM_OVERLAY if AI_PLATFORM_OVERLAY.exists() else None
+
+
+def read_overlay(path: Path) -> dict | None:
+    try:
+        overlay = read_yaml(path)
+        merge_overlay({}, overlay, path.name)       # shape check only
+    except SiteError as exc:
+        bad(str(exc))
+        return None
+    return overlay
+
+
+def apply_ai_platform_to_env(path: Path) -> None:
+    """Apply an ai-platform overlay to an existing .env — an install done
+    without a site file. Only the MCP keys (and GRAFANA_PUBLIC_URL) change."""
+    overlay = read_overlay(path)
+    if overlay is None:
+        return
+    problems = validate_ai_platform(overlay)
+    if problems:
+        for problem in problems:
+            bad(f"{path.name}: {problem}")
+        return
+    current = read_env(ENV)
+    values = ai_platform_env(overlay, current.get("SYSLOG_COLLECTOR_IP", ""),
+                             current.get("GRAFANA_PORT", "3000"))
+    if dig(overlay, "ai_platform.allow_write") is not None:
+        values["MCP_ALLOW_WRITE"] = str(
+            as_bool(dig(overlay, "ai_platform.allow_write"), "ai_platform.allow_write")).lower()
+    ENV.write_text(set_env_values(ENV.read_text(), values))
+    os.chmod(ENV, 0o600)
+    report_ai_platform(values, path.name)
+
+
+def report_ai_platform(values: dict[str, str], source: str) -> None:
+    if values.get("MCP_BIND_IP", "127.0.0.1") == "127.0.0.1":
+        info("MCP servers: this host only (ai_platform.publish is off)")
+        return
+    ok(f"ai-platform settings applied from {source}")
+    info(f"MCP servers published on {values['MCP_BIND_IP']}:9001-9007 · "
+         f"auth {values['MCP_AUTH_MODE']}")
+    info("recreate them to take effect: make mcp-apply")
+
+
+def configure_from_site(site_path: Path, args, overlay_path: Path | None = None) -> None:
     """Generate .env from the site file. Nothing else is touched."""
     if not site_path.exists():
         bad(f"{site_path} not found. Start from: cp {SITE_EXAMPLE.name} {site_path.name}")
@@ -734,6 +937,12 @@ def configure_from_site(site_path: Path, args) -> None:
         bad(str(exc))
         return
     ok(f"read {site_path.name}")
+    if overlay_path:
+        overlay = read_overlay(overlay_path)
+        if overlay is None:
+            return
+        site = merge_overlay(site, overlay, overlay_path.name)
+        ok(f"merged {overlay_path.relative_to(ROOT) if overlay_path.is_relative_to(ROOT) else overlay_path}")
 
     problems = validate_site(site)
     if problems:
@@ -788,6 +997,8 @@ def configure_from_site(site_path: Path, args) -> None:
     info(f"devices send to {derived['SYSLOG_COLLECTOR_IP']}: "
          f"syslog {derived['SYSLOG_PORT']}, netflow {derived['NETFLOW_PORT']}, "
          f"ipfix {derived['IPFIX_PORT']}")
+
+    report_ai_platform(derived, overlay_path.name if overlay_path else site_path.name)
 
     leftover = [v for v in REQUIRED if re.search(rf"^{v}=CHANGEME\s*$", text, re.M)]
     if leftover:
@@ -1009,6 +1220,9 @@ def main() -> int:
     ap.add_argument("--fix-sysctl", action="store_true", help="apply kernel settings and stop (needs sudo)")
     ap.add_argument("--skip-tests", action="store_true", help="stop after initialise")
     ap.add_argument("--step", type=int, metavar="N", help="run step N only (1-7)")
+    ap.add_argument("--ai-platform", dest="ai_platform", metavar="FILE",
+                    help=f"apply an ai-platform connection file (default: "
+                         f"{AI_PLATFORM_OVERLAY.relative_to(ROOT)} if present)")
     args = ap.parse_args()
 
     print(f"{C['b']}DARQCUBE-AGENTICOPS-STACK{C['x']}")

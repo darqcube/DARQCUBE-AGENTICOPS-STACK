@@ -262,3 +262,113 @@ def test_a_bad_boolean_is_listed_with_the_other_problems(inst, site):
 def test_port_overrides_accept_strings_or_ints(inst, site):
     site["ports"]["overrides"] = {"syslog": "514"}
     assert inst.site_to_env(site)["SYSLOG_PORT"] == "514"
+
+
+# --- an ai-platform on another machine -------------------------------------
+# Documentation addresses only (RFC 5737): this repo is cloned onto other
+# people's networks.
+
+def test_mcp_stays_on_this_host_unless_published(inst, site):
+    env = inst.site_to_env(site)
+    assert env["MCP_BIND_IP"] == "127.0.0.1"
+    assert env["MCP_ALLOWED_HOSTS"] == ""
+    assert env["MCP_AUTH_MODE"] == "token"
+
+
+def test_publishing_defaults_to_the_collector_address(inst, site):
+    """bind_ip empty = the address devices already reach this host on, so the
+    common case needs no second copy of an IP."""
+    site["site"]["collector_ip"] = "192.0.2.10"
+    site["ai_platform"]["publish"] = {"enabled": True, "bind_ip": ""}
+    env = inst.site_to_env(site)
+    assert env["MCP_BIND_IP"] == "192.0.2.10"
+    assert env["MCP_ALLOWED_HOSTS"] == "192.0.2.10:*", "published address not in the Host allow-list"
+
+
+def test_an_explicit_bind_ip_wins(inst, site):
+    site["ai_platform"]["publish"] = {"enabled": True, "bind_ip": "192.0.2.20"}
+    env = inst.site_to_env(site)
+    assert env["MCP_BIND_IP"] == "192.0.2.20" and env["MCP_ALLOWED_HOSTS"] == "192.0.2.20:*"
+
+
+def test_grafana_links_use_an_address_a_person_can_open(inst, site):
+    site["site"]["collector_ip"] = "192.0.2.10"
+    assert inst.site_to_env(site)["GRAFANA_PUBLIC_URL"] == "http://192.0.2.10:13000"
+
+
+def test_oidc_needs_issuer_and_jwks(inst, site):
+    site["ai_platform"]["auth"]["mode"] = "oidc"
+    problems = inst.validate_ai_platform(site)
+    assert any("auth.issuer is required" in p for p in problems)
+    assert any("auth.jwks_url is required" in p for p in problems)
+    site["ai_platform"]["auth"].update(issuer="http://idp.example/realms/demo",
+                                       jwks_url="http://192.0.2.1:7080/realms/demo/certs")
+    assert not inst.validate_ai_platform(site)
+
+
+def test_audiences_accept_a_list_or_a_csv(inst, site):
+    site["ai_platform"]["auth"]["audiences"] = ["a", "b"]
+    assert inst.site_to_env(site)["MCP_OIDC_AUDIENCES"] == "a,b"
+    site["ai_platform"]["auth"]["audiences"] = "a,b"
+    assert inst.site_to_env(site)["MCP_OIDC_AUDIENCES"] == "a,b"
+
+
+def test_an_unknown_auth_mode_or_key_is_refused(inst, site):
+    site["ai_platform"]["auth"]["mode"] = "open"
+    site["ai_platform"]["publish"]["bind"] = "x"          # typo for bind_ip
+    problems = inst.validate_ai_platform(site)
+    assert any("auth.mode 'open'" in p for p in problems)
+    assert any("unknown key 'bind'" in p for p in problems)
+
+
+def test_a_loopback_bind_ip_is_refused(inst, site):
+    site["ai_platform"]["publish"] = {"enabled": True, "bind_ip": "127.0.0.1"}
+    assert any("loopback" in p for p in inst.validate_ai_platform(site))
+
+
+def test_max_response_is_bounded_and_in_bytes(inst, site):
+    site["ai_platform"]["max_response_kb"] = 64
+    assert inst.site_to_env(site)["MCP_MAX_RESPONSE_BYTES"] == str(64 * 1024)
+    site["ai_platform"]["max_response_kb"] = 1
+    assert any("max_response_kb" in p for p in inst.validate_ai_platform(site))
+
+
+def test_the_overlay_may_only_speak_for_ai_platform(inst, site):
+    """It is generated on another machine; it must not be able to change device
+    credentials, ports or anything else."""
+    with pytest.raises(inst.SiteError, match="may only contain 'ai_platform'"):
+        inst.merge_overlay(site, {"devices": {"ssh_password": "x"}}, "ai-platform.yml")
+
+
+def test_the_overlay_merges_over_the_site_file(inst, site):
+    merged = inst.merge_overlay(site, {"ai_platform": {"auth": {"mode": "oidc"}}}, "o.yml")
+    assert merged["ai_platform"]["auth"]["mode"] == "oidc"
+    assert merged["ai_platform"]["auth"]["write_role"] == "darqcube-write", "merge dropped a sibling"
+    assert merged["devices"] == site["devices"]
+
+
+def test_set_env_values_replaces_and_appends(inst):
+    text = "A=1\nMCP_AUTH_MODE=token   # comment\n"
+    out = inst.set_env_values(text, {"MCP_AUTH_MODE": "oidc", "MCP_OIDC_ISSUER": "http://i"})
+    assert "MCP_AUTH_MODE=oidc\n" in out and "A=1\n" in out
+    assert out.rstrip().endswith("MCP_OIDC_ISSUER=http://i"), "a key missing from an older .env was not added"
+
+
+def test_an_overlay_applies_to_an_existing_env(inst, tmp_path, monkeypatch):
+    """An install done without a site file still takes the overlay — and only
+    the MCP keys change."""
+    env = tmp_path / ".env"
+    env.write_text("SYSLOG_COLLECTOR_IP=192.0.2.10\nGRAFANA_PORT=13000\nDEVICE_PASSWORD=keep\n"
+                   "MCP_ALLOW_WRITE=false\n")
+    overlay = tmp_path / "ai-platform.yml"
+    overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n  auth:\n    mode: oidc\n"
+                       "    issuer: http://idp.example/realms/demo\n"
+                       "    jwks_url: http://192.0.2.1:7080/realms/demo/certs\n")
+    monkeypatch.setattr(inst, "ENV", env)
+    monkeypatch.setattr(inst, "local_addresses", lambda: set())
+    inst.apply_ai_platform_to_env(overlay)
+    values = inst.read_env(env)
+    assert values["MCP_BIND_IP"] == "192.0.2.10"
+    assert values["MCP_AUTH_MODE"] == "oidc"
+    assert values["MCP_OIDC_JWKS_URL"] == "http://192.0.2.1:7080/realms/demo/certs"
+    assert values["DEVICE_PASSWORD"] == "keep" and values["MCP_ALLOW_WRITE"] == "false"

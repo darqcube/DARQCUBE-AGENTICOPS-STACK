@@ -102,6 +102,36 @@ def collect(device: str, wanted: set[str] | None = None) -> tuple[dict, dict, di
     return features, errors, absent
 
 
+def features_of(spec: dict | None) -> dict[str, str]:
+    """{feature: "learn" | "parse"} — what Genie can return for a platform.
+
+    Read from the platform's `pyats:` block, so the allow-list an AI platform
+    sees is exactly what platforms.yml declares and two tests verify against
+    the installed Genie. Nothing outside it can be requested.
+    """
+    if not spec:
+        return {}
+    found = {f: "learn" for f in (spec.get("learn") or [])}
+    found.update({f: "parse" for f in (spec.get("parse") or {})})
+    return found
+
+
+def feature_result(device: str, feature: str, features: dict, errors: dict, absent: dict) -> dict:
+    """One feature's outcome from collect(), as a single answer.
+
+    Three outcomes, never conflated: `ok` with the data, `absent` (not
+    configured on this device — a real answer), or `error` (configured but
+    Genie returned nothing, or the session failed). An empty result is never
+    reported as `ok`.
+    """
+    if feature in features:
+        return {"device": device, "feature": feature, "status": "ok", "data": features[feature]}
+    if feature in absent:
+        return {"device": device, "feature": feature, "status": "absent", "reason": absent[feature]}
+    return {"device": device, "feature": feature, "status": "error",
+            "reason": errors.get(feature, f"{device}: pyATS collected nothing for '{feature}'")}
+
+
 def bgp_peers(tree) -> list[dict]:
     """Every BGP session in a Genie result: {vrf, af, peer, state}.
 

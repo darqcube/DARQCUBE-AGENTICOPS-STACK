@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import os
 
-from common import Backend, build, identifier
+from mcp.server.fastmcp import Context
+
+from common import Backend, build, identifier, require_role
 
 # 300s: a config push is four sequential device commands — fetch the running
 # config, snapshot state, push, snapshot again — and fetching a large config
@@ -66,21 +68,27 @@ def get_device_state(device: str) -> dict:
 if ALLOW_WRITE:
 
     @mcp.tool()
-    def push_device_config(device: str, lines: list[str]) -> dict:
+    def push_device_config(device: str, lines: list[str], ctx: Context) -> dict:
         """Push configuration lines to a device. THIS CHANGES THE NETWORK.
 
         The device's running configuration is archived before anything is sent.
+        The caller must hold the write role (MCP_WRITE_ROLE) when calls carry a
+        person's identity (MCP_AUTH_MODE=oidc).
 
         Args:
             device: the device name as it appears in the source of truth.
             lines: configuration lines to apply, in order.
         """
         identifier(device, "device")
+        # Registration is the first gate (MCP_ALLOW_WRITE); this is the second:
+        # the same tool, allowed for one person and refused for another.
+        who = require_role(ctx)
         if not lines:
             raise ValueError("no configuration lines supplied")
         result = api.post(f"/device/{device}/config", json={"lines": lines})
         return {
             "device": device,
+            "pushed_by": who["user"],
             "lines_sent": result["lines_sent"],
             "previous_config_archived_to": result["config_archived_to"],
             "output": result["output"],

@@ -56,7 +56,7 @@ to**. Changing one means changing every device. The dedicated range
 
 ```
 ! Cisco
-logging host 192.168.1.50 transport tcp port 1514    ! or udp — the stack listens on both
+logging host 192.0.2.10 transport tcp port 1514    ! or udp — the stack listens on both
 
 # MikroTik
 /system logging action set darqcube remote-port=1514

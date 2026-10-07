@@ -36,7 +36,7 @@ flowchart LR
       AU["Nornir · Netmiko<br/>TextFSM · TTP · pyATS<br/>:8100"]
     end
     subgraph MCPG["🔌 mcp"]
-      MS["6 servers<br/>internal only"]
+      MS["7 servers<br/>this host unless published"]
     end
   end
 
@@ -210,7 +210,7 @@ flowchart LR
 | Network intent | Infrahub | GraphQL; YAML + `make seed` | Infrahub UI |
 | Observability | Telegraf, Logstash, Prometheus, Loki | PromQL, LogQL | Grafana, Alertmanager |
 | Automation | Nornir, Netmiko, TextFSM, TTP, pyATS | Automation REST API | `make` targets |
-| AgenticOps | the three above, via six MCP servers | MCP | an AI platform |
+| AgenticOps | the three above, via seven MCP servers | MCP | an AI platform |
 
 AgenticOps adds no capability of its own: every MCP tool is a bounded view of
 something a script can already do, which is why the stack works the same with

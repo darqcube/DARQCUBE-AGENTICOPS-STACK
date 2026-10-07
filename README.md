@@ -27,7 +27,7 @@ Everything here works standalone. Grafana dashboards, Prometheus alerts, Loki
 log search and the automation API are all usable by a person with no AI
 involved.
 
-The six MCP servers are an *additional* interface onto the same data. Nothing in
+The seven MCP servers are an *additional* interface onto the same data. Nothing in
 the stack depends on them — set `ai_platform.enabled: false` in `site.yml`
 (which drops `mcp` from `COMPOSE_PROFILES`) and every other feature is
 unaffected. That is a structural property, not a claim: MCP sits at the bottom
@@ -86,7 +86,7 @@ flowchart LR
       AU["Nornir · Netmiko<br/>TextFSM · TTP · pyATS"]
     end
     subgraph MCPG["🔌 mcp"]
-      MS["6 servers"]
+      MS["7 servers"]
     end
   end
 
@@ -258,7 +258,7 @@ Other routes:
 
 ## What's in the box
 
-22 containers in four groups (render-hook only with auto-render). Select a group with
+23 containers in four groups (render-hook only with auto-render). Select a group with
 `docker ps --filter "label=com.darqcube.group=observability"`.
 
 | Group | Containers | Published |
@@ -266,9 +266,9 @@ Other routes:
 | **source-of-truth** | infrahub-server, infrahub-worker, neo4j, redis, rabbitmq, task-db, task-manager, render-hook (optional, auto-render) | Infrahub UI |
 | **observability** | telegraf, logstash, prometheus, loki, alertmanager, grafana, config-init | Grafana, Prometheus, Alertmanager, Loki, syslog, NetFlow, IPFIX |
 | **automation** | automation | the automation API |
-| **mcp** | mcp-infrahub, -prometheus, -loki, -grafana, -netmiko, -assurance | nothing — internal only |
+| **mcp** | mcp-infrahub, -prometheus, -loki, -grafana, -netmiko, -assurance, -pyats | this host only, unless published for an ai-platform |
 
-Seven of those are Infrahub and the services it requires; six MCP containers
+Seven of those are Infrahub and the services it requires; seven MCP containers
 come from one image.
 
 ### Dashboards

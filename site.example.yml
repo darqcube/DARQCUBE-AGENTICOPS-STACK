@@ -99,14 +99,45 @@ alerts:
 
 
 ai_platform:
-  # The six MCP servers give an AI platform read access to the stack. They are
-  # internal-only; see docs/how-to/connect-an-ai-platform.md to expose them.
+  # The seven MCP servers give an AI platform read access to the stack. By
+  # default they answer on this host only; `publish` below opens them to an
+  # ai-platform on another machine. docs/how-to/connect-an-ai-platform.md
   enabled: true
 
   # Whether an AI may PUSH CONFIGURATION to devices. false means the tool is
   # not registered at all — it cannot be discovered, let alone called. Turn
   # this on deliberately, not by default.
   allow_write: false
+
+  # --- an ai-platform on ANOTHER machine --------------------------------
+  # Every value here differs per deployment. Rather than typing them, generate
+  # them ON THE AI-PLATFORM HOST with scripts/ai-platform-connect.py and copy
+  # the result to sites/ai-platform.yml here; install.py merges it over this
+  # block. Fill them in by hand only if you prefer.
+  publish:
+    enabled: false
+    # This machine's address on the network the ai-platform host can reach.
+    # Empty = site.collector_ip (usually right). Find it with: ip -4 -br addr
+    bind_ip: ""
+
+  auth:
+    # token = the shared MCP_AUTH_TOKEN, one secret, no identity (default)
+    # oidc  = each caller's own JWT from the ai-platform's identity provider
+    # both  = either, e.g. while moving from one to the other
+    mode: token
+    # Exactly the "iss" claim in the ai-platform's tokens.
+    issuer: ""
+    # The provider's JWKS URL, as reachable FROM THIS MACHINE (which may not
+    # be the address in the issuer).
+    jwks_url: ""
+    # Comma-separated "aud" values to accept. Empty = do not check audience.
+    audiences: ""
+    # Role a caller needs for push_device_config (when allow_write is on).
+    write_role: darqcube-write
+
+  # Cap on one tool result, in KiB. Lower it (e.g. 64) for a small local model,
+  # whose whole context window can be smaller than the 512 default.
+  max_response_kb: 512
 
 
 source_of_truth:

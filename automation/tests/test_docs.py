@@ -74,9 +74,11 @@ def test_referenced_repo_paths_exist(doc):
     # Backticked paths that look like repo files, not commands or globs.
     candidates = re.findall(r"`((?:[a-z0-9_.-]+/)+[a-z0-9_.-]+\.(?:yml|yaml|py|conf|json|sh|tmpl|grok))`", text)
     missing = [c for c in set(candidates) if not (ROOT / c).exists()]
-    # generated/ is created at runtime; .env and the inventory are per-install
+    # generated/ is created at runtime; .env, the inventory and sites/ (the
+    # ai-platform connection file) are per-install
     missing = [m for m in missing if "generated/" not in m and not m.endswith(".env")
-               and not re.fullmatch(r"source-of-truth/devices/[^/]+\.ya?ml", m)]
+               and not re.fullmatch(r"source-of-truth/devices/[^/]+\.ya?ml", m)
+               and not re.fullmatch(r"sites/[^/]+\.ya?ml", m)]
     assert not missing, f"{doc.name} names files that do not exist: {sorted(missing)}"
 
 

@@ -6,7 +6,7 @@ are all usable by a person with no AI involved. An AI platform is an
 
 ## 1. Tools in — the MCP servers
 
-Six servers, all reached over the Docker network:
+Seven servers, all reached over the Docker network:
 
 | Server | Address | Gives the AI |
 |---|---|---|
@@ -16,6 +16,7 @@ Six servers, all reached over the Docker network:
 | `mcp-grafana` | `http://mcp-grafana:9004/mcp` | dashboards to link to |
 | `mcp-netmiko` | `http://mcp-netmiko:9005/mcp` | device config and parsed state |
 | `mcp-assurance` | `http://mcp-assurance:9006/mcp` | assurance checks, snapshots, parsed config |
+| `mcp-pyats` | `http://mcp-pyats:9007/mcp` | Genie structured models — BGP neighbors, interfaces, LLDP, platform |
 
 `mcp-infrahub` tools — fixed queries, each taking at most one validated name:
 
@@ -28,14 +29,37 @@ Six servers, all reached over the Docker network:
 | `get_site_services(site)` | the hosts at a site and the applications they serve |
 | `get_application_dependencies(application)` | the hosts, subnets, gateways and site devices an application depends on — "what breaks if X fails?" |
 
+`mcp-pyats` tools — a feature is a name from the platform's `pyats:` allow-list
+in `platforms.yml`, never a Genie command:
+
+| Tool | Answers |
+|---|---|
+| `list_pyats_features(device)` | which Genie features this device's platform has (`learn` or `parse`) |
+| `learn_device_feature(device, feature)` | Genie's structured model — `ok`, `absent` (not configured) or `error` |
+| `get_bgp_neighbors(device)` | every BGP session as VRF, address family, peer and state |
+
 The application tools return empty results until hosts and services are
 modelled — [model-applications.md](model-applications.md). With services
 modelled, `get_flow_summary` on `mcp-prometheus` also returns `by_application`.
 
-Transport is streamable-HTTP; auth is a bearer token:
+Transport is streamable-HTTP; auth is a bearer credential:
 
 ```
-Authorization: Bearer ${MCP_AUTH_TOKEN}
+Authorization: Bearer <credential>
+```
+
+`MCP_AUTH_MODE` decides what the credential is:
+
+| Mode | Credential | Use when |
+|---|---|---|
+| `token` (default) | the shared `MCP_AUTH_TOKEN` | one trusted client; no per-person identity |
+| `oidc` | the **caller's own JWT** from the ai-platform's identity provider, checked against its JWKS (issuer, audience, expiry) | the ai-platform has sign-in and forwards the user's token — every call is attributable to a person, and roles gate the write tool |
+| `both` | either | moving from one to the other, or keeping `make mcp-check` working with the token |
+
+Every request is logged with who made it and which tool it called:
+
+```
+INFO:     mcp.audit user=alice sub=4f1c… via=oidc server=netmiko rpc=tools/call tool=get_device_state
 ```
 
 ### If the AI platform runs in the same Compose project
@@ -43,23 +67,74 @@ Authorization: Bearer ${MCP_AUTH_TOKEN}
 Attach it to the `darqcube` network and use the service names above. Nothing to
 publish.
 
-### If it runs elsewhere
+### If it runs on another machine
 
-Publish the ports you need, in an override file rather than by editing
-`compose/mcp.yaml`:
+By default the ports are published on `127.0.0.1` only. Opening them to an
+ai-platform on another host takes three values that live **on the ai-platform
+side** — its identity provider's issuer, the URL its signing keys can be fetched
+from, and the address this stack reaches that host on — so they are generated
+there rather than typed on this VM. Every value differs per deployment; the
+examples below use documentation addresses (`192.0.2.10` for this stack,
+`192.0.2.1` for the ai-platform host).
 
-```yaml
-# compose.override.yaml
-services:
-  mcp-prometheus:
-    ports: ["9002:9002"]
-  mcp-loki:
-    ports: ["9003:9003"]
+**1. On the ai-platform host**, from a clone of this repository:
+
+```bash
+python3 scripts/ai-platform-connect.py \
+    --stack-host 192.0.2.10 \
+    --idp http://localhost:7080/realms/<realm> \
+    --token-header <header the ai-platform forwards the caller's token in> \
+    --max-response-kb 64
 ```
 
-They are unpublished by default because a bearer token is the only thing in
-front of them. Put them behind a reverse proxy with TLS before exposing them
-beyond a trusted network.
+It reads the provider's OpenID configuration, works out this machine's address
+on the route to the stack, and writes:
+
+| File | What it is | Goes to |
+|---|---|---|
+| `ai-platform.site.yml` | the `ai_platform:` block — publish, auth mode, issuer, JWKS URL, audiences | the stack VM, as `sites/ai-platform.yml` |
+| `mcp-servers.snippet.yaml` | the seven servers with their endpoints and credential source | the ai-platform's MCP server configuration |
+
+The issuer is kept exactly as tokens carry it (often `http://localhost:…`); only
+the JWKS URL is rewritten to an address the stack can reach. Add
+`--token-file user.jwt` to check a real token's `iss`, audiences and roles.
+
+**2. Copy it to the stack VM** (both files are gitignored — they name your
+addresses):
+
+```bash
+ssh <user>@192.0.2.10 mkdir -p ~/DARQCUBE-AGENTICOPS-STACK/sites
+scp ai-platform.site.yml <user>@192.0.2.10:~/DARQCUBE-AGENTICOPS-STACK/sites/ai-platform.yml
+```
+
+**3. On the stack VM**, apply it:
+
+```bash
+cd ~/DARQCUBE-AGENTICOPS-STACK
+git pull
+python3 install.py --step 2      # merges sites/ai-platform.yml into .env
+make mcp-apply                   # rebuild and recreate the MCP servers
+make mcp-check                   # 7 servers, tools listed (uses the shared token: mode both, or token)
+```
+
+`install.py` merges the file over `site.yml` if you have one, or — for an install
+done without a site file — changes only the MCP keys in the existing `.env`. The
+file may only contain `ai_platform`; it cannot touch credentials or ports. Check
+the VM can fetch the keys: `curl -s <jwks_url>`.
+
+**4. Register the servers** in the ai-platform from `mcp-servers.snippet.yaml`,
+then from the ai-platform host:
+
+```bash
+python3 scripts/mcp-check.py --host 192.0.2.10 --token-file user.jwt
+```
+
+Prefer `site.yml` by hand? The same keys are documented in `site.example.yml`
+under `ai_platform.publish` and `ai_platform.auth`.
+
+Publishing is for a trusted network. There is no TLS between components (see
+[INSTALL](../INSTALL.md)); put a reverse proxy with TLS in front before exposing
+the ports any further.
 
 ## 2. Alerts out — the Alertmanager webhook
 
@@ -116,12 +191,8 @@ docker compose up -d --force-recreate mcp-netmiko
 Confirm which you have:
 
 ```bash
-docker compose exec automation curl -sS \
-  -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
-  -H 'Accept: application/json, text/event-stream' \
-  -X POST http://mcp-netmiko:9005/mcp \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-# 2 tools = read only.  3 tools = push_device_config is live.
+make mcp-check
+# netmiko: 2 tools = read only.  3 tools = push_device_config is live.
 ```
 
 When enabled it archives the running config before sending anything, caps the
@@ -193,15 +264,15 @@ and assurance check. See
 What is here is built and tested; what a production integration needs on top
 depends on the platform, and is deliberately not guessed at:
 
-- **Identity.** Today all six servers share one `MCP_AUTH_TOKEN`. A platform
-  with multiple agents would want a token per agent so an audit log can say
-  *which* agent acted. The servers already stash `X-Agent-Id` from the request.
+- **Identity.** With `MCP_AUTH_MODE=oidc` each call carries the person's own
+  token and the audit log names them. In `token` mode all seven servers share one
+  `MCP_AUTH_TOKEN` and the log can only say "token".
 - **Per-tool authorisation.** `MCP_ALLOW_WRITE` is one flag over one tool.
   Finer control — this agent may read logs, that one may run checks — belongs
   in the platform, or in a registry in front of the servers.
 - **Approval on writes.** There is no human-in-the-loop step. A push happens
-  when the tool is called. If your platform has an approval concept, that is
-  where it belongs.
+  when the tool is called by someone holding `MCP_WRITE_ROLE` (in `oidc` mode).
+  If your platform has an approval concept, that is where it belongs.
 - **Rate limiting.** Nothing stops an agent looping over 400 devices. The
   per-device lock serialises one device; it does not bound overall volume.
 
@@ -221,9 +292,7 @@ for it in `mcp/servers/<server>.py` rather than a general one.
 ## Check the surface
 
 ```bash
-docker compose exec automation curl -sS \
-  -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
-  -H 'Accept: application/json, text/event-stream' \
-  -X POST http://mcp-prometheus:9002/mcp \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+make mcp-check
 ```
+
+A real MCP handshake against every server, listing its tools.

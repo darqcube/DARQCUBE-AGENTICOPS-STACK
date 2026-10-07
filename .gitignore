@@ -43,3 +43,6 @@ sites/*.yml
 # `make seed` reads source-of-truth/devices/*.yml and never the examples/ folder.
 source-of-truth/devices/*.yml
 source-of-truth/devices/*.yaml
+# Written by scripts/ai-platform-connect.py — they name this deployment's addresses
+ai-platform.site.yml
+mcp-servers.snippet.yaml

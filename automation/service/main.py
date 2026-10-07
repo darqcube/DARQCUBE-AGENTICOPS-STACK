@@ -1,7 +1,7 @@
 """The automation API — get and put information and configuration on devices.
 
 Every device operation in the stack goes through here, including the ones an AI
-platform calls: mcp-netmiko and mcp-assurance front THIS API rather than opening
+platform calls: mcp-netmiko, mcp-assurance and mcp-pyats front THIS API rather than opening
 their own SSH sessions. That keeps credentials, TextFSM parsing and error
 handling in exactly one place.
 
@@ -176,5 +176,51 @@ def device_config_structured(device: str, kind: str = Query("interfaces")):
         raise HTTPException(404, str(exc)) from exc
     except ttp_parse.TTPParseError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"{device}: {exc}") from exc
+
+
+# --- pyATS / Genie ---------------------------------------------------------
+# Read only. A feature must be in the platform's `pyats:` allow-list in
+# platforms.yml — there is no "run this Genie command" endpoint, for the same
+# reason there is no raw-CLI one.
+
+FEATURE_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+
+
+@app.get("/device/{device}/pyats/features")
+def device_pyats_features(device: str):
+    """What pyATS/Genie can return for this device's platform."""
+    check_device_name(device)
+    try:
+        return tasks.pyats_features(device)
+    except tasks.DeviceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"{device}: {exc}") from exc
+
+
+@app.get("/device/{device}/pyats/learn/{feature}")
+def device_pyats_learn(device: str, feature: str):
+    """Genie's structured model of one feature: status ok, absent or error."""
+    check_device_name(device)
+    if not FEATURE_RE.fullmatch(feature):
+        raise HTTPException(400, f"invalid feature name: {feature!r}")
+    try:
+        return tasks.pyats_learn(device, feature)
+    except tasks.DeviceError as exc:
+        raise HTTPException(400 if "not a pyATS feature" in str(exc) else 404, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"{device}: {exc}") from exc
+
+
+@app.get("/device/{device}/pyats/bgp")
+def device_pyats_bgp(device: str):
+    """BGP sessions as {vrf, af, peer, state}, from Genie."""
+    check_device_name(device)
+    try:
+        return tasks.pyats_bgp_neighbors(device)
+    except tasks.DeviceError as exc:
+        raise HTTPException(400 if "not a pyATS feature" in str(exc) else 404, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"{device}: {exc}") from exc

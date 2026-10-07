@@ -1,4 +1,7 @@
-mcp~=1.12
+# Pinned: 1.12 -> 1.30 silently added a Host allow-list (see common.build).
+mcp==1.30.*
+pyjwt[crypto]~=2.10
+anyio~=4.9
 httpx~=0.28
 pydantic~=2.9
 uvicorn~=0.34

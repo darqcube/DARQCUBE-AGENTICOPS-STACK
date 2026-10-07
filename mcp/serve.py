@@ -5,7 +5,7 @@ import importlib
 import os
 import sys
 
-VALID = ["infrahub", "prometheus", "loki", "grafana", "netmiko", "assurance"]
+VALID = ["infrahub", "prometheus", "loki", "grafana", "netmiko", "assurance", "pyats"]
 
 
 def main() -> int:

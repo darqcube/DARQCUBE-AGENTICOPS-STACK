@@ -322,3 +322,45 @@ def test_absent_feature_skips_its_rule(rows):
     result = engine.run_rules("ios_xe", rows("ios_xe"), {}, pyats_absent={"bgp": why})
     bgp = next(r for r in result["results"] if r["source"] == "pyats")
     assert bgp["status"] == "skipped" and bgp["detail"] == why
+
+
+# --- mcp-pyats: the allow-list and the three outcomes ----------------------
+
+def _platforms():
+    return yaml.safe_load((ROOT / "platforms.yml").read_text())
+
+
+def test_features_come_only_from_the_platform_declaration():
+    """What an AI platform may ask Genie for is exactly what platforms.yml
+    declares — learn models and parse commands, by name."""
+    plats = _platforms()
+    iosxe = next(p for p in plats.values() if (p.get("pyats") or {}).get("os") == "iosxe")
+    hvrp = next(p for p in plats.values() if (p.get("pyats") or {}).get("os") == "hvrp")
+    assert checks.features_of(iosxe["pyats"]) == {f: "learn" for f in iosxe["pyats"]["learn"]}
+    assert checks.features_of(hvrp["pyats"]) == {"bgp": "parse"}
+
+
+def test_a_platform_without_genie_offers_nothing():
+    assert checks.features_of(None) == {}
+    assert checks.features_of({}) == {}
+
+
+def test_feature_result_never_reports_empty_as_ok():
+    data = sample("iosxe-learn-bgp.json")
+    ok = checks.feature_result("router1", "bgp", {"bgp": data}, {}, {})
+    assert ok["status"] == "ok" and ok["data"] is data
+
+    absent = checks.feature_result("router1", "bgp", {}, {}, {"bgp": "not configured"})
+    assert absent["status"] == "absent" and "data" not in absent
+
+    failed = checks.feature_result("router1", "bgp", {}, {"bgp": "session refused"}, {})
+    assert failed["status"] == "error" and failed["reason"] == "session refused"
+
+    nothing = checks.feature_result("router1", "lldp", {}, {}, {})
+    assert nothing["status"] == "error", "a feature that came back with nothing must not pass"
+
+
+def test_bgp_neighbors_shape_is_the_same_across_oses():
+    for name in ("iosxe-learn-bgp.json", "hvrp-display-bgp-peer.json"):
+        sessions = checks.bgp_peers(sample(name))
+        assert sessions and all(set(s) == {"vrf", "af", "peer", "state"} for s in sessions), name

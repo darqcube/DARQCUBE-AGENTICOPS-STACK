@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SERVERS = ROOT / "mcp/servers"
 IMAGE = "darqcube/mcp:local"
 
-ALL = ["infrahub", "prometheus", "loki", "grafana", "netmiko", "assurance"]
+ALL = ["infrahub", "prometheus", "loki", "grafana", "netmiko", "assurance", "pyats"]
 
 pytestmark = pytest.mark.skipif(shutil.which("docker") is None, reason="docker not available")
 
@@ -98,7 +98,7 @@ def test_every_tool_has_a_docstring(server):
 def test_device_arguments_are_validated():
     """Device names reach a CLI command or a query selector, and they arrive
     from an AI platform rather than a person."""
-    for server in ("netmiko", "assurance", "prometheus", "loki", "infrahub"):
+    for server in ("netmiko", "assurance", "pyats", "prometheus", "loki", "infrahub"):
         source = (SERVERS / f"{server}.py").read_text()
         assert "identifier(" in source, f"{server}: no argument validation"
 
@@ -113,3 +113,19 @@ def test_infrahub_serves_the_service_model():
     for arg in ("application", "host", "site"):
         assert f'identifier({arg}, "{arg}")' in source, f"infrahub: '{arg}' is not validated"
 
+
+
+def test_pyats_takes_features_not_commands():
+    """mcp-pyats names a feature from the platform's allow-list; it never takes
+    a Genie command or parser name, which would be a passthrough by another name."""
+    source = (SERVERS / "pyats.py").read_text()
+    assert 'identifier(feature, "feature")' in source
+    assert not re.search(r"def \w+\([^)]*\b(command|parser)\s*:", source)
+
+
+def test_write_tool_checks_the_callers_role():
+    """Registration is the first gate on push_device_config; the caller's role
+    (when calls carry identity) is the second."""
+    source = (SERVERS / "netmiko.py").read_text()
+    push = source[source.index("def push_device_config"):]
+    assert "require_role(ctx)" in push.split("api.post")[0], "role is not checked before the push"

@@ -1,14 +1,17 @@
 # ---------------------------------------------------------------------------
 # GROUP: mcp — the tool surface an AI platform uses.
 #
-# Six containers from ONE image. MCP_SERVER selects the module, PORT the port.
+# Seven containers from ONE image. MCP_SERVER selects the module, PORT the port.
 #
 # OPTIONAL BY DESIGN. Drop `mcp` from COMPOSE_PROFILES and nothing else in the
 # stack loses a feature — Grafana, Prometheus, Loki and the automation API are
 # all still usable directly. Nothing depends on these servers.
 #
-# All six are `expose:` only. They are reached over the compose network, never
-# published to the host.
+# Published on MCP_BIND_IP, which defaults to 127.0.0.1: reachable from this
+# host only, exactly as unexposed as before. An ai-platform on ANOTHER machine
+# needs MCP_BIND_IP set to this host's address on the network it can route to
+# (site.yml ai_platform.publish) — then MCP_ALLOWED_HOSTS must name it too, and
+# install.py derives both. docs/how-to/connect-an-ai-platform.md
 # ---------------------------------------------------------------------------
 
 x-mcp: &mcp
@@ -24,6 +27,15 @@ x-mcp: &mcp
 
 x-mcp-env: &mcp-env
   MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?set in .env}
+  # token (shared secret) | oidc (the caller's own JWT) | both
+  MCP_AUTH_MODE: ${MCP_AUTH_MODE:-token}
+  MCP_OIDC_ISSUER: ${MCP_OIDC_ISSUER:-}
+  MCP_OIDC_JWKS_URL: ${MCP_OIDC_JWKS_URL:-}
+  MCP_OIDC_AUDIENCES: ${MCP_OIDC_AUDIENCES:-}
+  MCP_WRITE_ROLE: ${MCP_WRITE_ROLE:-darqcube-write}
+  # Host headers accepted besides loopback and the compose name (421 otherwise).
+  MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
+  MCP_MAX_RESPONSE_BYTES: ${MCP_MAX_RESPONSE_BYTES:-524288}
 
 x-mcp-health: &mcp-health
   test: ["CMD-SHELL", "python -c \"import os,urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:'+os.environ['PORT']+'/healthz').status==200 else 1)\""]
@@ -43,6 +55,7 @@ services:
       INFRAHUB_URL: http://infrahub-server:8000
       INFRAHUB_API_TOKEN: ${INFRAHUB_ADMIN_TOKEN:?set in .env}
     expose: ["9001"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9001:9001"]
     healthcheck: *mcp-health
 
   mcp-prometheus:
@@ -53,6 +66,7 @@ services:
       PORT: "9002"
       PROMETHEUS_URL: http://prometheus:9090
     expose: ["9002"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9002:9002"]
     healthcheck: *mcp-health
 
   mcp-loki:
@@ -63,6 +77,7 @@ services:
       PORT: "9003"
       LOKI_URL: http://loki:3100
     expose: ["9003"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9003:9003"]
     healthcheck: *mcp-health
 
   mcp-grafana:
@@ -74,7 +89,10 @@ services:
       GRAFANA_URL: http://grafana:3000
       GRAFANA_USER: ${GRAFANA_ADMIN_USER:-admin}
       GRAFANA_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env}
+      # How a person reaches Grafana, for the links this server hands out.
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-}
     expose: ["9004"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9004:9004"]
     healthcheck: *mcp-health
 
   mcp-netmiko:
@@ -88,6 +106,7 @@ services:
       # absent from tools/list entirely, not merely refused when called.
       MCP_ALLOW_WRITE: ${MCP_ALLOW_WRITE:-false}
     expose: ["9005"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9005:9005"]
     healthcheck: *mcp-health
 
   mcp-assurance:
@@ -98,4 +117,16 @@ services:
       PORT: "9006"
       AUTOMATION_URL: http://automation:8100
     expose: ["9006"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9006:9006"]
+    healthcheck: *mcp-health
+
+  mcp-pyats:
+    <<: *mcp
+    environment:
+      <<: *mcp-env
+      MCP_SERVER: pyats
+      PORT: "9007"
+      AUTOMATION_URL: http://automation:8100
+    expose: ["9007"]
+    ports: ["${MCP_BIND_IP:-127.0.0.1}:9007:9007"]
     healthcheck: *mcp-health

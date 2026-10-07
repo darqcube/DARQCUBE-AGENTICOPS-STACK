@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import time
 
-from common import Backend, build, duration, identifier, limit
+from common import Backend, build, duration, identifier, limit, literal
 
 api = Backend(os.environ.get("LOKI_URL", "http://loki:3100"))
 mcp = build("loki")
@@ -59,6 +59,7 @@ def search_device_logs(
         max_results: cap on returned lines (default 100, maximum 1000).
     """
     identifier(device, "device")
+    literal(term)
     window = duration(window)
     count = limit(max_results)
     entries = _range(window, count, f'{{device="{device}"}}', term)
@@ -93,6 +94,7 @@ def count_log_pattern(term: str, window: str = "1h") -> dict:
         term: literal substring to count. Not a regex.
         window: time window, e.g. "15m", "6h". Maximum 24h.
     """
+    literal(term)
     window = duration(window)
     safe = term.replace("\\", "\\\\").replace('"', '\\"')
     body = api.get(

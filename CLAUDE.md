@@ -33,7 +33,7 @@ Four groups, each with its own compose file and top-level directory:
 | source-of-truth | `source-of-truth/` | `compose/source-of-truth.yaml` | Infrahub — what should exist |
 | observability | `observability/` | `compose/observability.yaml` | Telegraf, Logstash, Prometheus, Loki, Alertmanager, Grafana |
 | automation | `automation/` | `compose/automation.yaml` | Nornir, Netmiko, TextFSM, TTP, pyATS, assurance |
-| mcp | `mcp/` | `compose/mcp.yaml` | six servers, one image |
+| mcp | `mcp/` | `compose/mcp.yaml` | seven servers, one image |
 
 Telegraf ingests SNMP, gNMI and NetFlow/IPFIX. **Logstash ingests syslog** — not Telegraf. That
 split is deliberate; don't merge them.
@@ -85,6 +85,9 @@ Use the Makefile rather than inventing `docker compose` invocations.
 | `make test` | stack tests — needs the stack up |
 | `make test-devices` | needs real devices |
 | `make verify` | exactly what `docs/INSTALL.md` says to verify |
+| `make mcp-apply` | rebuild and recreate the seven MCP servers (after a pull or an `.env` change) |
+| `make mcp-check` | a real MCP handshake + `tools/list` against every server |
+| `python3 scripts/ai-platform-connect.py` | **on the ai-platform host**: generate `sites/ai-platform.yml` + the MCP server snippet |
 
 ## Scale — 400 devices is the tested ceiling
 
@@ -190,14 +193,24 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | LLDP neighbours | a re-learned neighbour gets a new `remIndex`; count neighbours by name, not entries, or the port looks like a shared segment and the link vanishes. IOS has no LLDP on tunnels — tunnel links come from BGP |
 | Single-file bind mounts | `platforms.yml` is mounted as a file. `git pull` replaces it (new inode) and the running container keeps the old content — `docker compose restart infrahub-server` (and `automation`) after a pull that changes it, or `make render` renders the old platforms |
 | Genie fixtures | `automation/pyats/samples/*.json` are Genie's **own** golden test data, copied out of the installed package. Use them to test pyATS logic offline; don't hand-write Genie output |
+| MCP Host allow-list | the MCP SDK answers only `Host` headers on a server's allow-list and returns **421** for anything else — while `/healthz` (outside the MCP app) stays green. `FastMCP(name)` defaults to a loopback-only list; `common.build()` sets loopback + `mcp-<name>:*` + `MCP_ALLOWED_HOSTS`. `mcp` is pinned (`==1.30.*`) because a minor bump turned this on silently. Verify with `make mcp-check`, never `/healthz` |
+| MCP caller identity | the auth middleware puts the caller on the request scope; a tool reads it via its `Context` (`common.caller(ctx)` / `require_role(ctx)`). A ContextVar does **not** reach the tool — in a stateful session tools run in the session task, not the request task |
+| MCP sync tools | FastMCP runs a sync tool on the event loop; `common._Server` wraps every sync tool in a worker thread. Keep tools sync and let it — a slow device call otherwise stalls the whole server |
+| ai-platform overlay | `sites/ai-platform.yml` is generated on the ai-platform host (`scripts/ai-platform-connect.py`) and may contain **only** `ai_platform` — `merge_overlay` refuses anything else. Without a site file, `install.py` changes only the MCP keys in the existing `.env` (`set_env_values` appends keys an older `.env` lacks) |
 
 ## Don't
 
 - Add a **passthrough MCP tool** — no raw PromQL, LogQL, GraphQL, or `run_command(device, anything)`.
   Every tool builds its query server-side from bounded arguments. One passthrough tool makes every
   other boundary in the stack decorative.
-- **Publish MCP ports.** They are `expose:` only, reached over the Compose network.
+- **Publish MCP ports beyond `MCP_BIND_IP`.** They bind `127.0.0.1` by default; another host is
+  opened only through `ai_platform.publish` (which also sets `MCP_ALLOWED_HOSTS`). Never bind
+  `0.0.0.0` or add `ports:` in a tracked file.
+- **Name a specific ai-platform product** in code, docs or tests — say "ai-platform". Project-specific
+  values (such as the header an ai-platform forwards tokens in) are passed as arguments, never
+  hardcoded. `test_neutral.py` enforces this and the no-lab-addresses rule.
 - Register `push_device_config` when `MCP_ALLOW_WRITE` is false. It must be absent from `tools/list`,
   not merely refuse when called. Note the flag gates the MCP **tool** only — the automation API
-  beneath has no auth, so it is not a system-wide write switch. Don't describe it as one.
+  beneath has no auth, so it is not a system-wide write switch. Don't describe it as one. In
+  `oidc` mode it also calls `require_role(ctx)` before pushing — keep that first.
 - Add a component that isn't in one of the four groups without saying why.

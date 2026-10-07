@@ -7,6 +7,9 @@ import os
 from common import Backend, build, identifier
 
 URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
+# Where a PERSON reaches Grafana. URL above is the compose-network name, which
+# only containers can resolve; a link built from it opens nothing in a browser.
+PUBLIC_URL = (os.environ.get("GRAFANA_PUBLIC_URL") or URL).rstrip("/")
 USER = os.environ.get("GRAFANA_USER", "admin")
 PASSWORD = os.environ.get("GRAFANA_PASSWORD", "")
 
@@ -39,7 +42,7 @@ def get_dashboard_link(uid: str, device: str | None = None) -> dict:
         device: optional device to pre-select in the dashboard's variable.
     """
     identifier(uid, "uid")
-    url = f"{URL}/d/{uid}"
+    url = f"{PUBLIC_URL}/d/{uid}"
     if device:
         identifier(device, "device")
         url += f"?var-device={device}"

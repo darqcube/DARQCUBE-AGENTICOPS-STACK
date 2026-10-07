@@ -352,6 +352,57 @@ def run_assurance(device: str) -> dict:
     return result
 
 
+def pyats_features(device: str) -> dict:
+    """What pyATS/Genie can return for this device's platform. No device session."""
+    from automation.pyats.checks import features_of
+    from automation.pyats.testbed import pyats_spec
+
+    platform = get_nornir(device).inventory.hosts[device].data["infrahub_platform"]
+    spec = pyats_spec(platform)
+    found = features_of(spec)
+    return {
+        "device": device,
+        "platform": platform,
+        "supported": bool(found),
+        "os": (spec or {}).get("os"),
+        "features": found,
+        **({} if found else {"reason": f"platform '{platform}' has no pyats block in "
+                                       f"platforms.yml — use the TextFSM state instead"}),
+    }
+
+
+def pyats_learn(device: str, feature: str) -> dict:
+    """Genie's structured view of one feature, from the platform's allow-list.
+
+    Same session rules as run_assurance: unicon opens its own SSH session, so
+    the device lock is held for the whole collection.
+    """
+    from automation.pyats import checks as pyats_checks
+
+    known = pyats_features(device)
+    if feature not in known["features"]:
+        raise DeviceError(
+            f"{device}: '{feature}' is not a pyATS feature for platform "
+            f"'{known['platform']}'. Available: {sorted(known['features']) or 'none'}"
+        )
+    with device_lock(device):
+        features, errors, absent = pyats_checks.collect(device, {feature})
+    result = pyats_checks.feature_result(device, feature, features, errors, absent)
+    result["platform"] = known["platform"]
+    result["via"] = known["features"][feature]
+    return result
+
+
+def pyats_bgp_neighbors(device: str) -> dict:
+    """Every BGP session as {vrf, af, peer, state} — compact, any Genie OS."""
+    from automation.pyats import checks as pyats_checks
+
+    result = pyats_learn(device, "bgp")
+    if result["status"] == "ok":
+        result["sessions"] = pyats_checks.bgp_peers(result.pop("data"))
+    return result
+
+
 def snapshot_device(device: str, nr=None) -> dict:
     """A comparable point-in-time view of a device, for pre/post comparison."""
     from automation.assurance import engine

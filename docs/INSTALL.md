@@ -189,7 +189,8 @@ Six are **required**: `site.collector_ip`, `devices.ssh_user`,
 | `scale.metrics_retention` / `logs_retention` | how long to keep data | disk you have | ~105,000 series at 60s is about 4 GB per 15 days |
 | `ports.standard` | `true` for the usual ports, `false` for the non-colliding set | whether anything else uses 3000/8000/514 on this host | port conflicts at startup; `syslog` on 514 also needs root |
 | `alerts.webhook_url` | where alerts are delivered | optional | empty means alerts stay in the Alertmanager UI — no external dependency |
-| `ai_platform.enabled` | run the six MCP servers | optional | `false` removes no other feature |
+| `ai_platform.enabled` | run the seven MCP servers | optional | `false` removes no other feature |
+| `ai_platform.publish` / `auth` | open MCP to an ai-platform on another machine, and how callers are checked | optional — normally generated on the ai-platform host by `scripts/ai-platform-connect.py` | off = MCP answers on this host only — [how-to/connect-an-ai-platform.md](how-to/connect-an-ai-platform.md) |
 | `ai_platform.allow_write` | may an AI push configuration to devices | **leave `false` unless you mean it** | `true` registers the write tool; `false` means it does not exist to be called |
 | `source_of_truth.auto_render` | re-render collectors automatically on Infrahub changes | optional, default `false` | `true` adds the `auto-render` profile; then `make auto-render` once — [how-to/auto-render.md](how-to/auto-render.md) |
 
