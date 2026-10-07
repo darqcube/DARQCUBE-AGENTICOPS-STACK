@@ -39,8 +39,10 @@ EXPECTED = [
     "both_accepts_token", "both_accepts_jwt", "both_refuses_garbage",
     "empty_token_refused_at_startup", "oidc_without_issuer_refused_at_startup",
     "unknown_mode_refused_at_startup",
+    "audit_names_user_and_tool", "audit_omits_arguments",
     "tools_run_off_the_event_loop", "context_is_not_exposed_as_an_argument",
 ]
+
 
 
 @pytest.fixture(scope="module")

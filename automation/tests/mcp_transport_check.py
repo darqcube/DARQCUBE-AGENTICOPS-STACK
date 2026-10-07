@@ -165,6 +165,32 @@ def startup_checks():
     check("unknown_mode_refused_at_startup", lambda: (refuses(mode="open", token="x"), ""))
 
 
+def audit_checks():
+    """One audit line per request, naming the caller and the tool — never the
+    arguments."""
+    import logging
+
+    records: list[str] = []
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    handler = Capture()
+    audit = logging.getLogger("mcp.audit")
+    audit.addHandler(handler)
+    audit.setLevel(logging.INFO)
+    try:
+        APP.verifier = verifier("oidc")
+        call_push(c, f"Bearer {token(['darqcube-write'])}")
+    finally:
+        audit.removeHandler(handler)
+    line = next((r for r in records if "tool=push_device_config" in r), "")
+    check("audit_names_user_and_tool",
+          lambda: (line.startswith("audit ") and "user=alice" in line and "via=oidc" in line, records))
+    check("audit_omits_arguments", lambda: ("router1" not in " ".join(records), records))
+
+
 def offload_checks():
     tools = netmiko.mcp._tool_manager.list_tools()
     check("tools_run_off_the_event_loop",
@@ -175,7 +201,8 @@ def offload_checks():
 
 
 with TestClient(APP) as c:
-    for group in (host_checks, token_checks, oidc_checks, both_checks, startup_checks, offload_checks):
+    for group in (host_checks, token_checks, oidc_checks, both_checks, startup_checks, audit_checks,
+                  offload_checks):
         try:
             group()
         except Exception:

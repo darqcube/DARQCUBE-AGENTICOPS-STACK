@@ -56,10 +56,10 @@ Authorization: Bearer <credential>
 | `oidc` | the **caller's own JWT** from the ai-platform's identity provider, checked against its JWKS (issuer, audience, expiry) | the ai-platform has sign-in and forwards the user's token — every call is attributable to a person, and roles gate the write tool |
 | `both` | either | moving from one to the other, or keeping `make mcp-check` working with the token |
 
-Every request is logged with who made it and which tool it called:
+Every request is logged with who made it and which tool it called (`docker compose logs mcp-netmiko | grep audit`):
 
 ```
-INFO:     mcp.audit user=alice sub=4f1c… via=oidc server=netmiko rpc=tools/call tool=get_device_state
+audit user=alice sub=4f1c… via=oidc server=netmiko rpc=tools/call tool=get_device_state
 ```
 
 ### If the AI platform runs in the same Compose project

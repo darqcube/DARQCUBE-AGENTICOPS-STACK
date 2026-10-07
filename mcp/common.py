@@ -245,7 +245,7 @@ class _Auth:
         try:
             caller = self.verifier.verify(headers.get("authorization", ""))
         except AuthError as exc:
-            log.warning("denied server=%s reason=%s", self.server, exc)
+            log.warning("audit denied server=%s reason=%s", self.server, exc)
             response = JSONResponse({"error": "unauthorized"}, status_code=401)
             return await response(scope, receive, send)
 
@@ -260,7 +260,9 @@ class _Auth:
             return message
 
         await self.app(scope, recording_receive, send)
-        log.info("user=%s sub=%s via=%s server=%s %s", caller["user"], caller["sub"],
+        # Prefixed so `grep audit` finds it whatever log format is active —
+        # the MCP SDK configures a bare %(message)s format.
+        log.info("audit user=%s sub=%s via=%s server=%s %s", caller["user"], caller["sub"],
                  caller["via"], self.server, _rpc_summary(bytes(body)))
 
 
