@@ -24,13 +24,17 @@ SERVERS = [("infrahub", 9001), ("prometheus", 9002), ("loki", 9003), ("grafana",
            ("netmiko", 9005), ("assurance", 9006), ("pyats", 9007)]
 
 
-def env_token() -> str:
+def env_value(key: str) -> str:
     env = ROOT / ".env"
     if env.exists():
         for line in env.read_text().splitlines():
-            if line.startswith("MCP_AUTH_TOKEN="):
+            if line.startswith(f"{key}="):
                 return line.split("=", 1)[1].split("#")[0].strip()
     return ""
+
+
+def env_token() -> str:
+    return env_value("MCP_AUTH_TOKEN")
 
 
 def post(url: str, payload: dict, headers: dict) -> tuple[int, dict, list[dict]]:
@@ -70,7 +74,8 @@ def check(host: str, name: str, port: int, token: str) -> tuple[bool, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--host", default="127.0.0.1", help="where the MCP ports are published")
+    ap.add_argument("--host", default=env_value("MCP_BIND_IP") or "127.0.0.1",
+                    help="where the MCP ports are published (default: MCP_BIND_IP from .env)")
     ap.add_argument("--token", help="bearer credential (default: MCP_AUTH_TOKEN from .env)")
     ap.add_argument("--token-file", type=Path, help="read the bearer credential from a file, e.g. a user JWT")
     args = ap.parse_args()
