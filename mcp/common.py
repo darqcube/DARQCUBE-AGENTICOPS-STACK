@@ -49,6 +49,9 @@ MAX_RESPONSE_BYTES = int(os.environ.get("MCP_MAX_RESPONSE_BYTES") or 512 * 1024)
 
 AUTH_MODES = ("token", "oidc", "both")
 
+# Longer than common proxy pool idle timeouts (60 s and below), see serve().
+KEEP_ALIVE_SECONDS = 75
+
 log = logging.getLogger("mcp.audit")
 
 # Device and label values that reach a backend query. Deliberately strict:
@@ -372,4 +375,9 @@ def serve(mcp: FastMCP, port: int) -> None:
     import uvicorn
 
     print(f"auth mode: {verifier.mode}", flush=True)
-    uvicorn.run(_Auth(app, verifier, mcp.name), host="0.0.0.0", port=port, log_level="info")
+    # A gateway in front (an ai-platform's MCP proxy) reuses pooled keep-alive
+    # connections. uvicorn closes idle ones after 5 s by default, so a reused
+    # connection can be closed mid-request: "connection closed before message
+    # completed", intermittently. Outlive the proxy's pool instead.
+    uvicorn.run(_Auth(app, verifier, mcp.name), host="0.0.0.0", port=port, log_level="info",
+                timeout_keep_alive=KEEP_ALIVE_SECONDS)

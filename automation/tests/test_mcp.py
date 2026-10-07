@@ -129,3 +129,13 @@ def test_write_tool_checks_the_callers_role():
     source = (SERVERS / "netmiko.py").read_text()
     push = source[source.index("def push_device_config"):]
     assert "require_role(ctx)" in push.split("api.post")[0], "role is not checked before the push"
+
+
+def test_keep_alive_outlives_a_proxy_pool():
+    """uvicorn's 5 s default closes idle connections a gateway still has
+    pooled; the next request on one fails with "connection closed before
+    message completed". Seen intermittently behind an ai-platform's gateway."""
+    source = (ROOT / "mcp/common.py").read_text()
+    match = re.search(r"KEEP_ALIVE_SECONDS = (\d+)", source)
+    assert match and int(match.group(1)) > 60
+    assert "timeout_keep_alive=KEEP_ALIVE_SECONDS" in source
