@@ -164,7 +164,7 @@ if GRAPHS:
             },
             max_bytes=MAX_IMAGE_BYTES, content_type="image/png",
         )
-        image_id = IMAGES.put(png)
+        image_id = IMAGES.put(png, label=f"{device} {interface} {kind} {window}")
         url = f"{IMAGE_BASE_URL}/g/{image_id}.png"
         alt = f"{device} {interface} {kind}, last {window}"
         link = _dashboard_url("darqcube-interface", device, interface)

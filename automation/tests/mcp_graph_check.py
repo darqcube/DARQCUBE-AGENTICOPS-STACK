@@ -84,8 +84,13 @@ r = renders[-1] if renders else {}
 check("returns_markdown_image_on_the_public_base",
       lambda: (out["markdown"].startswith("![cr2 Et0/1 traffic, last 1h](http://192.0.2.10:9004/g/")
                and out["markdown"].endswith(".png)") and out["image_url"] in out["markdown"], out))
-check("image_id_is_short_and_unguessable",
-      lambda: (len(out["image_url"].rsplit("/", 1)[1]) == len("x" * 22 + ".png"), out["image_url"]))
+name = out["image_url"].rsplit("/", 1)[1]
+check("image_link_is_readable_with_a_random_suffix",
+      lambda: (name.startswith("cr2-et0-1-traffic-1h-") and name.endswith(".png")
+               and len(name.removesuffix(".png").rsplit("-", 1)[1]) == 10, name))
+other = call(device="cr2", interface="Et0/1", window="1h", kind="traffic")
+check("same_request_gets_a_different_link",
+      lambda: (other["image_url"] != out["image_url"], (out["image_url"], other["image_url"])))
 check("renders_only_the_fixed_dashboard_panel",
       lambda: (r.get("path") == "/render/d-solo/darqcube-interface/interface-detail"
                and r["params"]["panelId"] == 1, r))
@@ -126,7 +131,8 @@ with TestClient(common._Auth(app, verifier, "grafana", prefixes)) as client:
           lambda: (got.headers.get("x-content-type-options") == "nosniff"
                    and got.headers.get("content-security-policy") == "default-src 'none'"
                    and got.headers.get("cache-control", "").startswith("private"), dict(got.headers)))
-    check("unknown_image_404", lambda: (client.get("/g/" + "A" * 22 + ".png").status_code == 404, ""))
+    check("unknown_image_404",
+          lambda: (client.get("/g/cr2-et0-1-traffic-1h-abcdefghij.png").status_code == 404, ""))
     check("malformed_image_name_404",
           lambda: (client.get("/g/..%2F..%2Fetc%2Fpasswd").status_code == 404
                    and client.get("/g/abc.png").status_code == 404, ""))

@@ -41,10 +41,11 @@ starts Grafana's image renderer (container `grafana-renderer`, profile
 
 How the picture reaches the chat: chat platforms drop images inside tool
 results, so the tool keeps the PNG in memory and returns
-`![cr2 Et0/1 traffic, last 1h](http://192.0.2.10:9004/g/<id>.png)`. The model
-puts that line in its answer; the user's browser loads the image. The link is
-its own authorisation — a random 128-bit id that expires (15 minutes,
-`MCP_IMAGE_TTL_SECONDS`) — because an `<img>` cannot send a bearer token.
+`![cr2 Et0/1 traffic, last 1h](http://192.0.2.10:9004/g/cr2-et0-1-traffic-1h-k7m2x9q4ab.png)`.
+The model puts that line in its answer; the user's browser loads the image. The
+link is its own authorisation, because an `<img>` cannot send a bearer token:
+a readable label (models copy words reliably, and mangle long random strings)
+plus a 50-bit random suffix, forgotten after 15 minutes (`MCP_IMAGE_TTL_SECONDS`).
 
 - It renders panel 1 or 2 of the **Interface Detail** dashboard only, from
   validated arguments; a caller never names a dashboard, panel or query.

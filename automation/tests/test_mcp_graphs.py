@@ -26,7 +26,8 @@ pytestmark = pytest.mark.skipif(shutil.which("docker") is None, reason="docker n
 
 EXPECTED = [
     "render_tool_registered_when_enabled", "returns_markdown_image_on_the_public_base",
-    "image_id_is_short_and_unguessable", "renders_only_the_fixed_dashboard_panel",
+    "image_link_is_readable_with_a_random_suffix", "same_request_gets_a_different_link",
+    "renders_only_the_fixed_dashboard_panel",
     "render_request_carries_validated_vars_and_window", "render_expects_png_and_caps_size",
     "summary_has_the_numbers_in_readable_units", "summary_aggregates_across_series",
     "dashboard_link_scopes_device_and_interface",
