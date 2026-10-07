@@ -139,6 +139,11 @@ ai_platform:
   # whose whole context window can be smaller than the 512 default.
   max_response_kb: 512
 
+  # Graphs in the ai-platform's chat: starts Grafana's image renderer and
+  # registers render_interface_graph, which returns an image link the chat
+  # shows inline. Needs publish (a person's browser opens the image).
+  graphs: false
+
 
 source_of_truth:
   # Re-render collector configuration automatically when Infrahub's main

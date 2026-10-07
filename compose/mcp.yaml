@@ -91,6 +91,15 @@ services:
       GRAFANA_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env}
       # How a person reaches Grafana, for the links this server hands out.
       GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-}
+      # Graphs in chat (ai_platform.graphs): render_interface_graph is
+      # registered only when true — absent from tools/list otherwise.
+      MCP_GRAPHS_ENABLED: ${MCP_GRAPHS_ENABLED:-false}
+      # How a person's browser reaches THIS server, for image links.
+      MCP_IMAGE_BASE_URL: ${MCP_IMAGE_BASE_URL:-}
+      MCP_IMAGE_TTL_SECONDS: ${MCP_IMAGE_TTL_SECONDS:-900}
+      MCP_GRAPH_TZ: ${MCP_GRAPH_TZ:-UTC}
+      # The numbers behind a graph, for its text summary.
+      PROMETHEUS_URL: http://prometheus:9090
     expose: ["9004"]
     ports: ["${MCP_BIND_IP:-127.0.0.1}:9004:9004"]
     healthcheck: *mcp-health

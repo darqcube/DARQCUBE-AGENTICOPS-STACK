@@ -29,6 +29,35 @@ Seven servers, all reached over the Docker network:
 | `get_site_services(site)` | the hosts at a site and the applications they serve |
 | `get_application_dependencies(application)` | the hosts, subnets, gateways and site devices an application depends on — "what breaks if X fails?" |
 
+### Graphs in the chat (optional)
+
+`ai_platform.graphs: true` (or `--graphs` on `scripts/ai-platform-connect.py`)
+starts Grafana's image renderer (container `grafana-renderer`, profile
+`graphs`) and registers one more tool on `mcp-grafana`:
+
+| Tool | Answers |
+|---|---|
+| `render_interface_graph(device, interface, window, kind)` | a PNG of one interface's **traffic** or **errors** over the window, as a Markdown image link, plus the same numbers as text |
+
+How the picture reaches the chat: chat platforms drop images inside tool
+results, so the tool keeps the PNG in memory and returns
+`![cr2 Et0/1 traffic, last 1h](http://192.0.2.10:9004/g/<id>.png)`. The model
+puts that line in its answer; the user's browser loads the image. The link is
+its own authorisation — a random 128-bit id that expires (15 minutes,
+`MCP_IMAGE_TTL_SECONDS`) — because an `<img>` cannot send a bearer token.
+
+- It renders panel 1 or 2 of the **Interface Detail** dashboard only, from
+  validated arguments; a caller never names a dashboard, panel or query.
+- Images come from `MCP_IMAGE_BASE_URL` (`http://<published address>:9004`).
+  In production put an HTTPS reverse proxy in front and set that variable to
+  it: platforms that enforce a Content-Security-Policy load `https:` images only.
+- Tell the agent to paste the tool's `markdown` field verbatim — a model that
+  rewrites the URL breaks the image (the `summary` and `dashboard_url` still work).
+- Renders are headless Chromium: 2–8 s each, at most 4 at once, the container
+  capped at 1.5 GB.
+
+Apply on the stack host: `python3 install.py --step 2 && make mcp-apply && make up`.
+
 `mcp-pyats` tools — a feature is a name from the platform's `pyats:` allow-list
 in `platforms.yml`, never a Genie command:
 

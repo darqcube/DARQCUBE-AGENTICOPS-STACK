@@ -24,7 +24,7 @@ def main() -> int:
     count = len(tools.list_tools()) if tools else "?"
     print(f"mcp-{name} listening on :{port} with {count} tool(s)", flush=True)
 
-    serve(module.mcp, port)
+    serve(module.mcp, port, getattr(module, "PUBLIC_ROUTES", ()))
     return 0
 
 

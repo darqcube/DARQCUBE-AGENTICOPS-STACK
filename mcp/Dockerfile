@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY common.py serve.py ./
+COPY common.py images.py serve.py ./
 COPY servers ./servers
 
 ENV PYTHONUNBUFFERED=1

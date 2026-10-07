@@ -670,7 +670,17 @@ def test_dashboards_are_valid_and_point_at_provisioned_datasources():
             if v.get("type") == "query":
                 assert v["datasource"]["uid"] in datasources, f"{f.name}: variable {v['name']}"
     assert len(uids) == len(set(uids)), f"duplicate dashboard uid: {uids}"
-    assert {"darqcube-network", "darqcube-devices", "darqcube-netflow", "darqcube-applications", "darqcube-logs"} <= set(uids)
+    assert {"darqcube-network", "darqcube-devices", "darqcube-netflow", "darqcube-applications", "darqcube-logs",
+            "darqcube-interface"} <= set(uids)
+
+
+def test_graph_panels_keep_their_ids():
+    """mcp-grafana renders panels 1 and 2 of Interface Detail by id. Renumber
+    them and every graph in chat silently becomes the wrong panel."""
+    d = json.loads((DASHBOARDS / "interface.json").read_text())
+    panels = {p["id"]: p for p in d["panels"]}
+    assert "Traffic" in panels[1]["title"] and "Errors" in panels[2]["title"]
+    assert {v["name"]: v.get("multi") for v in d["templating"]["list"]} == {"device": False, "interface": False}
 
 
 def test_grafana_opens_on_a_shipped_dashboard():

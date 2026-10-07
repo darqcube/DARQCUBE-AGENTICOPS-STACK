@@ -152,6 +152,13 @@ services:
       # after that); air-gapped: docs/how-to/change-dashboards.md.
       GF_PLUGINS_PREINSTALL: ${GRAFANA_PLUGINS:-tamirsuliman-weathermap-panel@1.6.16}
       GF_PLUGINS_PREINSTALL_ASYNC: "false"
+      # Image rendering (graphs in an ai-platform's chat). Empty = off, which
+      # is the default; ai_platform.graphs in site.yml fills these and starts
+      # grafana-renderer (profile `graphs`).
+      GF_RENDERING_SERVER_URL: ${GRAFANA_RENDERER_URL:-}
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      # A render is a headless browser: bound how many run at once.
+      GF_RENDERING_CONCURRENT_RENDER_REQUEST_LIMIT: "4"
     volumes:
       - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
@@ -166,6 +173,21 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    networks: [darqcube]
+    restart: unless-stopped
+
+  # Grafana's image renderer — headless Chromium turning a panel into a PNG,
+  # for the graphs mcp-grafana links into an ai-platform's chat. Optional
+  # (profile `graphs`) and internal: only Grafana calls it, and it only ever
+  # loads Grafana. Memory-capped because a browser grows under load.
+  grafana-renderer:
+    image: grafana/grafana-image-renderer:${GRAFANA_RENDERER_VERSION:-v5.12.5}
+    labels:
+      com.darqcube.group: observability
+      com.darqcube.role: renderer
+    profiles: [graphs]
+    expose: ["8081"]
+    mem_limit: 1536m
     networks: [darqcube]
     restart: unless-stopped
 

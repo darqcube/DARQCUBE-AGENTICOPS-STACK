@@ -89,6 +89,18 @@ def limit(value: int | None, default: int = 100, maximum: int = 1000) -> int:
     return max(1, min(int(value), maximum))
 
 
+# Interface names carry slashes (Et0/0, GigabitEthernet1/0/1) that identifier()
+# rightly refuses. Still a closed alphabet: no spaces, quotes or braces, so a
+# name can sit inside a PromQL label matcher or a URL parameter safely.
+_INTERFACE = re.compile(r"^[A-Za-z][A-Za-z0-9_./:-]{0,63}$")
+
+
+def interface_name(value: str) -> str:
+    if not value or not _INTERFACE.fullmatch(value):
+        raise BoundsError(f"invalid interface: {value!r}")
+    return value
+
+
 def literal(value: str | None, what: str = "term", maximum: int = 256) -> str | None:
     """A free-text search term, length-capped. It is escaped where it is used;
     this only stops a caller sending a megabyte of it."""
@@ -109,6 +121,27 @@ class Backend:
 
     def post(self, path: str, json: dict | None = None) -> Any:
         return self._request("POST", path, json=json)
+
+    def get_bytes(self, path: str, params: dict | None = None, *, max_bytes: int,
+                  content_type: str) -> bytes:
+        """Raw bytes of one expected type — a rendered image, never JSON.
+
+        Its own cap: MAX_RESPONSE_BYTES bounds what reaches a MODEL, and an
+        image never does (the tool returns a link to it).
+        """
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        try:
+            response = self._client.get(url, params=params)
+        except httpx.RequestError as exc:
+            raise RuntimeError(f"{self.base_url} unreachable: {exc}") from exc
+        if response.status_code >= 400:
+            raise RuntimeError(f"GET {path} -> {response.status_code}: {response.text[:300]}")
+        got = response.headers.get("content-type", "")
+        if not got.startswith(content_type):
+            raise RuntimeError(f"GET {path} returned {got or 'no content type'}, not {content_type}")
+        if len(response.content) > max_bytes:
+            raise RuntimeError(f"GET {path} returned {len(response.content)} bytes, over {max_bytes}")
+        return response.content
 
     def _request(self, method: str, path: str, **kw) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"
@@ -237,11 +270,16 @@ class _Auth:
     stateful session the tool runs in the session's task, not the request's.
     """
 
-    def __init__(self, app, verifier: Verifier, server: str):
+    def __init__(self, app, verifier: Verifier, server: str, public_prefixes: tuple[str, ...] = ()):
         self.app, self.verifier, self.server = app, verifier, server
+        # Paths that authorise themselves (an image link is its own
+        # capability: a browser <img> cannot send a bearer token).
+        self.public_prefixes = public_prefixes
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["path"] == "/healthz":
+            return await self.app(scope, receive, send)
+        if self.public_prefixes and scope["path"].startswith(self.public_prefixes):
             return await self.app(scope, receive, send)
 
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
@@ -364,14 +402,21 @@ def build(name: str) -> FastMCP:
     )
 
 
-def serve(mcp: FastMCP, port: int) -> None:
-    """Run over streamable-HTTP with auth and a health endpoint."""
+def serve(mcp: FastMCP, port: int, public_routes: list[Route] | tuple = ()) -> None:
+    """Run over streamable-HTTP with auth and a health endpoint.
+
+    `public_routes` are served WITHOUT the bearer check and must authorise
+    themselves; each route's path up to its first parameter becomes an exempt
+    prefix (e.g. /g/{name} -> /g/).
+    """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s %(message)s")
     verifier = Verifier()
     app = mcp.streamable_http_app()
     app.router.routes.append(
         Route("/healthz", lambda r: PlainTextResponse("ok"), methods=["GET"])
     )
+    app.router.routes.extend(public_routes)
+    prefixes = tuple(r.path.split("{", 1)[0] for r in public_routes)
     import uvicorn
 
     print(f"auth mode: {verifier.mode}", flush=True)
@@ -379,5 +424,5 @@ def serve(mcp: FastMCP, port: int) -> None:
     # connections. uvicorn closes idle ones after 5 s by default, so a reused
     # connection can be closed mid-request: "connection closed before message
     # completed", intermittently. Outlive the proxy's pool instead.
-    uvicorn.run(_Auth(app, verifier, mcp.name), host="0.0.0.0", port=port, log_level="info",
+    uvicorn.run(_Auth(app, verifier, mcp.name, prefixes), host="0.0.0.0", port=port, log_level="info",
                 timeout_keep_alive=KEEP_ALIVE_SECONDS)

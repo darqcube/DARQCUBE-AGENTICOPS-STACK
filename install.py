@@ -298,7 +298,7 @@ PORT_VARS = {
 
 AUTH_MODES = ("token", "oidc", "both")
 AI_PLATFORM_KEYS = {
-    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb"},
+    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs"},
     "publish": {"enabled", "bind_ip"},
     "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role"},
 }
@@ -333,7 +333,21 @@ def ai_platform_env(site: dict, collector_ip: str, grafana_port: str) -> dict[st
     # inside the compose network.
     known_ip = collector_ip and collector_ip != "CHANGEME"
     env["GRAFANA_PUBLIC_URL"] = f"http://{collector_ip}:{grafana_port}" if known_ip else ""
+
+    # Graphs in chat: Grafana's renderer (profile `graphs`) plus the image
+    # links mcp-grafana returns, which a person's BROWSER opens — so they use
+    # the published address, the same one the ai-platform reaches MCP on.
+    graphs = as_bool(dig(site, "ai_platform.graphs"), "ai_platform.graphs")
+    env["MCP_GRAPHS_ENABLED"] = str(graphs).lower()
+    env["GRAFANA_RENDERER_URL"] = "http://grafana-renderer:8081/render" if graphs else ""
+    env["MCP_IMAGE_BASE_URL"] = f"http://{env['MCP_BIND_IP']}:9004" if graphs else ""
     return env
+
+
+def with_profile(profiles: str, name: str, wanted: bool) -> str:
+    """COMPOSE_PROFILES with `name` added or removed, order kept."""
+    items = [p for p in profiles.split(",") if p and p != name]
+    return ",".join(items + ([name] if wanted else []))
 
 
 def validate_ai_platform(site: dict) -> list[str]:
@@ -357,6 +371,12 @@ def validate_ai_platform(site: dict) -> list[str]:
     except SiteError as exc:
         problems.append(str(exc))
         publish = False
+    try:
+        if as_bool(dig(site, "ai_platform.graphs"), "ai_platform.graphs") and not publish:
+            problems.append("ai_platform.graphs needs ai_platform.publish.enabled — a person's "
+                            "browser opens the graph images, so the MCP ports must be reachable")
+    except SiteError as exc:
+        problems.append(str(exc))
     bind = str(dig(site, "ai_platform.publish.bind_ip", "") or "").strip()
     if publish and bind and bind != "CHANGEME":
         try:
@@ -475,6 +495,8 @@ def site_to_env(site: dict) -> dict[str, str]:
         profiles.append("mcp")
     if as_bool(dig(site, "source_of_truth.auto_render"), "source_of_truth.auto_render"):
         profiles.append("auto-render")
+    if as_bool(dig(site, "ai_platform.graphs"), "ai_platform.graphs"):
+        profiles.append("graphs")
     env["COMPOSE_PROFILES"] = ",".join(profiles)
     env["MCP_ALLOW_WRITE"] = str(
         as_bool(dig(site, "ai_platform.allow_write"), "ai_platform.allow_write")
@@ -903,6 +925,10 @@ def apply_ai_platform_to_env(path: Path) -> None:
     if dig(overlay, "ai_platform.allow_write") is not None:
         values["MCP_ALLOW_WRITE"] = str(
             as_bool(dig(overlay, "ai_platform.allow_write"), "ai_platform.allow_write")).lower()
+    # Without a site file nothing else rebuilds COMPOSE_PROFILES: keep the
+    # install's own profiles and only switch `graphs` on or off.
+    values["COMPOSE_PROFILES"] = with_profile(current.get("COMPOSE_PROFILES", ""), "graphs",
+                                              values["MCP_GRAPHS_ENABLED"] == "true")
     ENV.write_text(set_env_values(ENV.read_text(), values))
     os.chmod(ENV, 0o600)
     report_ai_platform(values, path.name)
@@ -914,8 +940,10 @@ def report_ai_platform(values: dict[str, str], source: str) -> None:
         return
     ok(f"ai-platform settings applied from {source}")
     info(f"MCP servers published on {values['MCP_BIND_IP']}:9001-9007 · "
-         f"auth {values['MCP_AUTH_MODE']}")
-    info("recreate them to take effect: make mcp-apply")
+         f"auth {values['MCP_AUTH_MODE']}"
+         + (" · graphs in chat on" if values.get("MCP_GRAPHS_ENABLED") == "true" else ""))
+    info("apply: make mcp-apply" + (" && make up   (starts the graph renderer)"
+                                    if values.get("MCP_GRAPHS_ENABLED") == "true" else ""))
 
 
 def configure_from_site(site_path: Path, args, overlay_path: Path | None = None) -> None:

@@ -139,3 +139,19 @@ def test_keep_alive_outlives_a_proxy_pool():
     match = re.search(r"KEEP_ALIVE_SECONDS = (\d+)", source)
     assert match and int(match.group(1)) > 60
     assert "timeout_keep_alive=KEEP_ALIVE_SECONDS" in source
+
+
+def test_render_tool_is_absent_unless_graphs_are_enabled():
+    """Like the write tool: off means not registered, and no image route."""
+    count = lambda out: int(re.search(r"with (\d+) tool", out).group(1))
+    assert count(start("grafana")) == 2
+    assert count(start("grafana", {"MCP_GRAPHS_ENABLED": "true"})) == 3
+    source = (SERVERS / "grafana.py").read_text()
+    assert 'PUBLIC_ROUTES = [Route("/g/{name}", _image, methods=["GET"])] if GRAPHS else []' in source
+
+
+def test_render_tool_takes_no_dashboard_panel_or_query():
+    source = (SERVERS / "grafana.py").read_text()
+    sig = source[source.index("def render_interface_graph("):].split(") -> dict:")[0]
+    assert not re.search(r"\b(uid|panel|panel_id|dashboard|query|url)\s*:", sig), sig
+    assert "interface_name(interface)" in source and 'identifier(device, "device")' in source

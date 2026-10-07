@@ -127,6 +127,7 @@ def site_overlay(args, issuer: str, jwks_url: str, audiences: list[str]) -> str:
         f'    audiences: "{",".join(audiences)}"',
         f"    write_role: {args.write_role}",
         f"  max_response_kb: {args.max_response_kb}",
+        f"  graphs: {'true' if args.graphs else 'false'}",
     ]
     return "\n".join(lines) + "\n"
 
@@ -176,6 +177,8 @@ def main() -> int:
     ap.add_argument("--write-role", default="darqcube-write")
     ap.add_argument("--allow-write", action="store_true",
                     help="register push_device_config (still gated by --write-role)")
+    ap.add_argument("--graphs", action="store_true",
+                    help="graphs in chat: start Grafana's renderer and register render_interface_graph")
     ap.add_argument("--max-response-kb", type=int, default=64,
                     help="cap on one tool result (default 64, for small local models)")
     ap.add_argument("--token-header", default="",
@@ -227,7 +230,8 @@ def main() -> int:
     print(f"  1. scp {overlay} {args.stack_user}@{args.stack_host}:{args.stack_dir}/sites/ai-platform.yml")
     print(f"     (create the directory first if needed: ssh {args.stack_user}@{args.stack_host} "
           f"mkdir -p {args.stack_dir}/sites)")
-    print(f"  2. on the stack VM:  cd {args.stack_dir} && git pull && python3 install.py --step 2 && make mcp-apply")
+    then_up = " && make up" if args.graphs else ""
+    print(f"  2. on the stack VM:  cd {args.stack_dir} && git pull && python3 install.py --step 2 && make mcp-apply{then_up}")
     print(f"  3. register the servers in {snippet} with the ai-platform")
     if not args.token_header:
         print("     — set --token-header to fill in the header the ai-platform forwards tokens in")

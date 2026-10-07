@@ -1,0 +1,185 @@
+{
+  "uid": "darqcube-interface",
+  "title": "Interface Detail",
+  "description": "One interface of one device: traffic in and out, errors. Also what the ai-platform renders as a graph in chat (panels 1 and 2 - keep their ids).",
+  "tags": [
+    "darqcube",
+    "snmp",
+    "interfaces"
+  ],
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
+  ],
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(interface_oper_status, device)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      },
+      {
+        "name": "interface",
+        "label": "Interface",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(interface_oper_status{device=\"$device\"}, ifName)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Traffic \u2014 $device $interface",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(interface_in_octets{device=\"$device\", ifName=\"$interface\"}[5m]) * 8",
+          "legendFormat": "in",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "darqcube-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "rate(interface_out_octets{device=\"$device\", ifName=\"$interface\"}[5m]) * 8",
+          "legendFormat": "out",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "darqcube-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Errors \u2014 $device $interface",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(interface_in_errors{device=\"$device\", ifName=\"$interface\"}[5m])",
+          "legendFormat": "in errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "darqcube-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "rate(interface_out_errors{device=\"$device\", ifName=\"$interface\"}[5m])",
+          "legendFormat": "out errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "darqcube-prometheus"
+          }
+        }
+      ]
+    }
+  ]
+}

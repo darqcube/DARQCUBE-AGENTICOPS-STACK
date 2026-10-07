@@ -13,7 +13,7 @@ loses a feature — nothing in the stack depends on them.
 | `mcp-infrahub` | 9001 | Infrahub | 8 |
 | `mcp-prometheus` | 9002 | Prometheus | 5 |
 | `mcp-loki` | 9003 | Loki | 3 |
-| `mcp-grafana` | 9004 | Grafana | 2 |
+| `mcp-grafana` | 9004 | Grafana | 2 (3 with graphs on) |
 | `mcp-netmiko` | 9005 | automation API | 2 (3 with writes on) |
 | `mcp-assurance` | 9006 | automation API | 4 |
 | `mcp-pyats` | 9007 | automation API (pyATS/Genie) | 3 |

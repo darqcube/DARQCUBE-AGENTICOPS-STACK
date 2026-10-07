@@ -372,3 +372,40 @@ def test_an_overlay_applies_to_an_existing_env(inst, tmp_path, monkeypatch):
     assert values["MCP_AUTH_MODE"] == "oidc"
     assert values["MCP_OIDC_JWKS_URL"] == "http://192.0.2.1:7080/realms/demo/certs"
     assert values["DEVICE_PASSWORD"] == "keep" and values["MCP_ALLOW_WRITE"] == "false"
+
+
+def test_graphs_are_off_unless_asked_for(inst, site):
+    env = inst.site_to_env(site)
+    assert env["MCP_GRAPHS_ENABLED"] == "false" and env["GRAFANA_RENDERER_URL"] == ""
+    assert "graphs" not in env["COMPOSE_PROFILES"]
+
+
+def test_graphs_start_the_renderer_and_link_on_the_published_address(inst, site):
+    site["site"]["collector_ip"] = "192.0.2.10"
+    site["ai_platform"]["publish"] = {"enabled": True, "bind_ip": ""}
+    site["ai_platform"]["graphs"] = True
+    env = inst.site_to_env(site)
+    assert env["MCP_GRAPHS_ENABLED"] == "true"
+    assert "graphs" in env["COMPOSE_PROFILES"].split(",")
+    assert env["GRAFANA_RENDERER_URL"] == "http://grafana-renderer:8081/render"
+    assert env["MCP_IMAGE_BASE_URL"] == "http://192.0.2.10:9004"
+
+
+def test_graphs_without_publish_are_refused(inst, site):
+    """A person's browser opens the images: unpublished, they cannot load."""
+    site["ai_platform"]["graphs"] = True
+    assert any("ai_platform.graphs needs ai_platform.publish" in p for p in inst.validate_ai_platform(site))
+
+
+def test_overlay_switches_only_the_graphs_profile(inst, tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text("SYSLOG_COLLECTOR_IP=192.0.2.10\nGRAFANA_PORT=13000\nCOMPOSE_PROFILES=devices,automation,mcp\n")
+    overlay = tmp_path / "ai-platform.yml"
+    overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n  graphs: true\n")
+    monkeypatch.setattr(inst, "ENV", env)
+    monkeypatch.setattr(inst, "local_addresses", lambda: set())
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["COMPOSE_PROFILES"] == "devices,automation,mcp,graphs"
+    overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n  graphs: false\n")
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["COMPOSE_PROFILES"] == "devices,automation,mcp"
