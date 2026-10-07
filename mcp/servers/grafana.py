@@ -111,7 +111,9 @@ def _summary(device: str, interface: str, window: str, kind: str) -> dict:
     scale = " * 8" if kind == "traffic" else ""
     out = {}
     for direction in ("in", "out"):
-        rate = f"rate({metric.format(d=direction)}{sel}[5m]){scale}"
+        # sum(): one number even if the series' labels changed in the window —
+        # taking the first of several series reported 0 next to a busy graph.
+        rate = f"sum(rate({metric.format(d=direction)}{sel}[5m])){scale}"
         stats = {
             "now": _scalar(rate),
             "avg": _scalar(f"avg_over_time(({rate})[{window}:1m])"),

@@ -101,7 +101,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(interface_in_octets{device=\"$device\", ifName=\"$interface\"}[5m]) * 8",
+          "expr": "sum by (device, ifName) (rate(interface_in_octets{device=\"$device\", ifName=\"$interface\"}[5m])) * 8",
           "legendFormat": "in",
           "datasource": {
             "type": "prometheus",
@@ -110,7 +110,7 @@
         },
         {
           "refId": "B",
-          "expr": "rate(interface_out_octets{device=\"$device\", ifName=\"$interface\"}[5m]) * 8",
+          "expr": "sum by (device, ifName) (rate(interface_out_octets{device=\"$device\", ifName=\"$interface\"}[5m])) * 8",
           "legendFormat": "out",
           "datasource": {
             "type": "prometheus",
@@ -163,7 +163,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(interface_in_errors{device=\"$device\", ifName=\"$interface\"}[5m])",
+          "expr": "sum by (device, ifName) (rate(interface_in_errors{device=\"$device\", ifName=\"$interface\"}[5m]))",
           "legendFormat": "in errors",
           "datasource": {
             "type": "prometheus",
@@ -172,7 +172,7 @@
         },
         {
           "refId": "B",
-          "expr": "rate(interface_out_errors{device=\"$device\", ifName=\"$interface\"}[5m])",
+          "expr": "sum by (device, ifName) (rate(interface_out_errors{device=\"$device\", ifName=\"$interface\"}[5m]))",
           "legendFormat": "out errors",
           "datasource": {
             "type": "prometheus",

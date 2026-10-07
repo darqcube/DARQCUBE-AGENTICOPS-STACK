@@ -681,6 +681,10 @@ def test_graph_panels_keep_their_ids():
     panels = {p["id"]: p for p in d["panels"]}
     assert "Traffic" in panels[1]["title"] and "Errors" in panels[2]["title"]
     assert {v["name"]: v.get("multi") for v in d["templating"]["list"]} == {"device": False, "interface": False}
+    for p in d["panels"]:
+        for t in p["targets"]:
+            assert t["expr"].startswith("sum by (device, ifName) ("), (
+                f"panel {p['id']}: unaggregated — a relabel within the window draws duplicate lines")
 
 
 def test_grafana_opens_on_a_shipped_dashboard():

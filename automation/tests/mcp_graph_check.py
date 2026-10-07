@@ -41,8 +41,12 @@ def fake_get_bytes(path, params=None, *, max_bytes, content_type):
     return PNG
 
 
+queries: list[str] = []
+
+
 def fake_prometheus_get(path, params=None):
     q = (params or {}).get("query", "")
+    queries.append(q)
     value = "5e6" if "max_over_time" in q else ("2e6" if "avg_over_time" in q else "1e6")
     return {"status": "success", "data": {"result": [{"metric": {}, "value": [0, value]}]}}
 
@@ -92,6 +96,8 @@ check("render_expects_png_and_caps_size",
       lambda: (r["content_type"] == "image/png" and r["max_bytes"] <= 4 * 1024 * 1024, r))
 check("summary_has_the_numbers_in_readable_units",
       lambda: (out["summary"]["in"] == {"now": "1.00 Mbps", "avg": "2.00 Mbps", "max": "5.00 Mbps"}, out["summary"]))
+check("summary_aggregates_across_series",
+      lambda: (queries and all("sum(rate(" in q for q in queries), queries[:3]))
 check("dashboard_link_scopes_device_and_interface",
       lambda: (out["dashboard_url"] == "http://192.0.2.10:13000/d/darqcube-interface?var-device=cr2&var-interface=Et0%2F1",
                out["dashboard_url"]))
