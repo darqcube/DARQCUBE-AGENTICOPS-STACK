@@ -130,6 +130,11 @@ devices and finishes in seconds.
 | assurance | `automation/assurance/rules.yml` | rules with `source: interfaces` or `source: pyats` |
 | comparison | **DeepDiff** | pre/post snapshots → what actually changed |
 
+**SSH host keys come from Infrahub** (`ssh_host_keys` on the device, `automation/hostkeys.py`).
+Pinned: Netmiko and pyATS accept only those keys, failing closed on a bad value. Not pinned: pyATS
+learns once, filed by device NAME (never by address — lab addresses reshuffle). `make seed` never
+clears the field (`OBSERVED` in seed.py); `make pin-host-keys` is the only writer besides the YAML.
+
 **What Genie actually supports — verified against the installed library, not the docs:**
 
 | Platform | unicon | Genie parsers | Genie `learn()` | pyATS used for |

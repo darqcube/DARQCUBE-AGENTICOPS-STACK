@@ -17,7 +17,8 @@ Every file is validated before anything is written, so one bad record among
 400 changes nothing rather than leaving a half-applied fleet.
 
 The YAML is the whole record. A field left out is reset to its schema default
-(or cleared), and a device's tags are set to exactly the list given. A value
+(or cleared), and a device's tags are set to exactly the list given — except
+the OBSERVED fields below (SSH host keys), which a record may leave out. A value
 edited in the Infrahub UI is therefore overwritten by the next seed — see
 docs/administration/infrahub-guide.md for which of the two owns what.
 
@@ -57,6 +58,13 @@ SECTIONS = (
     ("applications", "NetworkApplication"),
     ("services", "NetworkService"),
 )
+
+# Attributes that record what was OBSERVED on the device rather than intent —
+# written by operations (`make pin-host-keys`), not by the YAML. A record that
+# leaves one out keeps the value in Infrahub instead of resetting it, or every
+# seed would silently un-pin the fleet's SSH host keys. A record that sets one
+# (keys provisioned out of band) still wins.
+OBSERVED = {"NetworkDevice": ("ssh_host_keys",)}
 
 # Relationships a record may set. Component, Parent, Group and Profile
 # relationships are managed from the other side, or by Infrahub itself.
@@ -356,6 +364,8 @@ def apply(client, sections: dict, views: dict, existing: dict, ids: dict) -> dic
                 for attr_name, attr in attrs.items():
                     if attr_name == "name":
                         continue
+                    if attr_name in OBSERVED.get(kind, ()) and attr_name not in rec:
+                        continue   # kept: operations owns it unless the YAML says
                     getattr(node, attr_name).value = rec.get(attr_name, attr["default"])
                 for rel_name, rel in rels.items():
                     if rel["cardinality"] == "many":

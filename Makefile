@@ -27,7 +27,7 @@ AUTOMATION_PORT := $(strip $(AUTOMATION_PORT))
 # pytest for anyone who set up their own environment.
 PYTEST := $(if $(wildcard .venv/bin/pytest),.venv/bin/pytest,pytest)
 
-.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check schema seed render \
+.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check schema seed pin-host-keys render \
         config-get config-put state check snapshot config-parsed \
         test test-templates test-devices verify clean
 
@@ -83,6 +83,10 @@ BRANCH ?= main
 
 seed: ## Apply source-of-truth/devices/*.yml to Infrahub. BRANCH=x stages it for review
 	$(COMPOSE) exec -T -e INFRAHUB_BRANCH=$(strip $(BRANCH)) infrahub-server python /scripts/seed.py
+
+# Re-keyed on purpose (verified on the console)?  make pin-host-keys DEV=x REPLACE=1
+pin-host-keys: ## Scan devices' SSH host keys and pin them in Infrahub (DEV=x for one)
+	$(AUTO) python -m automation.hostkeys pin $(DEV) $(if $(REPLACE),--replace)
 
 auto-render: ## Register the Infrahub webhook for auto-render (needs the auto-render profile up)
 	$(COMPOSE) exec -T -e RENDER_HOOK_SECRET=$(strip $(RENDER_HOOK_SECRET)) infrahub-server python /scripts/render-hook.py --register

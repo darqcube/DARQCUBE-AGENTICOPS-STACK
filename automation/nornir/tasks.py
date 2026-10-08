@@ -21,6 +21,7 @@ from nornir_netmiko.tasks import netmiko_send_command, netmiko_send_config
 # Absolute import. `from textfsm import parse` would resolve to the INSTALLED
 # textfsm library, not automation/textfsm/ — see automation/__init__.py.
 from automation.textfsm import parse as textfsm_parse
+from automation import hostkeys
 
 INFRAHUB_URL = os.environ.get("INFRAHUB_URL", "http://infrahub-server:8000")
 INFRAHUB_TOKEN = os.environ.get("INFRAHUB_API_TOKEN", "")
@@ -166,8 +167,38 @@ def _build_nornir():
         host.platform = plats.get(infrahub_platform, {}).get("netmiko_type", infrahub_platform)
         host.username = DEVICE_USER
         host.password = DEVICE_PASSWORD
+        _apply_host_keys(host)
 
     return nr
+
+
+def _apply_host_keys(host) -> None:
+    """Pin the device's SSH host keys from Infrahub, when it has any.
+
+    Netmiko (paramiko) otherwise accepts whatever key a device presents. With
+    keys pinned it checks them and refuses anything else. A value that does
+    not parse fails CLOSED — no keys trusted, so no session — rather than
+    falling back to accepting any key; one device's typo never breaks the
+    inventory for the rest.
+    """
+    from nornir.core.inventory import ConnectionOptions
+
+    raw = getattr(getattr(host.data.get("InfrahubNode"), "ssh_host_keys", None), "value", None)
+    try:
+        keys = hostkeys.parse(raw)
+        host.data["ssh_host_keys_error"] = None
+    except hostkeys.HostKeyError as exc:
+        keys = []
+        host.data["ssh_host_keys_error"] = f"ssh_host_keys in Infrahub: {exc}"
+    host.data["ssh_host_keys"] = keys
+    if not (keys or host.data["ssh_host_keys_error"]):
+        return
+    trust = hostkeys.trust_file(f"{host.name}.paramiko", keys,
+                                [hostkeys.paramiko_name(str(host.hostname))])
+    host.connection_options["netmiko"] = ConnectionOptions(extras={
+        "ssh_strict": True, "system_host_keys": False,
+        "alt_host_keys": True, "alt_key_file": str(trust),
+    })
 
 
 def _one(result, device: str):

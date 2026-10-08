@@ -12,8 +12,12 @@ import os
 DEVICE_USER = os.environ.get("DEVICE_USER", "")
 DEVICE_PASSWORD = os.environ.get("DEVICE_PASSWORD", "")
 
-# SSH host keys, remembered by DEVICE NAME (the source-of-truth identity), not
-# by address. pyATS runs the system ssh, which by default files a key under the
+# SSH host keys. When Infrahub holds the device's keys (`ssh_host_keys`, set by
+# `make pin-host-keys` — see automation/hostkeys.py), they are the ONLY keys
+# accepted: StrictHostKeyChecking=yes against a file generated from Infrahub.
+#
+# Otherwise they are learned once and remembered by DEVICE NAME (the
+# source-of-truth identity), not by address. pyATS runs the system ssh, which by default files a key under the
 # IP it connected to — so when addresses move (a lab platform reshuffling them
 # on restart, DHCP), a device's unchanged key is filed under another device's
 # old IP and ssh refuses with "REMOTE HOST IDENTIFICATION HAS CHANGED".
@@ -24,8 +28,15 @@ DEVICE_PASSWORD = os.environ.get("DEVICE_PASSWORD", "")
 KNOWN_HOSTS = os.environ.get("PYATS_KNOWN_HOSTS", "/app/automation/configs/known_hosts")
 
 
-def ssh_options(device: str) -> str:
-    """ssh options for one device's pyATS session."""
+def ssh_options(device: str, pinned: str | None = None) -> str:
+    """ssh options for one device's pyATS session.
+
+    `pinned`: a known_hosts file generated from the keys in Infrahub. With it,
+    only those keys are accepted and nothing is learned.
+    """
+    if pinned:
+        return (f"-o HostKeyAlias={device} -o StrictHostKeyChecking=yes "
+                f"-o UserKnownHostsFile={pinned} -o GlobalKnownHostsFile=/dev/null")
     return (f"-o HostKeyAlias={device} -o StrictHostKeyChecking=accept-new "
             f"-o UserKnownHostsFile={KNOWN_HOSTS}")
 
@@ -45,9 +56,15 @@ def build_testbed(device: str):
     """A one-device pyATS testbed plus its spec, or NoPyatsSupport."""
     from pyats.topology import loader
 
+    from automation import hostkeys
     from automation.nornir import tasks
 
     host = tasks.get_nornir(device).inventory.hosts[device]
+    if host.data.get("ssh_host_keys_error"):
+        # Fail closed: a broken pin must never fall back to learning a key.
+        raise tasks.DeviceError(f"{device}: {host.data['ssh_host_keys_error']}")
+    keys = host.data.get("ssh_host_keys") or []
+    pinned = str(hostkeys.trust_file(f"{device}.ssh", keys, [device])) if keys else None
     platform = host.data["infrahub_platform"]
     spec = pyats_spec(platform)
     if not spec:
@@ -69,7 +86,7 @@ def build_testbed(device: str):
                     "cli": {
                         "protocol": "ssh",
                         "ip": str(host.hostname).split("/")[0],
-                        "ssh_options": ssh_options(device),
+                        "ssh_options": ssh_options(device, pinned),
                     }
                 },
             }

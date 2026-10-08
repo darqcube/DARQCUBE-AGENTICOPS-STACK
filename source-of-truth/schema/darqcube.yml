@@ -18,6 +18,8 @@
 # change: edit here, `make schema`, then set the value in the YAML.
 #
 # Device credentials are deliberately NOT modelled here. They live in .env.
+# Device SSH host keys ARE (ssh_host_keys): public, and the identity check
+# every SSH session makes — see automation/hostkeys.py.
 # ---------------------------------------------------------------------------
 version: "1.0"
 
@@ -120,6 +122,11 @@ nodes:
         kind: Text
         optional: true
         description: DNS name to poll and connect to. Wins over management_ip. One of the two is required.
+
+      - name: ssh_host_keys
+        kind: TextArea
+        optional: true
+        description: Pinned SSH host public keys, one 'type base64' per line. Set by make pin-host-keys; kept by make seed.
 
       - name: environment
         kind: Dropdown

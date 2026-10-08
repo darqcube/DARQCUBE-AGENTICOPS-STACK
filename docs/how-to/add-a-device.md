@@ -91,6 +91,10 @@ curl -sSG localhost:${LOKI_PORT:-3100}/loki/api/v1/query_range \
 make state DEV=router2
 ```
 
+Then pin its SSH host key, so every session checks it is talking to this
+device: `make pin-host-keys DEV=router2` — see
+[pin-ssh-host-keys.md](pin-ssh-host-keys.md).
+
 If metrics do not appear, see [troubleshooting.md](troubleshooting.md#a-device-is-not-appearing-in-prometheus).
 
 ## Removing a device

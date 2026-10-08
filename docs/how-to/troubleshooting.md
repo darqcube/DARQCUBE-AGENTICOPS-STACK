@@ -141,6 +141,20 @@ docker compose logs <service> | tail -40
 | `telegraf` | a bad OID or symbolic MIB name; look for `E!` |
 | any | a port already in use — `./scripts/preflight.sh` |
 
+## SSH refused: host key changed or not trusted
+
+`REMOTE HOST IDENTIFICATION HAS CHANGED`, `Host key verification failed`, or
+Netmiko's `not found in known_hosts`: the device presented a key other than
+the one pinned in Infrahub (or learned on first connect). An address change
+alone never causes this — keys are filed by device name. Check the device's
+fingerprint on its console; if it was re-keyed or replaced on purpose:
+
+```bash
+make pin-host-keys DEV=router2 REPLACE=1
+```
+
+See [pin-ssh-host-keys.md](pin-ssh-host-keys.md).
+
 ## Everything looks healthy but nothing works
 
 Services can all be green while nothing is connected. That is what layer 3 of

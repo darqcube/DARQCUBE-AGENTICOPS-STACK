@@ -15,6 +15,7 @@ files and commands. If you are looking for *what a component is*, see
 | Parse a device **configuration** into structure | [add-a-ttp-template.md](add-a-ttp-template.md) |
 | Add or change an assurance check | [change-assurance-rules.md](change-assurance-rules.md) |
 | Parse a new vendor's syslog format | [add-a-syslog-format.md](add-a-syslog-format.md) |
+| Make every SSH session verify the device's host key (from Infrahub) | [pin-ssh-host-keys.md](pin-ssh-host-keys.md) |
 
 ## Monitoring
 
