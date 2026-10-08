@@ -9,10 +9,25 @@ from __future__ import annotations
 
 import os
 
-from automation.nornir import tasks
-
 DEVICE_USER = os.environ.get("DEVICE_USER", "")
 DEVICE_PASSWORD = os.environ.get("DEVICE_PASSWORD", "")
+
+# SSH host keys, remembered by DEVICE NAME (the source-of-truth identity), not
+# by address. pyATS runs the system ssh, which by default files a key under the
+# IP it connected to — so when addresses move (a lab platform reshuffling them
+# on restart, DHCP), a device's unchanged key is filed under another device's
+# old IP and ssh refuses with "REMOTE HOST IDENTIFICATION HAS CHANGED".
+# Keyed by name, an address change is irrelevant; a genuinely changed key on a
+# known device is still refused. A device never seen before is learned once
+# (accept-new). The file lives under configs/ — bind-mounted, gitignored —
+# so learned keys survive container rebuilds.
+KNOWN_HOSTS = os.environ.get("PYATS_KNOWN_HOSTS", "/app/automation/configs/known_hosts")
+
+
+def ssh_options(device: str) -> str:
+    """ssh options for one device's pyATS session."""
+    return (f"-o HostKeyAlias={device} -o StrictHostKeyChecking=accept-new "
+            f"-o UserKnownHostsFile={KNOWN_HOSTS}")
 
 
 class NoPyatsSupport(RuntimeError):
@@ -21,12 +36,16 @@ class NoPyatsSupport(RuntimeError):
 
 def pyats_spec(platform: str) -> dict | None:
     """The `pyats:` block for a platform, or None if it has none."""
+    from automation.nornir import tasks   # lazy: keeps ssh_options() testable offline
+
     return tasks.platforms().get(platform, {}).get("pyats")
 
 
 def build_testbed(device: str):
     """A one-device pyATS testbed plus its spec, or NoPyatsSupport."""
     from pyats.topology import loader
+
+    from automation.nornir import tasks
 
     host = tasks.get_nornir(device).inventory.hosts[device]
     platform = host.data["infrahub_platform"]
@@ -50,6 +69,7 @@ def build_testbed(device: str):
                     "cli": {
                         "protocol": "ssh",
                         "ip": str(host.hostname).split("/")[0],
+                        "ssh_options": ssh_options(device),
                     }
                 },
             }

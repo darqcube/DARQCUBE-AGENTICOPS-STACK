@@ -364,3 +364,37 @@ def test_bgp_neighbors_shape_is_the_same_across_oses():
     for name in ("iosxe-learn-bgp.json", "hvrp-display-bgp-peer.json"):
         sessions = checks.bgp_peers(sample(name))
         assert sessions and all(set(s) == {"vrf", "af", "peer", "state"} for s in sessions), name
+
+
+
+# --- ssh host keys: by device name, not address ----------------------------
+
+def test_host_keys_are_remembered_by_device_name():
+    """A lab platform reshuffled addresses on restart: every router's unchanged
+    key was then filed under another router's old IP, and pyATS refused all of
+    them ("REMOTE HOST IDENTIFICATION HAS CHANGED"). Keyed by the device name
+    from the source of truth, an address change cannot do that."""
+    from automation.pyats import testbed
+
+    opts = testbed.ssh_options("cr2")
+    assert "-o HostKeyAlias=cr2" in opts
+    assert f"-o UserKnownHostsFile={testbed.KNOWN_HOSTS}" in opts
+
+
+def test_a_changed_key_on_a_known_device_is_still_refused():
+    """accept-new learns a NEW device once; it never overwrites a known key.
+    Turning checking off would hide an impostor device."""
+    from automation.pyats import testbed
+
+    opts = testbed.ssh_options("cr2")
+    assert "StrictHostKeyChecking=accept-new" in opts
+    assert "StrictHostKeyChecking=no" not in opts and "/dev/null" not in opts
+
+
+def test_learned_keys_survive_a_rebuild():
+    """configs/ is bind-mounted and gitignored: keys outlive the container and
+    never reach the repository."""
+    from automation.pyats import testbed
+
+    assert testbed.KNOWN_HOSTS.startswith("/app/automation/configs/")
+    assert "automation/configs/*" in (ROOT / ".gitignore").read_text()
