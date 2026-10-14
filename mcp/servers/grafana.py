@@ -18,7 +18,7 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
 from common import Backend, BoundsError, build, duration, identifier, interface_name
-from images import ImageStore
+from images import ID as IMAGE_ID, ImageStore
 
 URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
 # Where a PERSON reaches Grafana. URL above is the compose-network name, which
@@ -136,7 +136,9 @@ if GRAPHS:
 
         Put the returned `markdown` in your answer EXACTLY as given — it shows
         the graph to the user. Never write or alter an image URL yourself.
-        The `summary` holds the same numbers as text.
+        The link expires after 15 minutes: call this tool again for EVERY graph
+        request, even one already shown earlier in the chat — never reuse an
+        old image link. The `summary` holds the same numbers as text.
 
         Args:
             device: the device name as it appears in the source of truth.
@@ -178,20 +180,42 @@ if GRAPHS:
         }
 
 
+# Shown in place of a graph whose link has expired (IMAGE_TTL passed, or the
+# server restarted — the store is memory only). A bare 404 left a broken image
+# nobody could explain, typically after a model re-used a link from earlier in
+# the chat. Static: nothing from the request is reflected into it.
+EXPIRED_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="120" viewBox="0 0 1000 120">'
+    '<rect width="1000" height="120" rx="8" fill="#1f2937"/>'
+    '<text x="32" y="52" font-family="sans-serif" font-size="24" fill="#f3f4f6">'
+    'Graph expired</text>'
+    '<text x="32" y="88" font-family="sans-serif" font-size="18" fill="#9ca3af">'
+    'Graph links last a short while. Ask again for a fresh graph.</text></svg>'
+).encode()
+
+_LOCKED_DOWN = {
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 async def _image(request: Request) -> Response:
     """GET /g/<id>.png — the link IS the authorisation (see images.py)."""
     name = request.path_params["name"]
-    found = IMAGES.get(name[:-4]) if name.endswith(".png") else None
+    image_id = name[:-4] if name.endswith(".png") else ""
+    if not IMAGE_ID.fullmatch(image_id):
+        return PlainTextResponse("not found", status_code=404)
+    found = IMAGES.get(image_id)
     if not found:
-        return PlainTextResponse("not found or expired", status_code=404)
+        # 200, not 404: an <img> shows the body of a successful response only.
+        log.info("audit image expired server=grafana id=%s…", name[:6])
+        return Response(EXPIRED_SVG, media_type="image/svg+xml",
+                        headers={"Cache-Control": "no-store", **_LOCKED_DOWN})
     data, content_type = found
     log.info("audit image served server=grafana id=%s…", name[:6])
     return Response(data, media_type=content_type, headers={
-        "Cache-Control": f"private, max-age={IMAGE_TTL}",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'",
-        "Referrer-Policy": "no-referrer",
-    })
+        "Cache-Control": f"private, max-age={IMAGE_TTL}", **_LOCKED_DOWN})
 
 
 PUBLIC_ROUTES = [Route("/g/{name}", _image, methods=["GET"])] if GRAPHS else []

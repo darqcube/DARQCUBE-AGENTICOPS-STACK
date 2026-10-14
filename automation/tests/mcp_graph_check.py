@@ -131,8 +131,14 @@ with TestClient(common._Auth(app, verifier, "grafana", prefixes)) as client:
           lambda: (got.headers.get("x-content-type-options") == "nosniff"
                    and got.headers.get("content-security-policy") == "default-src 'none'"
                    and got.headers.get("cache-control", "").startswith("private"), dict(got.headers)))
-    check("unknown_image_404",
-          lambda: (client.get("/g/cr2-et0-1-traffic-1h-abcdefghij.png").status_code == 404, ""))
+    def expired():
+        got = client.get("/g/cr2-et0-1-traffic-1h-abcdefghij.png")
+        ok = (got.status_code == 200 and got.headers["content-type"].startswith("image/svg+xml")
+              and b"Graph expired" in got.content and got.headers.get("cache-control") == "no-store"
+              and got.headers.get("content-security-policy") == "default-src 'none'"
+              and b"abcdefghij" not in got.content)
+        return ok, f"{got.status_code} {dict(got.headers)}"
+    check("expired_image_shows_a_placeholder", expired)
     check("malformed_image_name_404",
           lambda: (client.get("/g/..%2F..%2Fetc%2Fpasswd").status_code == 404
                    and client.get("/g/abc.png").status_code == 404, ""))

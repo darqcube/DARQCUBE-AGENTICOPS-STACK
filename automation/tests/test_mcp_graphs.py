@@ -4,8 +4,9 @@ Pinned: the tool renders ONE fixed panel of one fixed dashboard from validated
 arguments (no dashboard, panel or query from the caller); it returns a
 Markdown image on the published base URL with a short unguessable id, plus the
 numbers as text; the image route serves without a bearer token (an <img>
-cannot send one) while /mcp still requires one; images expire and the store is
-bounded by count and bytes.
+cannot send one) while /mcp still requires one; images expire, an expired link
+shows a placeholder rather than a broken image, and the store is bounded by
+count and bytes.
 
 Needs darqcube/mcp:local. No stack: mcp_graph_check.py replaces Grafana's
 render endpoint and Prometheus.
@@ -34,7 +35,7 @@ EXPECTED = [
     "errors_kind_uses_the_errors_panel",
     "bad_interface_refused", "bad_device_refused", "window_over_24h_refused", "unknown_kind_refused",
     "image_served_without_a_bearer_token", "image_response_is_locked_down",
-    "unknown_image_404", "malformed_image_name_404", "exemption_is_only_the_image_route",
+    "expired_image_shows_a_placeholder", "malformed_image_name_404", "exemption_is_only_the_image_route",
     "store_returns_what_it_kept", "store_forgets_after_ttl",
     "store_evicts_oldest_by_count", "store_evicts_oldest_by_bytes",
 ]

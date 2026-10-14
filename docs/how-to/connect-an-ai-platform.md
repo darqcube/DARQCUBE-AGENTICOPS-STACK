@@ -46,6 +46,10 @@ The model puts that line in its answer; the user's browser loads the image. The
 link is its own authorisation, because an `<img>` cannot send a bearer token:
 a readable label (models copy words reliably, and mangle long random strings)
 plus a 50-bit random suffix, forgotten after 15 minutes (`MCP_IMAGE_TTL_SECONDS`).
+After that, or after the server restarts (images are kept in memory only), the
+link shows a small "Graph expired" image instead of a broken one. Ask again for
+a fresh graph — and tell your agents to call `render_interface_graph` for every
+graph request, never re-using a link from earlier in the chat.
 
 - It renders panel 1 or 2 of the **Interface Detail** dashboard only, from
   validated arguments; a caller never names a dashboard, panel or query.
