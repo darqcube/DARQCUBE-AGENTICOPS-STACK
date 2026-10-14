@@ -177,11 +177,13 @@ def get_application(application: str) -> dict:
 
 @mcp.tool()
 def get_host(host: str) -> dict:
-    """Get one host (server, workstation, gateway): address, site, subnet and
-    its gateway device, and the services it runs with their applications.
+    """Get one host — a server, workstation or appliance, NOT a router or
+    switch (use get_device for those): address, site, subnet and its gateway
+    device, and the services it runs with their applications.
 
     Args:
-        host: the host name, exactly as in the source of truth.
+        host: the host name exactly as in the source of truth, e.g. "srv-01" —
+            a name, never a description (see get_site_services for names).
     """
     identifier(host, "host")
     data = _query(
@@ -193,6 +195,12 @@ def get_host(host: str) -> dict:
     )
     nodes = _nodes(data["NetworkHost"])
     if not nodes:
+        # Models reach for get_host with a router's name; say where it lives.
+        device = _query("query ($n: String!) { NetworkDevice(name__value: $n) { count } }",
+                        {"n": host})
+        if device["NetworkDevice"]["count"]:
+            return {"found": False, "host": host,
+                    "error": f"'{host}' is a network device, not a host: use get_device"}
         return {"found": False, "host": host, "error": "not in the source of truth"}
     h = nodes[0]
     h["site"] = (_node(h.get("site")) or {}).get("name")

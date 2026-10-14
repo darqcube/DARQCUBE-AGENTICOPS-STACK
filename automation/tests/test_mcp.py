@@ -115,6 +115,36 @@ def test_infrahub_serves_the_service_model():
 
 
 
+def test_get_host_points_a_router_name_to_get_device():
+    """Small models reach for get_host with a router's name. The answer must
+    say where it lives rather than a bare 'not found' they cannot act on."""
+    if not _image_exists():
+        pytest.skip(f"{IMAGE} not built — run: docker compose build mcp-infrahub")
+    script = (
+        "import json\n"
+        "from servers import infrahub as i\n"
+        "devices = {'b-south'}\n"
+        "def fake(gql, variables=None):\n"
+        "    if 'NetworkHost' in gql: return {'NetworkHost': {'edges': []}}\n"
+        "    return {'NetworkDevice': {'count': int(variables['n'] in devices)}}\n"
+        "i._query = fake\n"
+        "import asyncio, inspect\n"
+        "def call(name):\n"
+        "    r = i.get_host(name)\n"
+        "    return asyncio.run(r) if inspect.isawaitable(r) else r\n"
+        "print(json.dumps([call('b-south'), call('srv-99')]))\n"
+    )
+    out = subprocess.run(
+        ["docker", "run", "--rm", "-e", "INFRAHUB_API_TOKEN=x", "-e", "MCP_AUTH_TOKEN=test",
+         IMAGE, "python", "-c", script], capture_output=True, text=True, timeout=120)
+    import json
+    lines = out.stdout.strip().splitlines()
+    assert lines, out.stderr[-800:]
+    router, missing = json.loads(lines[-1])
+    assert router["found"] is False and "use get_device" in router["error"]
+    assert missing == {"found": False, "host": "srv-99", "error": "not in the source of truth"}
+
+
 def test_pyats_takes_features_not_commands():
     """mcp-pyats names a feature from the platform's allow-list; it never takes
     a Genie command or parser name, which would be a passthrough by another name."""
