@@ -5,12 +5,20 @@ render_interface_graph is registered only when MCP_GRAPHS_ENABLED=true
 It renders ONE fixed panel of the Interface Detail dashboard for a validated
 device and interface — never an arbitrary dashboard, panel or query — keeps
 the PNG briefly in memory, and returns a link the chat shows as an image.
+
+Renders are a shared, slow resource (a headless browser, ~6 s each): they
+queue for a fixed number of slots, identical requests within a minute share
+one render, and Grafana's own "could not render" images are recognised and
+never shown as a graph.
 """
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import os
+import threading
+import time
 import urllib.parse
 
 from starlette.requests import Request
@@ -18,7 +26,7 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
 from common import Backend, BoundsError, build, duration, identifier, interface_name
-from images import ID as IMAGE_ID, ImageStore
+from images import ID as IMAGE_ID, ImageStore, RecentRenders
 
 URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
 # Where a PERSON reaches Grafana. URL above is the compose-network name, which
@@ -39,14 +47,45 @@ MAX_IMAGE_BYTES = 2 * 1024 * 1024
 GRAPH_DASHBOARD = ("darqcube-interface", "interface-detail")
 GRAPH_PANELS = {"traffic": 1, "errors": 2}
 
+# Render slots: equal to Grafana's GF_RENDERING_CONCURRENT_RENDER_REQUEST_LIMIT
+# (compose sets both; test_render pins them together). Over the limit, Grafana
+# does not queue — it answers 200 with a "limit reached" picture.
+RENDER_SLOTS = int(os.environ.get("MCP_RENDER_LIMIT") or 4)
+# How long a request waits for a slot. The ai-platform's MCP client reads a
+# tool result for up to 5 minutes; a slot frees every ~6 s under load.
+QUEUE_WAIT = 60.0
+# Waits before retrying a "limit reached" picture — another Grafana user (a
+# person sharing a panel image) took the slot this server thought was free.
+BUSY_BACKOFF = (2.0, 4.0, 8.0)
+# Identical requests within this window share one render.
+GRAPH_CACHE_SECONDS = 60
+
+# Grafana answers a render it cannot do with one of its own static images —
+# HTTP 200, image/png, exactly the file's bytes (verified on 12.0). Fetched
+# from Grafana itself, so they match the running version.
+PLACEHOLDERS = {
+    "busy": ("rendering_limit_dark", "rendering_limit_light"),
+    "failed": ("rendering_error_dark", "rendering_error_light", "rendering_timeout_dark",
+               "rendering_timeout_light", "rendering_plugin_not_installed"),
+}
+
 _basic = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
 api = Backend(URL, headers={"Authorization": f"Basic {_basic}"})
 # A render drives a headless browser: seconds, not milliseconds.
 render_api = Backend(URL, headers={"Authorization": f"Basic {_basic}"}, timeout=60.0)
 prometheus = Backend(os.environ.get("PROMETHEUS_URL", "http://prometheus:9090"))
 IMAGES = ImageStore(ttl_seconds=IMAGE_TTL)
+RECENT = RecentRenders(ttl_seconds=GRAPH_CACHE_SECONDS)
 mcp = build("grafana")
 log = logging.getLogger("mcp.audit")
+
+_slots = threading.BoundedSemaphore(RENDER_SLOTS)
+# One render per request at a time, so identical requests wait for the first
+# and then read RECENT. Striped, not per key: nothing to clean up, and two
+# different requests share a stripe rarely.
+_key_locks = [threading.Lock() for _ in range(64)]
+_placeholders: dict[str, str] = {}      # sha256 of the image -> "busy" | "failed"
+_placeholders_lock = threading.Lock()
 
 
 @mcp.tool()
@@ -127,6 +166,63 @@ def _summary(device: str, interface: str, window: str, kind: str) -> dict:
     return out
 
 
+class GraphUnavailable(Exception):
+    """No graph this time; the tool still returns the numbers."""
+
+
+def _placeholder(png: bytes) -> str | None:
+    """"busy" or "failed" if this is one of Grafana's own error pictures."""
+    with _placeholders_lock:
+        if not _placeholders:
+            for kind, names in PLACEHOLDERS.items():
+                for name in names:
+                    try:
+                        image = render_api.get_bytes(f"/public/img/{name}.png", max_bytes=MAX_IMAGE_BYTES,
+                                                     content_type="image/png")
+                    except RuntimeError:
+                        continue        # not in this Grafana version
+                    _placeholders[hashlib.sha256(image).hexdigest()] = kind
+            if not _placeholders:
+                # Retried on the next render; until then an error picture
+                # would pass as a graph, so say so.
+                log.warning("audit graph placeholders unavailable server=grafana")
+    return _placeholders.get(hashlib.sha256(png).hexdigest())
+
+
+def _render_png(params: dict) -> bytes:
+    """One render, through a slot. Raises GraphUnavailable, never returns an
+    error picture."""
+    uid, slug = GRAPH_DASHBOARD
+    for wait in (*BUSY_BACKOFF, None):
+        if not _slots.acquire(timeout=QUEUE_WAIT):
+            raise GraphUnavailable(f"every render slot was busy for {QUEUE_WAIT:.0f} s; "
+                                   "ask again in a minute")
+        try:
+            png = render_api.get_bytes(f"/render/d-solo/{uid}/{slug}", params=params,
+                                       max_bytes=MAX_IMAGE_BYTES, content_type="image/png")
+        finally:
+            _slots.release()
+        found = _placeholder(png)
+        if found is None:
+            return png
+        if found == "failed":
+            raise GraphUnavailable("Grafana could not render the panel")
+        if wait is None:
+            raise GraphUnavailable("Grafana's renderer stayed at its limit; ask again in a minute")
+        log.info("audit render busy server=grafana retry_in=%ss", wait)
+        time.sleep(wait)
+    raise AssertionError("unreachable")
+
+
+def _graph_png(key: tuple, params: dict) -> bytes:
+    with _key_locks[hash(key) % len(_key_locks)]:
+        png = RECENT.get(key)
+        if png is None:
+            png = _render_png(params)
+            RECENT.put(key, png)
+        return png
+
+
 if GRAPHS:
 
     @mcp.tool()
@@ -139,6 +235,8 @@ if GRAPHS:
         The link expires after 15 minutes: call this tool again for EVERY graph
         request, even one already shown earlier in the chat — never reuse an
         old image link. The `summary` holds the same numbers as text.
+        If the result has no `markdown`, the graph could not be drawn: say
+        so with its `reason`, and give the `summary` and `dashboard_url`.
 
         Args:
             device: the device name as it appears in the source of truth.
@@ -155,21 +253,29 @@ if GRAPHS:
             raise RuntimeError("image links are not configured: set MCP_IMAGE_BASE_URL "
                                "(ai_platform.publish in site.yml derives it)")
 
-        uid, slug = GRAPH_DASHBOARD
-        png = render_api.get_bytes(
-            f"/render/d-solo/{uid}/{slug}",
-            params={
-                "orgId": 1, "panelId": GRAPH_PANELS[kind],
-                "var-device": device, "var-interface": interface,
-                "from": f"now-{window}", "to": "now",
-                "width": 1000, "height": 450, "theme": "dark", "tz": GRAPH_TZ,
-            },
-            max_bytes=MAX_IMAGE_BYTES, content_type="image/png",
-        )
-        image_id = IMAGES.put(png, label=f"{device} {interface} {kind} {window}")
-        url = f"{IMAGE_BASE_URL}/g/{image_id}.png"
+        params = {
+            "orgId": 1, "panelId": GRAPH_PANELS[kind],
+            "var-device": device, "var-interface": interface,
+            "from": f"now-{window}", "to": "now",
+            "width": 1000, "height": 450, "theme": "dark", "tz": GRAPH_TZ,
+        }
         alt = f"{device} {interface} {kind}, last {window}"
         link = _dashboard_url("darqcube-interface", device, interface)
+        try:
+            png = _graph_png((device, interface, window, kind), params)
+        except GraphUnavailable as exc:
+            log.warning("audit graph unavailable server=grafana device=%s interface=%s reason=%s",
+                        device, interface, exc)
+            # No markdown: a picture of an error must never pass as a graph.
+            return {
+                "graph": "unavailable",
+                "reason": str(exc),
+                "alt": alt,
+                "summary": _summary(device, interface, window, kind),
+                "dashboard_url": link,
+            }
+        image_id = IMAGES.put(png, label=f"{device} {interface} {kind} {window}")
+        url = f"{IMAGE_BASE_URL}/g/{image_id}.png"
         return {
             "markdown": f"![{alt}]({url})",
             "image_url": url,

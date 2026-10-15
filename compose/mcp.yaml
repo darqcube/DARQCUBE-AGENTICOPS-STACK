@@ -98,6 +98,10 @@ services:
       MCP_IMAGE_BASE_URL: ${MCP_IMAGE_BASE_URL:-}
       MCP_IMAGE_TTL_SECONDS: ${MCP_IMAGE_TTL_SECONDS:-900}
       MCP_GRAPH_TZ: ${MCP_GRAPH_TZ:-UTC}
+      # Renders queue here for this many slots — the same number as Grafana's
+      # GF_RENDERING_CONCURRENT_RENDER_REQUEST_LIMIT (observability.yaml), so
+      # Grafana never reaches its limit (test_render pins the two together).
+      MCP_RENDER_LIMIT: "4"
       # The numbers behind a graph, for its text summary.
       PROMETHEUS_URL: http://prometheus:9090
     expose: ["9004"]

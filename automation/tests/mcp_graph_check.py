@@ -12,8 +12,10 @@ import asyncio
 import json
 import os
 import sys
+import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 os.environ.update({
     "MCP_GRAPHS_ENABLED": "true",
@@ -31,14 +33,38 @@ from images import ImageStore  # noqa: E402
 from servers import grafana  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+# Grafana's own pictures for "limit reached" and "could not render".
+LIMIT_PNG = b"\x89PNG\r\n\x1a\n" + b"limit" * 8
+FAILED_PNG = b"\x89PNG\r\n\x1a\n" + b"error" * 8
 renders: list[dict] = []
+static: list[str] = []
 results: dict[str, list] = {}
+script: list[bytes] = []        # what the next renders return, before PNG
+render_delay = 0.0
+flight = {"now": 0, "max": 0}
+flight_lock = threading.Lock()
 
 
 def fake_get_bytes(path, params=None, *, max_bytes, content_type):
+    if path.startswith("/public/img/"):
+        static.append(path)
+        if "limit_dark" in path:
+            return LIMIT_PNG
+        if "error_dark" in path:
+            return FAILED_PNG
+        raise RuntimeError(f"GET {path} -> 404")   # missing in this "version"
     renders.append({"path": path, "params": dict(params or {}), "max_bytes": max_bytes,
                     "content_type": content_type})
-    return PNG
+    with flight_lock:
+        flight["now"] += 1
+        flight["max"] = max(flight["max"], flight["now"])
+    try:
+        time.sleep(render_delay)
+        with flight_lock:
+            return script.pop(0) if script else PNG
+    finally:
+        with flight_lock:
+            flight["now"] -= 1
 
 
 queries: list[str] = []
@@ -158,5 +184,121 @@ check("store_evicts_oldest_by_count",
 tiny = ImageStore(max_bytes=len(PNG) * 2)
 tids = [tiny.put(PNG) for _ in range(3)]
 check("store_evicts_oldest_by_bytes", lambda: (tiny.get(tids[0]) is None and len(tiny) == 2, len(tiny)))
+
+# --- the render queue, Grafana's placeholders, sharing ---------------------------
+grafana.BUSY_BACKOFF = (0.01, 0.01, 0.01)
+
+
+def fresh():
+    grafana.RECENT.clear()
+    return len(renders)
+
+
+def stored(res):
+    return grafana.IMAGES.get(res["image_url"].rsplit("/", 1)[1].removesuffix(".png"))
+
+
+check("placeholders_learned_from_grafana",
+      lambda: ("/public/img/rendering_limit_dark.png" in static
+               and "/public/img/rendering_error_dark.png" in static, static))
+
+
+def busy_then_drawn():
+    n = fresh()
+    script[:] = [LIMIT_PNG]
+    res = call(device="r1", interface="Et0/1")
+    return len(renders) - n == 2 and stored(res)[0] == PNG, (len(renders) - n, res)
+
+
+check("busy_picture_is_retried_not_shown", busy_then_drawn)
+
+
+def stuck_at_limit():
+    fresh()
+    script[:] = [LIMIT_PNG] * 4
+    res = call(device="r1", interface="Et0/1")
+    return ("markdown" not in res and res.get("graph") == "unavailable" and "limit" in res["reason"]
+            and res["summary"]["in"]["now"] == "1.00 Mbps" and res["dashboard_url"]), res
+
+
+check("renderer_stuck_at_limit_returns_numbers_not_a_picture", stuck_at_limit)
+
+
+def failed_not_shown_nor_kept():
+    n = fresh()
+    script[:] = [FAILED_PNG]
+    res = call(device="r1", interface="Et0/1")
+    again = call(device="r1", interface="Et0/1")
+    return ("markdown" not in res and "could not render" in res["reason"]
+            and "markdown" in again and len(renders) - n == 2), (res, len(renders) - n)
+
+
+check("error_picture_never_shown_nor_cached", failed_not_shown_nor_kept)
+
+
+def thirty_at_once():
+    global render_delay
+    fresh()
+    flight["max"] = 0
+    render_delay = 0.05
+    try:
+        with ThreadPoolExecutor(30) as ex:
+            outs = list(ex.map(lambda i: call(device=f"r{i}", interface="Et0/1"), range(30)))
+    finally:
+        render_delay = 0.0
+    return (flight["max"] <= grafana.RENDER_SLOTS and all("markdown" in o for o in outs),
+            f"max in flight {flight['max']}, slots {grafana.RENDER_SLOTS}")
+
+
+check("thirty_at_once_stay_within_the_slots_and_all_draw", thirty_at_once)
+
+
+def identical_share():
+    global render_delay
+    n = fresh()
+    render_delay = 0.1
+    try:
+        with ThreadPoolExecutor(10) as ex:
+            outs = list(ex.map(lambda _: call(device="r1", interface="Et0/2"), range(10)))
+    finally:
+        render_delay = 0.0
+    links = {o["image_url"] for o in outs}
+    return len(renders) - n == 1 and len(links) == 10, (len(renders) - n, len(links))
+
+
+check("identical_requests_share_one_render_with_own_links", identical_share)
+
+
+def shared_render_expires():
+    n = fresh()
+    ttl, grafana.RECENT.ttl = grafana.RECENT.ttl, 0.2
+    try:
+        call(device="r1", interface="Et0/3")
+        call(device="r1", interface="Et0/3")
+        time.sleep(0.3)
+        call(device="r1", interface="Et0/3")
+    finally:
+        grafana.RECENT.ttl = ttl
+    return len(renders) - n == 2, len(renders) - n
+
+
+check("shared_render_expires", shared_render_expires)
+
+
+def queue_wait_bounded():
+    fresh()
+    wait, grafana.QUEUE_WAIT = grafana.QUEUE_WAIT, 0.1
+    for _ in range(grafana.RENDER_SLOTS):
+        grafana._slots.acquire()
+    try:
+        res = call(device="r1", interface="Et0/4")
+    finally:
+        for _ in range(grafana.RENDER_SLOTS):
+            grafana._slots.release()
+        grafana.QUEUE_WAIT = wait
+    return "markdown" not in res and "busy" in res["reason"] and "summary" in res, res
+
+
+check("queue_wait_is_bounded", queue_wait_bounded)
 
 print(json.dumps(results))

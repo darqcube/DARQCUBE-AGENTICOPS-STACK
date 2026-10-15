@@ -6,7 +6,9 @@ Markdown image on the published base URL with a short unguessable id, plus the
 numbers as text; the image route serves without a bearer token (an <img>
 cannot send one) while /mcp still requires one; images expire, an expired link
 shows a placeholder rather than a broken image, and the store is bounded by
-count and bytes.
+count and bytes. Renders queue for the render slots (never more at once), a
+"limit reached" picture from Grafana is retried and an error picture never
+shown, identical requests within a minute share one render but not a link.
 
 Needs darqcube/mcp:local. No stack: mcp_graph_check.py replaces Grafana's
 render endpoint and Prometheus.
@@ -38,6 +40,10 @@ EXPECTED = [
     "expired_image_shows_a_placeholder", "malformed_image_name_404", "exemption_is_only_the_image_route",
     "store_returns_what_it_kept", "store_forgets_after_ttl",
     "store_evicts_oldest_by_count", "store_evicts_oldest_by_bytes",
+    "placeholders_learned_from_grafana", "busy_picture_is_retried_not_shown",
+    "renderer_stuck_at_limit_returns_numbers_not_a_picture", "error_picture_never_shown_nor_cached",
+    "thirty_at_once_stay_within_the_slots_and_all_draw", "identical_requests_share_one_render_with_own_links",
+    "shared_render_expires", "queue_wait_is_bounded",
 ]
 
 

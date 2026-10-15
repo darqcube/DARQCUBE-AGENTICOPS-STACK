@@ -687,6 +687,16 @@ def test_graph_panels_keep_their_ids():
                 f"panel {p['id']}: unaggregated — a relabel within the window draws duplicate lines")
 
 
+def test_render_queue_matches_grafanas_limit():
+    """mcp-grafana queues renders for as many slots as Grafana allows. More
+    slots and Grafana answers the extra renders with a "limit reached"
+    picture; fewer and graphs wait for capacity that is free."""
+    grafana = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]["grafana"]
+    mcp = yaml.safe_load((ROOT / "compose/mcp.yaml").read_text())["services"]["mcp-grafana"]
+    assert (mcp["environment"]["MCP_RENDER_LIMIT"]
+            == grafana["environment"]["GF_RENDERING_CONCURRENT_RENDER_REQUEST_LIMIT"])
+
+
 def test_grafana_opens_on_a_shipped_dashboard():
     env = yaml.safe_load((ROOT / "compose/observability.yaml").read_text())["services"]["grafana"]["environment"]
     home = env["GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH"]

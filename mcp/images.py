@@ -15,6 +15,9 @@ never loaded). The suffix is the secret: 10 base32 characters, 50 bits,
 alive 15 minutes among at most a few hundred images — not guessable in that
 window. Bounded twice — by count and by total bytes — so a busy chat cannot
 grow memory without limit.
+
+RecentRenders sits in front of the renderer: a minute's memory of the PNG per
+request, so several people asking about the same link cost one render.
 """
 from __future__ import annotations
 
@@ -78,3 +81,33 @@ class ImageStore:
         for key in [k for k, (exp, _, _) in self._items.items() if exp <= now]:
             _, data, _ = self._items.pop(key)
             self._bytes -= len(data)
+
+
+class RecentRenders:
+    """The last minute's renders, by what was asked — so identical requests
+    share one render. Holds bytes, never links: each request still gets its
+    own link from ImageStore. Bounded by count; an entry lives `ttl` seconds."""
+
+    def __init__(self, ttl_seconds: float = 60, max_items: int = 100):
+        self.ttl, self.max_items = ttl_seconds, max_items
+        self._items: OrderedDict[tuple, tuple[float, bytes]] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, key: tuple) -> bytes | None:
+        with self._lock:
+            item = self._items.get(key)
+            if item and item[0] > time.monotonic():
+                return item[1]
+            self._items.pop(key, None)
+            return None
+
+    def put(self, key: tuple, data: bytes) -> None:
+        with self._lock:
+            self._items.pop(key, None)
+            self._items[key] = (time.monotonic() + self.ttl, data)
+            while len(self._items) > self.max_items:
+                self._items.popitem(last=False)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._items.clear()
