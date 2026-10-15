@@ -1,0 +1,171 @@
+{
+  "uid": "darqcube-link-share",
+  "title": "Link Share",
+  "description": "Two groups of links side by side, by interface description (ifAlias): each device's share of the traffic. Rendered whole as a graph in chat - keep it to panels 1 and 2.",
+  "tags": [
+    "darqcube",
+    "snmp",
+    "interfaces"
+  ],
+  "links": [
+    {
+      "title": "DarqCube dashboards",
+      "type": "dashboards",
+      "tags": [
+        "darqcube"
+      ],
+      "asDropdown": true
+    }
+  ],
+  "timezone": "browser",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "link_a",
+        "label": "Link A",
+        "type": "textbox",
+        "query": "To-Provider-A",
+        "current": {
+          "text": "To-Provider-A",
+          "value": "To-Provider-A"
+        }
+      },
+      {
+        "name": "link_b",
+        "label": "Link B",
+        "type": "textbox",
+        "query": "To-Provider-B",
+        "current": {
+          "text": "To-Provider-B",
+          "value": "To-Provider-B"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "piechart",
+      "title": "Traffic share — $link_a",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "pie",
+        "displayLabels": [
+          "percent"
+        ],
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (device) (rate(interface_in_octets{ifAlias=\"$link_a\"}[$__range]) + rate(interface_out_octets{ifAlias=\"$link_a\"}[$__range])) * 8",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{device}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "darqcube-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "piechart",
+      "title": "Traffic share — $link_b",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "pie",
+        "displayLabels": [
+          "percent"
+        ],
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (device) (rate(interface_in_octets{ifAlias=\"$link_b\"}[$__range]) + rate(interface_out_octets{ifAlias=\"$link_b\"}[$__range])) * 8",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{device}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "darqcube-prometheus"
+          }
+        }
+      ]
+    }
+  ]
+}

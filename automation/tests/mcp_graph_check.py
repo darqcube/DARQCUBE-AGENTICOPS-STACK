@@ -73,6 +73,8 @@ queries: list[str] = []
 def fake_prometheus_get(path, params=None):
     q = (params or {}).get("query", "")
     queries.append(q)
+    if "Nowhere" in q:      # a link name nothing carries
+        return {"status": "success", "data": {"result": []}}
     value = "5e6" if "max_over_time" in q else ("2e6" if "avg_over_time" in q else "1e6")
     return {"status": "success", "data": {"result": [{"metric": {}, "value": [0, value]}]}}
 
@@ -300,5 +302,64 @@ def queue_wait_bounded():
 
 
 check("queue_wait_is_bounded", queue_wait_bounded)
+
+# --- render_link_comparison -------------------------------------------------------
+def compare(**kwargs):
+    grafana.RECENT.clear()
+    return asyncio.run(grafana.render_link_comparison(**kwargs))
+
+
+def compare_raises(**kwargs):
+    try:
+        compare(**kwargs)
+    except common.BoundsError:
+        return True
+    return False
+
+
+tools = {t.name for t in grafana.mcp._tool_manager.list_tools()}
+check("compare_tool_registered_when_enabled", lambda: ("render_link_comparison" in tools, sorted(tools)))
+
+n = len(queries)
+share = compare(link_a="To-Provider-A", link_b="To-Provider-B")
+share_render = renders[-1]
+share_queries = queries[n:]
+check("compare_share_renders_the_whole_share_dashboard_without_chrome",
+      lambda: (share_render["path"] == "/render/d/darqcube-link-share/link-share"
+               and share_render["params"]["kiosk"] == "1"
+               and "_dash.hideVariables" in share_render["params"]
+               and share_render["params"]["var-link_a"] == "To-Provider-A"
+               and share_render["params"]["var-link_b"] == "To-Provider-B"
+               and share_render["params"]["from"] == "now-24h", share_render))
+check("compare_returns_markdown_image_and_dashboard_link",
+      lambda: (share["markdown"].startswith("![To-Provider-A vs To-Provider-B traffic share, last 24h](http://192.0.2.10:9004/g/")
+               and share["dashboard_url"].startswith("http://192.0.2.10:13000/d/darqcube-link-share?var-link_a=To-Provider-A"),
+               share))
+check("compare_summary_has_share_per_link_and_device",
+      lambda: (share["summary"]["To-Provider-A"]["?"] == {"traffic": "1.00 Mbps", "share": "100.0 %"}
+               and set(share["summary"]) == {"To-Provider-A", "To-Provider-B"}, share["summary"]))
+check("compare_queries_match_names_exactly",
+      lambda: (any('ifAlias="To-Provider-A"' in q for q in share_queries)
+               and not any("=~" in q for q in share_queries), share_queries))
+
+
+def sla_panels():
+    got = {}
+    for kind in ("availability", "rtt", "jitter"):
+        compare(link_a="To-Provider-A", link_b="To-Provider-B", kind=kind, window="6h")
+        r = renders[-1]
+        got[kind] = (r["path"], r["params"]["panelId"], r["params"]["from"])
+    want = {k: ("/render/d-solo/darqcube-link-sla/link-sla", pid, "now-6h")
+            for k, pid in (("availability", 1), ("rtt", 2), ("jitter", 3))}
+    return got == want, got
+
+
+check("compare_sla_kinds_render_their_fixed_panels", sla_panels)
+check("compare_unknown_names_refused_before_rendering",
+      lambda: (compare_raises(link_a="Nowhere-A", link_b="Nowhere-B")
+               and renders[-1]["path"].endswith("link-sla"), renders[-1]["path"]))
+check("compare_bad_link_refused", lambda: (compare_raises(link_a='A"} or vector(1)', link_b="B"), ""))
+check("compare_unknown_kind_refused", lambda: (compare_raises(link_a="A", link_b="B", kind="pie"), ""))
+check("compare_window_over_24h_refused", lambda: (compare_raises(link_a="A", link_b="B", window="7d"), ""))
 
 print(json.dumps(results))

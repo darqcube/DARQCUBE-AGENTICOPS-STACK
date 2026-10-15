@@ -6,6 +6,7 @@ regression is caught in seconds rather than after a deploy.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import re
@@ -685,6 +686,40 @@ def test_graph_panels_keep_their_ids():
         for t in p["targets"]:
             assert t["expr"].startswith("sum by (device, ifName) ("), (
                 f"panel {p['id']}: unaggregated — a relabel within the window draws duplicate lines")
+
+
+def _compare_constants() -> dict:
+    """COMPARE_QUERIES and SLA_PANELS from mcp-grafana's source (its imports
+    need the MCP image; the literals do not)."""
+    tree = ast.parse((ROOT / "mcp/servers/grafana.py").read_text())
+    return {t.id: ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
+            for t in node.targets if isinstance(t, ast.Name) and t.id in ("COMPARE_QUERIES", "SLA_PANELS")}
+
+
+def test_link_comparison_dashboards_match_the_tool():
+    """render_link_comparison renders Link Share whole (pies 1 and 2) and
+    panels 1-3 of Link SLA by id, and states the numbers from its own copy of
+    each query. Exact-match labels only: a name is never a regex."""
+    c = _compare_constants()
+    share = json.loads((DASHBOARDS / "link-share.json").read_text())
+    sla = json.loads((DASHBOARDS / "link-sla.json").read_text())
+    assert share["uid"] == "darqcube-link-share" and sla["uid"] == "darqcube-link-sla"
+    assert [(p["id"], p["type"]) for p in share["panels"]] == [(1, "piechart"), (2, "piechart")]
+    assert {p["id"] for p in sla["panels"]} == set(c["SLA_PANELS"].values())
+
+    def query(kind, var):
+        return c["COMPARE_QUERIES"][kind].format(link=f"${var}", w="$__range")
+
+    for panel, var in zip(share["panels"], ("link_a", "link_b")):
+        assert [t["expr"] for t in panel["targets"]] == [query("traffic_share", var)]
+    by_id = {p["id"]: p for p in sla["panels"]}
+    for kind, pid in c["SLA_PANELS"].items():
+        assert [t["expr"] for t in by_id[pid]["targets"]] == [query(kind, "link_a"), query(kind, "link_b")]
+    for d in (share, sla):
+        assert {v["name"] for v in d["templating"]["list"]} == {"link_a", "link_b"}
+        for p in d["panels"]:
+            for t in p["targets"]:
+                assert "=~" not in t["expr"], f"{d['uid']} panel {p['id']}: regex match on a name"
 
 
 def test_render_queue_matches_grafanas_limit():

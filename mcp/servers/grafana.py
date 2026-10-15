@@ -47,6 +47,24 @@ MAX_IMAGE_BYTES = 2 * 1024 * 1024
 GRAPH_DASHBOARD = ("darqcube-interface", "interface-detail")
 GRAPH_PANELS = {"traffic": 1, "errors": 2}
 
+# Two groups of links side by side, picked by interface description (ifAlias)
+# and by the IP SLA probes tagged with that same description. Fixed like the
+# above: traffic_share renders Link Share whole (its two pies), the others one
+# panel of Link SLA.
+SHARE_DASHBOARD = ("darqcube-link-share", "link-share")
+SLA_DASHBOARD = ("darqcube-link-sla", "link-sla")
+SLA_PANELS = {"availability": 1, "rtt": 2, "jitter": 3}
+# The numbers behind each kind, per device, for one link name — the same
+# queries as the dashboards, with the window for $__range.
+COMPARE_QUERIES = {
+    "traffic_share": ('sum by (device) (rate(interface_in_octets{{ifAlias="{link}"}}[{w}])'
+                      ' + rate(interface_out_octets{{ifAlias="{link}"}}[{w}])) * 8'),
+    "availability": 'avg by (device) (avg_over_time(ipsla:ok{{probe="{link}"}}[{w}])) * 100',
+    "rtt": ('avg by (device) (avg_over_time((ipsla_rtt_ms{{probe="{link}"}}'
+            ' and on (device, index) ipsla_sense == 1)[{w}:1m]))'),
+    "jitter": 'avg by (device) (stddev_over_time(ipsla_rtt_ms{{probe="{link}", rtt_type="1"}}[{w}]))',
+}
+
 # Render slots: equal to Grafana's GF_RENDERING_CONCURRENT_RENDER_REQUEST_LIMIT
 # (compose sets both; test_render pins them together). Over the limit, Grafana
 # does not queue — it answers 200 with a "limit reached" picture.
@@ -142,6 +160,28 @@ def _scalar(promql: str) -> float | None:
     return float(result[0]["value"][1]) if result else None
 
 
+def _per_device(promql: str) -> dict[str, float]:
+    body = prometheus.get("/api/v1/query", params={"query": promql})
+    result = (body.get("data") or {}).get("result") or []
+    return {s["metric"].get("device", "?"): float(s["value"][1]) for s in result}
+
+
+def _compare_summary(link_a: str, link_b: str, window: str, kind: str) -> dict:
+    """Per link, per device, in readable units — the numbers behind the picture."""
+    out = {}
+    for link in (link_a, link_b):
+        values = _per_device(COMPARE_QUERIES[kind].format(link=link, w=window))
+        total = sum(values.values())
+        if kind == "traffic_share":
+            out[link] = {d: {"traffic": _bps(v), "share": f"{100 * v / total:.1f} %" if total else "0 %"}
+                         for d, v in sorted(values.items())}
+        elif kind == "availability":
+            out[link] = {d: f"{v:.2f} %" for d, v in sorted(values.items())}
+        else:
+            out[link] = {d: f"{v:.1f} ms" for d, v in sorted(values.items())}
+    return out
+
+
 def _summary(device: str, interface: str, window: str, kind: str) -> dict:
     """The numbers behind the picture — so the answer has them even if the
     image never loads, and the model can talk about them."""
@@ -189,16 +229,15 @@ def _placeholder(png: bytes) -> str | None:
     return _placeholders.get(hashlib.sha256(png).hexdigest())
 
 
-def _render_png(params: dict) -> bytes:
+def _render_png(path: str, params: dict) -> bytes:
     """One render, through a slot. Raises GraphUnavailable, never returns an
     error picture."""
-    uid, slug = GRAPH_DASHBOARD
     for wait in (*BUSY_BACKOFF, None):
         if not _slots.acquire(timeout=QUEUE_WAIT):
             raise GraphUnavailable(f"every render slot was busy for {QUEUE_WAIT:.0f} s; "
                                    "ask again in a minute")
         try:
-            png = render_api.get_bytes(f"/render/d-solo/{uid}/{slug}", params=params,
+            png = render_api.get_bytes(path, params=params,
                                        max_bytes=MAX_IMAGE_BYTES, content_type="image/png")
         finally:
             _slots.release()
@@ -214,13 +253,33 @@ def _render_png(params: dict) -> bytes:
     raise AssertionError("unreachable")
 
 
-def _graph_png(key: tuple, params: dict) -> bytes:
+def _graph_png(key: tuple, path: str, params: dict) -> bytes:
     with _key_locks[hash(key) % len(_key_locks)]:
         png = RECENT.get(key)
         if png is None:
-            png = _render_png(params)
+            png = _render_png(path, params)
             RECENT.put(key, png)
         return png
+
+
+def _image_result(png: bytes, label: str, alt: str, summary: dict, link: str) -> dict:
+    image_id = IMAGES.put(png, label=label)
+    url = f"{IMAGE_BASE_URL}/g/{image_id}.png"
+    return {
+        "markdown": f"![{alt}]({url})",
+        "image_url": url,
+        "alt": alt,
+        "expires_in_seconds": IMAGE_TTL,
+        "summary": summary,
+        "dashboard_url": link,
+    }
+
+
+def _unavailable(exc: GraphUnavailable, what: str, alt: str, summary: dict, link: str) -> dict:
+    log.warning("audit graph unavailable server=grafana %s reason=%s", what, exc)
+    # No markdown: a picture of an error must never pass as a graph.
+    return {"graph": "unavailable", "reason": str(exc), "alt": alt, "summary": summary,
+            "dashboard_url": link}
 
 
 if GRAPHS:
@@ -261,29 +320,77 @@ if GRAPHS:
         }
         alt = f"{device} {interface} {kind}, last {window}"
         link = _dashboard_url("darqcube-interface", device, interface)
+        uid, slug = GRAPH_DASHBOARD
         try:
-            png = _graph_png((device, interface, window, kind), params)
+            png = _graph_png((device, interface, window, kind), f"/render/d-solo/{uid}/{slug}", params)
         except GraphUnavailable as exc:
-            log.warning("audit graph unavailable server=grafana device=%s interface=%s reason=%s",
-                        device, interface, exc)
-            # No markdown: a picture of an error must never pass as a graph.
-            return {
-                "graph": "unavailable",
-                "reason": str(exc),
-                "alt": alt,
-                "summary": _summary(device, interface, window, kind),
-                "dashboard_url": link,
-            }
-        image_id = IMAGES.put(png, label=f"{device} {interface} {kind} {window}")
-        url = f"{IMAGE_BASE_URL}/g/{image_id}.png"
-        return {
-            "markdown": f"![{alt}]({url})",
-            "image_url": url,
-            "alt": alt,
-            "expires_in_seconds": IMAGE_TTL,
-            "summary": _summary(device, interface, window, kind),
-            "dashboard_url": link,
+            return _unavailable(exc, f"device={device} interface={interface}", alt,
+                                _summary(device, interface, window, kind), link)
+        return _image_result(png, f"{device} {interface} {kind} {window}", alt,
+                             _summary(device, interface, window, kind), link)
+
+    @mcp.tool()
+    def render_link_comparison(link_a: str, link_b: str, kind: str = "traffic_share",
+                               window: str = "24h") -> dict:
+        """Compare two groups of links side by side — e.g. the links to two
+        providers — as one image link for the chat.
+
+        A group is every interface whose description (ifAlias) is that name,
+        and every IP SLA probe tagged with the same name. Put the returned
+        `markdown` in your answer EXACTLY as given; never write or alter an
+        image URL. The link expires after 15 minutes: call again for EVERY
+        request. The `summary` holds the numbers per link and device. If the
+        result has no `markdown`, the graph could not be drawn: say so with
+        its `reason`, and give the `summary` and `dashboard_url`.
+
+        Args:
+            link_a: interface description of the first group, e.g. "To-Provider-A".
+            link_b: interface description of the second group, e.g. "To-Provider-B".
+            kind: "traffic_share" (two pie charts: each device's share of each
+                group's traffic), or the IP SLA of both groups as grouped bars per
+                device: "availability" (% of probes that succeeded), "rtt"
+                (average round-trip ms), "jitter" (spread of round-trip ms).
+            window: how far back, e.g. "1h", "6h", "24h". Maximum 24h.
+        """
+        identifier(link_a, "link_a")
+        identifier(link_b, "link_b")
+        window = duration(window, default="24h")
+        if kind not in COMPARE_QUERIES:
+            raise BoundsError(f"kind must be one of {sorted(COMPARE_QUERIES)}")
+        if not IMAGE_BASE_URL:
+            raise RuntimeError("image links are not configured: set MCP_IMAGE_BASE_URL "
+                               "(ai_platform.publish in site.yml derives it)")
+
+        summary = _compare_summary(link_a, link_b, window, kind)
+        if not any(summary.values()):
+            what = "interface description" if kind == "traffic_share" else "IP SLA probe tag"
+            raise BoundsError(f"no {what} is {link_a!r} or {link_b!r} in the last {window}; "
+                              "use the exact description (ifAlias) — see get_interface_status")
+
+        params = {
+            "orgId": 1, "var-link_a": link_a, "var-link_b": link_b,
+            "from": f"now-{window}", "to": "now", "theme": "dark", "tz": GRAPH_TZ,
         }
+        if kind == "traffic_share":
+            uid, slug = SHARE_DASHBOARD
+            # The whole dashboard — its two pies — without Grafana's chrome.
+            path = f"/render/d/{uid}/{slug}"
+            params.update({"width": 1000, "height": 480, "kiosk": "1", "_dash.hideTimePicker": "",
+                           "_dash.hideVariables": "", "_dash.hideLinks": ""})
+        else:
+            uid, slug = SLA_DASHBOARD
+            path = f"/render/d-solo/{uid}/{slug}"
+            params.update({"panelId": SLA_PANELS[kind], "width": 1000, "height": 420})
+
+        alt = f"{link_a} vs {link_b} {kind.replace('_', ' ')}, last {window}"
+        query = urllib.parse.urlencode({"var-link_a": link_a, "var-link_b": link_b,
+                                        "from": f"now-{window}", "to": "now"})
+        link = f"{PUBLIC_URL}/d/{uid}?{query}"
+        try:
+            png = _graph_png(("compare", link_a, link_b, kind, window), path, params)
+        except GraphUnavailable as exc:
+            return _unavailable(exc, f"link_a={link_a} link_b={link_b}", alt, summary, link)
+        return _image_result(png, f"{link_a} vs {link_b} {kind} {window}", alt, summary, link)
 
 
 # Shown in place of a graph whose link has expired (IMAGE_TTL passed, or the

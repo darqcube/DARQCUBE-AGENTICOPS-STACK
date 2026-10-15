@@ -33,11 +33,12 @@ Seven servers, all reached over the Docker network:
 
 `ai_platform.graphs: true` (or `--graphs` on `scripts/ai-platform-connect.py`)
 starts Grafana's image renderer (container `grafana-renderer`, profile
-`graphs`) and registers one more tool on `mcp-grafana`:
+`graphs`) and registers two more tools on `mcp-grafana`:
 
 | Tool | Answers |
 |---|---|
 | `render_interface_graph(device, interface, window, kind)` | a PNG of one interface's **traffic** or **errors** over the window, as a Markdown image link, plus the same numbers as text |
+| `render_link_comparison(link_a, link_b, kind, window)` | two groups of links side by side, by interface description: **traffic_share** (two pies), or IP SLA **availability**, **rtt**, **jitter** (grouped bars per device) — [per-link probes](../devices/cisco-ios-xe.md#3b-ip-sla--wan-quality-and-application-response-time-optional) |
 
 How the picture reaches the chat: chat platforms drop images inside tool
 results, so the tool keeps the PNG in memory and returns

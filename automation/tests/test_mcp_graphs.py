@@ -9,6 +9,8 @@ shows a placeholder rather than a broken image, and the store is bounded by
 count and bytes. Renders queue for the render slots (never more at once), a
 "limit reached" picture from Grafana is retried and an error picture never
 shown, identical requests within a minute share one render but not a link.
+render_link_comparison renders only the fixed Link Share / Link SLA views,
+matches link names exactly, and refuses names no link carries.
 
 Needs darqcube/mcp:local. No stack: mcp_graph_check.py replaces Grafana's
 render endpoint and Prometheus.
@@ -44,6 +46,11 @@ EXPECTED = [
     "renderer_stuck_at_limit_returns_numbers_not_a_picture", "error_picture_never_shown_nor_cached",
     "thirty_at_once_stay_within_the_slots_and_all_draw", "identical_requests_share_one_render_with_own_links",
     "shared_render_expires", "queue_wait_is_bounded",
+    "compare_tool_registered_when_enabled", "compare_share_renders_the_whole_share_dashboard_without_chrome",
+    "compare_returns_markdown_image_and_dashboard_link", "compare_summary_has_share_per_link_and_device",
+    "compare_queries_match_names_exactly", "compare_sla_kinds_render_their_fixed_panels",
+    "compare_unknown_names_refused_before_rendering", "compare_bad_link_refused",
+    "compare_unknown_kind_refused", "compare_window_over_24h_refused",
 ]
 
 

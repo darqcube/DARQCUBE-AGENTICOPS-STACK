@@ -121,6 +121,22 @@ responder (almost every application server) — without it the probe reports
 (`ipsla:jitter_ms:stddev10m`); `path-jitter` results are not exposed in
 RTTMON, so they cannot be polled.
 
+**Per-link SLA (Link SLA dashboard).** To compare WAN links — say the links
+to two providers — probe each one's next hop out of that interface, and tag
+the probe with the interface's **description**. The description is the name
+that picks a link group in Link Share and Link SLA (and in
+`render_link_comparison`): traffic by `ifAlias`, SLA by probe tag.
+
+```
+interface <WAN-INTERFACE>
+ description To-Provider-A
+ip sla 30
+ icmp-echo <PROVIDER-NEXT-HOP> source-interface <WAN-INTERFACE>
+ tag To-Provider-A
+ frequency 30
+ip sla schedule 30 life forever start-time now
+```
+
 ## 3c. LLDP — links for the Network Map (optional)
 
 The Network Map draws physical links from LLDP and tunnel links from BGP.

@@ -175,13 +175,16 @@ def test_render_tool_is_absent_unless_graphs_are_enabled():
     """Like the write tool: off means not registered, and no image route."""
     count = lambda out: int(re.search(r"with (\d+) tool", out).group(1))
     assert count(start("grafana")) == 2
-    assert count(start("grafana", {"MCP_GRAPHS_ENABLED": "true"})) == 3
+    # + render_interface_graph, render_link_comparison
+    assert count(start("grafana", {"MCP_GRAPHS_ENABLED": "true"})) == 4
     source = (SERVERS / "grafana.py").read_text()
     assert 'PUBLIC_ROUTES = [Route("/g/{name}", _image, methods=["GET"])] if GRAPHS else []' in source
 
 
 def test_render_tool_takes_no_dashboard_panel_or_query():
     source = (SERVERS / "grafana.py").read_text()
-    sig = source[source.index("def render_interface_graph("):].split(") -> dict:")[0]
-    assert not re.search(r"\b(uid|panel|panel_id|dashboard|query|url)\s*:", sig), sig
+    for tool in ("render_interface_graph", "render_link_comparison"):
+        sig = source[source.index(f"def {tool}("):].split(") -> dict:")[0]
+        assert not re.search(r"\b(uid|panel|panel_id|dashboard|query|url)\s*:", sig), sig
     assert "interface_name(interface)" in source and 'identifier(device, "device")' in source
+    assert 'identifier(link_a, "link_a")' in source and 'identifier(link_b, "link_b")' in source
