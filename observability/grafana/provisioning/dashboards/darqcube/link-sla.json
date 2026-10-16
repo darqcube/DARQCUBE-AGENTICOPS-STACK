@@ -29,22 +29,30 @@
       {
         "name": "link_a",
         "label": "Link A",
-        "type": "textbox",
-        "query": "To-Provider-A",
-        "current": {
-          "text": "To-Provider-A",
-          "value": "To-Provider-A"
-        }
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(ipsla_sense, probe)",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
       },
       {
         "name": "link_b",
         "label": "Link B",
-        "type": "textbox",
-        "query": "To-Provider-B",
-        "current": {
-          "text": "To-Provider-B",
-          "value": "To-Provider-B"
-        }
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "darqcube-prometheus"
+        },
+        "query": "label_values(ipsla_sense, probe)",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1
       }
     ]
   },

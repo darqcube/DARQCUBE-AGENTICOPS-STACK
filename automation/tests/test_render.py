@@ -715,8 +715,12 @@ def test_link_comparison_dashboards_match_the_tool():
     by_id = {p["id"]: p for p in sla["panels"]}
     for kind, pid in c["SLA_PANELS"].items():
         assert [t["expr"] for t in by_id[pid]["targets"]] == [query(kind, "link_a"), query(kind, "link_b")]
-    for d in (share, sla):
-        assert {v["name"] for v in d["templating"]["list"]} == {"link_a", "link_b"}
+    # Drop-downs of what exists, never a typed default: a placeholder name
+    # matches nothing and opens the dashboard empty.
+    for d, source in ((share, "label_values(interface_in_octets, ifAlias)"),
+                      (sla, "label_values(ipsla_sense, probe)")):
+        assert [(v["name"], v["type"], v["query"]) for v in d["templating"]["list"]] == [
+            ("link_a", "query", source), ("link_b", "query", source)]
         for p in d["panels"]:
             for t in p["targets"]:
                 assert "=~" not in t["expr"], f"{d['uid']} panel {p['id']}: regex match on a name"
