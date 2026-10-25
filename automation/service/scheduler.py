@@ -124,7 +124,9 @@ def metrics() -> str:
     ):
         lines += [f"# HELP {name} {help_}", f"# TYPE {name} gauge"]
         for device, entry in sorted(snapshot.items()):
-            lines.append(f'{name}{{device="{_esc(device)}"}} {float(entry[key]):g}')
+            # repr, not :g — :g keeps 6 significant digits, which rounds a Unix time to ~10,000 s and breaks
+            # AssuranceStale's "older than 3 intervals" comparison.
+            lines.append(f'{name}{{device="{_esc(device)}"}} {float(entry[key])!r}')
     return "\n".join(lines) + "\n"
 
 

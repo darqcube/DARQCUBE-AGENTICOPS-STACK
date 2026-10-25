@@ -134,3 +134,14 @@ def test_the_api_records_on_demand_checks():
     body = (ROOT / "automation/service/main.py").read_text()
     check = body.split("def device_check", 1)[1].split("\n@app.", 1)[0]
     assert "scheduler.record(device, result, started)" in check
+
+
+def test_timestamps_keep_full_precision(load):
+    """A Unix time printed with :g (6 digits) was off by up to ~1.4 h, so AssuranceStale compared a rounded time."""
+    mod = load()
+    mod.record("r1", {"results": RULES}, started=0.0)
+    with mod._lock:
+        mod._results["r1"]["ts"] = 1792923629.25
+    line = next(l for l in mod.metrics().splitlines()
+                if l.startswith('assurance_device_last_run_timestamp_seconds{device="r1"}'))
+    assert line.endswith(" 1792923629.25"), line
