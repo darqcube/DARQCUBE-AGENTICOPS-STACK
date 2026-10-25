@@ -96,6 +96,9 @@ alerts:
   # dependency. Point it at an AI platform, Slack relay or webhook receiver
   # when you have one.
   webhook_url: ""
+  # Alert timing: standard (few false alarms), or demo (alerts fire and clear
+  # within minutes of a fault and its fix — for drills and demonstrations).
+  profile: standard
 
 
 ai_platform:

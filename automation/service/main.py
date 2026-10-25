@@ -11,6 +11,7 @@ nothing is duplicated between CLI and HTTP.
 from __future__ import annotations
 
 import re
+import time
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -138,14 +139,18 @@ def device_check(device: str):
     shape first. Add a rule by editing that file — no code change.
     """
     check_device_name(device)
+    started = time.time()
     try:
-        return tasks.run_assurance(device)
+        result = tasks.run_assurance(device)
     except tasks.DeviceError as exc:
         raise HTTPException(404, str(exc)) from exc
     except (textfsm_parse.ParseError, normalise.NormaliseError) as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"{device}: {exc}") from exc
+    # The exported state follows the newest check, scheduled or not (scheduler.record).
+    scheduler.record(device, result, started)
+    return result
 
 
 @app.get("/device/{device}/snapshot")

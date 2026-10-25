@@ -66,11 +66,28 @@ Infrahub, no SNMP/gNMI data for 10 min — names the device and site) and
 success over 15 min) and `WANLatencyHigh` (ICMP probe RTT above 150 ms for
 10 min — set the threshold to the WAN's SLA).
 
-**Assurance alerts shipped** (need `ASSURANCE_INTERVAL_MINUTES` > 0):
-`AssuranceCheckFailing` (a rule in `fail` or `error` for 20 min — longer than
-one interval, so a single bad run does not page) and `AssuranceStale` (a
-device not assured for three intervals — the scheduler stopped or the device
-keeps timing out).
+**Assurance alerts shipped** (need `ASSURANCE_INTERVAL_MINUTES` > 0, or an
+on-demand check): `AssuranceCheckFailing` (a rule in `fail` or `error` for
+20 min — longer than one interval, so a single bad run does not page) and
+`AssuranceStale` (a device not assured for three intervals — the scheduler
+stopped or the device keeps timing out). An on-demand check (`make check`,
+the API, `run_device_checks`) updates the same state, so a check that passes
+after a fix clears `AssuranceCheckFailing` at once.
+
+**Alert profiles: how fast alerts react.** `IPSLAProbeFailing` and
+`AssuranceCheckFailing` come in two timings, in
+`observability/prometheus/profiles/`. Exactly one is loaded:
+
+| Profile | IP SLA judged over | Assurance fires after | For |
+|---|---|---|---|
+| `standard` (default) | 15 min | 20 min | production: few false alarms |
+| `demo` | 5 min | 2 min | drills and demonstrations: alerts fire and clear within minutes |
+
+Set `alerts.profile` in `site.yml` (or `ai_platform.alert_profile` in an
+ai-platform overlay), then `python3 install.py --step 2 && make up`; changing
+it recreates Prometheus. Edit both files together: a test checks they define
+the same alerts, and promtool tests (`observability/prometheus/tests/profile-*.test.yml`)
+check each one's timing.
 
 **Flow alerts shipped:** `NoFlowsReceived` (no flow from anywhere for 15 min)
 and `CriticalApplicationSilent` (a `critical` application that had traffic in

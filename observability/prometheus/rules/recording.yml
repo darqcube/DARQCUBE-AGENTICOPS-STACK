@@ -69,6 +69,9 @@ groups:
         expr: ipsla_sense == bool 1
       - record: ipsla:success:ratio15m
         expr: avg_over_time(ipsla:ok[15m])
+      # The same over 5 minutes: the demo alert profile's window (recovers within minutes).
+      - record: ipsla:success:ratio5m
+        expr: avg_over_time(ipsla:ok[5m])
       - record: ipsla:rtt_ms:avg10m
         expr: avg_over_time(ipsla_rtt_ms[10m]) and on (device, index) ipsla_sense == 1
       - record: ipsla:jitter_ms:stddev10m

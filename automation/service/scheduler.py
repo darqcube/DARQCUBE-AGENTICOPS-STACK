@@ -7,7 +7,9 @@ mcp-assurance) works the same either way.
 
 One run = every device in the inventory, AUTOMATION_CONCURRENCY at a time,
 each through tasks.run_assurance — the same function, locks and parsers the
-API uses, so a scheduled result and an on-demand one can never disagree.
+API uses, so a scheduled result and an on-demand one can never disagree. An
+on-demand check also becomes the device's latest result (record()), so the
+exported state is never older than the last check anyone ran.
 
 Results are exposed at /metrics for Prometheus:
 
@@ -46,6 +48,16 @@ def _run_device(device: str) -> None:
     except Exception as exc:  # one device's failure must not stop the run
         entry = {"ok": False, "rules": [], "error": str(exc)[:300]}
     entry.update(ts=time.time(), duration=time.time() - started)
+    with _lock:
+        _results[device] = entry
+
+
+def record(device: str, result: dict, started: float) -> None:
+    """Keep an on-demand result (the API, mcp-assurance, a change's post-check) as the device's latest, exactly as a
+    scheduled run would: what Prometheus sees is never older than the last check anyone ran. A post-check that passes
+    clears AssuranceCheckFailing at once instead of at the next scheduled run."""
+    entry = {"ok": True, "rules": result.get("results", []), "error": None, "ts": time.time(),
+             "duration": time.time() - started}
     with _lock:
         _results[device] = entry
 

@@ -132,3 +132,15 @@ def test_an_unreachable_idp_fails_clearly(tmp_path):
     )
     assert out.returncode == 1 and "cannot read" in out.stderr
     assert not (tmp_path / "ai-platform.site.yml").exists()
+
+
+def test_the_alert_profile_is_written_only_when_asked(gen, inst, idp, tmp_path):
+    base = [sys.executable, str(SCRIPT), "--stack-host", "127.0.0.1", "--idp", idp, "--jwks-host", "192.0.2.1"]
+    out = subprocess.run(base + ["--out", str(tmp_path)], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert "alert_profile" not in inst.read_yaml(tmp_path / "ai-platform.site.yml")["ai_platform"]
+    out = subprocess.run(base + ["--alert-profile", "demo", "--out", str(tmp_path)], capture_output=True, text=True,
+                         timeout=60)
+    assert out.returncode == 0, out.stderr
+    overlay = inst.read_yaml(tmp_path / "ai-platform.site.yml")
+    assert overlay["ai_platform"]["alert_profile"] == "demo" and not inst.validate_ai_platform(overlay)

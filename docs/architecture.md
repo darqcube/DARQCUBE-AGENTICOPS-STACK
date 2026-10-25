@@ -517,6 +517,7 @@ host, then restart or reload the service.
 | `source-of-truth/map/` | `infrahub-server` | `/map` — the network drawing (per deployment, gitignored) |
 | `observability/telegraf/profiles/` | `infrahub-server` | `/profiles` — SNMP templates the renderer expands per shard |
 | `observability/prometheus/` | `prometheus` | config and rules |
+| `observability/prometheus/profiles/` | `prometheus` | one alert profile, `${ALERT_PROFILE}.yml` (standard or demo), mounted on its own |
 | `observability/loki/` | `loki` | `loki.yml` |
 | `observability/grafana/provisioning/` | `grafana` | datasources and dashboards |
 | `observability/alertmanager/alertmanager.yml.tmpl` | `config-init` | the template it renders from |

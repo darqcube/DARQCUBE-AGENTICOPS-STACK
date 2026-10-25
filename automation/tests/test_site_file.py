@@ -409,3 +409,35 @@ def test_overlay_switches_only_the_graphs_profile(inst, tmp_path, monkeypatch):
     overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n  graphs: false\n")
     inst.apply_ai_platform_to_env(overlay)
     assert inst.read_env(env)["COMPOSE_PROFILES"] == "devices,automation,mcp"
+
+
+def test_alert_profile_defaults_to_standard(inst, site):
+    site.get("alerts", {}).pop("profile", None)
+    assert inst.site_to_env(site)["ALERT_PROFILE"] == "standard"
+
+
+def test_alert_profile_from_the_site_and_the_overlay_wins(inst, site):
+    site.setdefault("alerts", {})["profile"] = "demo"
+    assert inst.site_to_env(site)["ALERT_PROFILE"] == "demo"
+    merged = inst.merge_overlay(site, {"ai_platform": {"alert_profile": "standard"}}, "o.yml")
+    assert not inst.validate_ai_platform(merged)
+    assert inst.site_to_env(merged)["ALERT_PROFILE"] == "standard"
+
+
+def test_an_unknown_alert_profile_is_refused(inst, site):
+    site["ai_platform"]["alert_profile"] = "fast"
+    assert any("alert profile 'fast'" in p for p in inst.validate_ai_platform(site))
+
+
+def test_an_overlay_sets_the_alert_profile_only_when_it_names_one(inst, tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text("SYSLOG_COLLECTOR_IP=192.0.2.10\nGRAFANA_PORT=13000\nALERT_PROFILE=demo\n")
+    overlay = tmp_path / "ai-platform.yml"
+    monkeypatch.setattr(inst, "ENV", env)
+    monkeypatch.setattr(inst, "local_addresses", lambda: set())
+    overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n")
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["ALERT_PROFILE"] == "demo", "an overlay without the key changed it"
+    overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n  alert_profile: standard\n")
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["ALERT_PROFILE"] == "standard"

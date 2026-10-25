@@ -110,7 +110,8 @@ scheduler, every N minutes ─┘     │  holds the device lock across both eng
 | `automation/service/main.py` | the HTTP API, including `POST /device/{name}/check` | a new endpoint |
 | `automation/service/scheduler.py` | scheduled assurance: runs every device, serves `/metrics` and `/assurance/latest` | the published metrics |
 | `mcp/servers/assurance.py` | the `mcp-assurance` tools AI agents call (`run_device_checks` and others) — through the API above | what agents can ask |
-| `observability/prometheus/rules/` | `network:assurance_*` counts and the `AssuranceCheckFailing` / `AssuranceStale` alerts | alerting on results |
+| `observability/prometheus/rules/` | `network:assurance_*` counts and the `AssuranceStale` alert | alerting on results |
+| `observability/prometheus/profiles/` | `AssuranceCheckFailing`, timed by the alert profile (standard or demo) | how fast it fires |
 
 ### Common changes, step by step
 
@@ -212,7 +213,9 @@ start. One run takes roughly `devices ÷ AUTOMATION_CONCURRENCY × ~30 s`.
 | `assurance_interval_seconds` | the configured interval (`0` = off) |
 
 Labels are bounded — devices × rules. *Which* interface or peer failed stays
-in `GET /assurance/latest`, never in a label. Alerts `AssuranceCheckFailing`
+in `GET /assurance/latest`, never in a label. An on-demand check
+(`POST /device/{name}/check`) replaces the device's latest result too, so the
+metrics are never older than the last check anyone ran. Alerts `AssuranceCheckFailing`
 and `AssuranceStale` and the dashboards' assurance panels read these.
 
 The scheduler lives in the API process, and the image runs one uvicorn worker.

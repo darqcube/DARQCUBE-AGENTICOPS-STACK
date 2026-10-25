@@ -298,7 +298,7 @@ PORT_VARS = {
 
 AUTH_MODES = ("token", "oidc", "both")
 AI_PLATFORM_KEYS = {
-    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs"},
+    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs", "alert_profile"},
     "publish": {"enabled", "bind_ip"},
     "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role"},
 }
@@ -342,6 +342,17 @@ def ai_platform_env(site: dict, collector_ip: str, grafana_port: str) -> dict[st
     env["GRAFANA_RENDERER_URL"] = "http://grafana-renderer:8081/render" if graphs else ""
     env["MCP_IMAGE_BASE_URL"] = f"http://{env['MCP_BIND_IP']}:9004" if graphs else ""
     return env
+
+
+# Which timing the profile-dependent alerts use (observability/prometheus/profiles/). standard: few false alarms;
+# demo: alerts fire and clear within minutes of a fault and its fix.
+ALERT_PROFILES = ("standard", "demo")
+
+
+def alert_profile(site: dict) -> str:
+    """ALERT_PROFILE: the overlay's ai_platform.alert_profile wins over the site's alerts.profile (as every overlay
+    value does); default standard."""
+    return str(dig(site, "ai_platform.alert_profile") or dig(site, "alerts.profile") or "standard").strip().lower()
 
 
 def with_profile(profiles: str, name: str, wanted: bool) -> str:
@@ -393,6 +404,9 @@ def validate_ai_platform(site: dict) -> list[str]:
     elif publish and bind == "CHANGEME":
         problems.append("ai_platform.publish.bind_ip is CHANGEME — set this machine's address, "
                         "or leave it empty to use site.collector_ip")
+
+    if alert_profile(site) not in ALERT_PROFILES:
+        problems.append(f"alert profile '{alert_profile(site)}' — expected one of {', '.join(ALERT_PROFILES)}")
 
     mode = str(dig(site, "ai_platform.auth.mode", "token") or "token").strip().lower()
     if mode not in AUTH_MODES:
@@ -462,6 +476,7 @@ def site_to_env(site: dict) -> dict[str, str]:
     env: dict[str, str] = {}
 
     env["DEPLOYMENT_NAME"] = str(dig(site, "site.name", "darqcube"))
+    env["ALERT_PROFILE"] = alert_profile(site)
     env["SYSLOG_COLLECTOR_IP"] = str(dig(site, "site.collector_ip", ""))
 
     env["DEVICE_USER"] = str(dig(site, "devices.ssh_user", ""))
@@ -929,6 +944,8 @@ def apply_ai_platform_to_env(path: Path) -> None:
     # install's own profiles and only switch `graphs` on or off.
     values["COMPOSE_PROFILES"] = with_profile(current.get("COMPOSE_PROFILES", ""), "graphs",
                                               values["MCP_GRAPHS_ENABLED"] == "true")
+    if dig(overlay, "ai_platform.alert_profile") is not None:   # only when the overlay names one
+        values["ALERT_PROFILE"] = alert_profile(overlay)
     ENV.write_text(set_env_values(ENV.read_text(), values))
     os.chmod(ENV, 0o600)
     report_ai_platform(values, path.name)

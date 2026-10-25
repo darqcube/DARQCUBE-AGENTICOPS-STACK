@@ -833,9 +833,12 @@ def test_ipsla_table_only_for_platforms_that_declare_it(monkeypatch, tmp_path):
 def test_ipsla_rules_and_alerts_exist():
     rules = (ROOT / "observability/prometheus/rules/recording.yml").read_text()
     alerts = (ROOT / "observability/prometheus/rules/alerts.yml").read_text()
-    for rec in ("ipsla:ok", "ipsla:success:ratio15m", "ipsla:rtt_ms:avg10m", "ipsla:jitter_ms:stddev10m"):
+    for rec in ("ipsla:ok", "ipsla:success:ratio15m", "ipsla:success:ratio5m", "ipsla:rtt_ms:avg10m",
+                "ipsla:jitter_ms:stddev10m"):
         assert f"record: {rec}" in rules
-    assert "IPSLAProbeFailing" in alerts and "WANLatencyHigh" in alerts
+    assert "WANLatencyHigh" in alerts
+    for profile in ("standard", "demo"):
+        assert "IPSLAProbeFailing" in (ROOT / f"observability/prometheus/profiles/{profile}.yml").read_text()
 
 
 

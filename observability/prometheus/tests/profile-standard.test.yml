@@ -1,0 +1,27 @@
+# promtool: the "standard" alert profile on one fault and its fix. A probe fails from minute 10 to minute 40 and works
+# again after. 6 minutes after the fix (46m) the demo profile has cleared; the standard one still fires.
+rule_files:
+  - ../rules/recording.yml
+  - ../profiles/standard.yml
+evaluation_interval: 30s
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'ipsla_sense{device="b1", index="30", probe="wan"}'
+        values: '1x9 2x30 1x20'
+    alert_rule_test:
+      - eval_time: 36m
+        alertname: IPSLAProbeFailing
+        exp_alerts:
+          - exp_labels: { severity: warning, device: b1, index: "30", probe: wan }
+            exp_annotations:
+              summary: "IP SLA wan on b1 succeeds 0%"
+              description: "Fewer than 80% of operations succeeded over 15 minutes — loss on the path, or the target is down."
+    # 6 minutes after the fix the 15-minute ratio is still under 80% (its exact value depends on evaluation timing,
+    # so this checks the alert's state, not its annotation text).
+    promql_expr_test:
+      - expr: ALERTS{alertname="IPSLAProbeFailing", alertstate="firing"}
+        eval_time: 46m
+        exp_samples:
+          - labels: 'ALERTS{alertname="IPSLAProbeFailing", alertstate="firing", severity="warning", device="b1", index="30", probe="wan"}'
+            value: 1

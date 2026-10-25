@@ -271,7 +271,8 @@ def test_architecture_volume_section_matches_compose():
         named |= set((doc.get("volumes") or {}).keys())
         for spec in (doc.get("services") or {}).values():
             for m in spec.get("volumes", []) or []:
-                src = m.split(":")[0]
+                # A source chosen by a variable (profiles/${ALERT_PROFILE:-standard}.yml) is documented as its folder.
+                src = m[:m.index("${")].rstrip("/") if "${" in m else m.split(":")[0]
                 if src.startswith("../"):
                     binds.add(src[3:].rstrip("/"))
 

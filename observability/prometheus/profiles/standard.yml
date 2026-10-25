@@ -1,0 +1,28 @@
+# Alert profile "standard" — the alerts whose timing depends on what the deployment is for. Exactly one profile is
+# loaded: compose mounts profiles/${ALERT_PROFILE:-standard}.yml at /etc/prometheus-profile/ (set alerts.profile in
+# site.yml, or ai_platform.alert_profile in the overlay). Both files define the same alerts; tests keep them in step.
+# Standard (the default): a scheduled run must fail twice (20 min), IP SLA judged over 15 minutes. Few false alarms.
+groups:
+  - name: assurance-standard
+    rules:
+      # A rule from automation/assurance/rules.yml failing on a device. On-demand checks update the state too,
+      # so a post-check that passes clears it at once.
+      - alert: AssuranceCheckFailing
+        expr: assurance_rule_state{state=~"fail|error"} == 1
+        for: 20m
+        labels: { severity: warning }
+        annotations:
+          summary: "Assurance {{ $labels.rule }} is {{ $labels.state }} on {{ $labels.device }}"
+          description: "Detail: GET /assurance/latest on the automation API, or make check DEV={{ $labels.device }}."
+
+  - name: wan-quality-standard
+    rules:
+      # IP SLA probes: a probe that keeps failing is a path (or service) that
+      # is down from that site's point of view.
+      - alert: IPSLAProbeFailing
+        expr: ipsla:success:ratio15m < 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "IP SLA {{ $labels.probe }} on {{ $labels.device }} succeeds {{ $value | humanizePercentage }}"
+          description: "Fewer than 80% of operations succeeded over 15 minutes — loss on the path, or the target is down."

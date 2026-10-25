@@ -65,15 +65,8 @@ groups:
 
   - name: assurance
     rules:
-      # A rule from automation/assurance/rules.yml failing on a device for two
-      # consecutive scheduled runs (the for: window covers at least one more).
-      - alert: AssuranceCheckFailing
-        expr: assurance_rule_state{state=~"fail|error"} == 1
-        for: 20m
-        labels: { severity: warning }
-        annotations:
-          summary: "Assurance {{ $labels.rule }} is {{ $labels.state }} on {{ $labels.device }}"
-          description: "Detail: GET /assurance/latest on the automation API, or make check DEV={{ $labels.device }}."
+      # AssuranceCheckFailing: its timing depends on the alert profile (ALERT_PROFILE), so it is in
+      # observability/prometheus/profiles/<profile>.yml, not here.
       # The scheduler is on but a device has not been assured for 3 intervals.
       - alert: AssuranceStale
         expr: >-
@@ -87,15 +80,8 @@ groups:
 
   - name: wan-quality
     rules:
-      # IP SLA probes: a probe that keeps failing is a path (or service) that
-      # is down from that site's point of view.
-      - alert: IPSLAProbeFailing
-        expr: ipsla:success:ratio15m < 0.8
-        for: 5m
-        labels: { severity: warning }
-        annotations:
-          summary: "IP SLA {{ $labels.probe }} on {{ $labels.device }} succeeds {{ $value | humanizePercentage }}"
-          description: "Fewer than 80% of operations succeeded over 15 minutes — loss on the path, or the target is down."
+      # IPSLAProbeFailing: its timing depends on the alert profile (ALERT_PROFILE), so it is in
+      # observability/prometheus/profiles/<profile>.yml, not here.
       - alert: WANLatencyHigh
         expr: ipsla:rtt_ms:avg10m{rtt_type="1"} > 150
         for: 10m

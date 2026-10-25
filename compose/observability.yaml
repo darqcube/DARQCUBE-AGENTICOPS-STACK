@@ -72,6 +72,8 @@ services:
       - --web.enable-lifecycle
     volumes:
       - ../observability/prometheus:/etc/prometheus:ro
+      # One alert profile: standard (default) or demo. Changing it recreates Prometheus (make up).
+      - ../observability/prometheus/profiles/${ALERT_PROFILE:-standard}.yml:/etc/prometheus-profile/alerts.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"

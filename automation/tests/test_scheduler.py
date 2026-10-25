@@ -109,8 +109,28 @@ def test_prometheus_scrapes_the_automation_service():
 
 def test_alerts_and_rules_cover_assurance():
     rules = (ROOT / "observability/prometheus/rules/recording.yml").read_text()
-    alerts = (ROOT / "observability/prometheus/rules/alerts.yml").read_text()
+    alerts = (ROOT / "observability/prometheus/rules/alerts.yml").read_text() + \
+        "".join(f.read_text() for f in sorted((ROOT / "observability/prometheus/profiles").glob("*.yml")))
     for name in ("network:assurance_failing:count", "network:assurance_passing:count"):
         assert name in rules
     for name in ("AssuranceCheckFailing", "AssuranceStale"):
         assert f"alert: {name}" in alerts
+
+
+def test_an_on_demand_check_becomes_the_latest_result(load):
+    """A change's post-check that passes must clear AssuranceCheckFailing now, not at the next scheduled run."""
+    mod = load()
+    mod.run_once()
+    assert 'device="r1",rule="bgp_peers_established",severity="error",source="pyats",state="fail"' in mod.metrics()
+    passing = [dict(r, status="pass", failures=[]) for r in RULES]
+    mod.record("r1", {"results": passing}, started=0.0)
+    text = mod.metrics()
+    assert 'device="r1",rule="bgp_peers_established",severity="error",source="pyats",state="pass"' in text
+    assert 'state="fail"' not in text.split('device="r2"')[0], "r1 now shows only the on-demand result"
+    assert 'assurance_device_run_ok{device="r1"} 1' in text
+
+
+def test_the_api_records_on_demand_checks():
+    body = (ROOT / "automation/service/main.py").read_text()
+    check = body.split("def device_check", 1)[1].split("\n@app.", 1)[0]
+    assert "scheduler.record(device, result, started)" in check
