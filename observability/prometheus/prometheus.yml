@@ -18,11 +18,12 @@ alerting:
         - targets: [alertmanager:9093]
 
 scrape_configs:
-  # Every device metric — SNMP, gNMI and flow — arrives through this one target.
-  # Telegraf has already attached device/site/role from the source of truth.
+  # Every device metric arrives from Telegraf, which has already attached
+  # device/site/role from the source of truth: SNMP and gNMI on :9273, flows on
+  # :9274 (one sample per 60 s window, with its own timestamp; outputs.conf).
   - job_name: telegraf
     static_configs:
-      - targets: [telegraf:9273]
+      - targets: [telegraf:9273, telegraf:9274]
 
   # Scheduled assurance results (automation service /metrics). Present
   # whether or not scheduling is on: with ASSURANCE_INTERVAL_MINUTES=0 it

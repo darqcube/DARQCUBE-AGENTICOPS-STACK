@@ -89,7 +89,7 @@
       },
       "targets": [
         {
-          "expr": "sum(avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "expr": "sum((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) * 8 / 60",
           "refId": "A"
         }
       ],
@@ -127,7 +127,7 @@
       },
       "targets": [
         {
-          "expr": "sum(avg_over_time(netflow_flow_packets_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) / 60",
+          "expr": "sum((sum_over_time(netflow_flow_packets_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) / 60",
           "refId": "A"
         }
       ],
@@ -219,7 +219,7 @@
       },
       "targets": [
         {
-          "expr": "sum(avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[1h])) * 60",
+          "expr": "sum((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[1h]) / 60)) * 60",
           "refId": "A"
         }
       ],
@@ -257,7 +257,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "expr": "sum by (device) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{device}}",
           "refId": "A"
         }
@@ -304,7 +304,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "expr": "sum by (protocol) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{protocol}}",
           "refId": "A"
         }
@@ -354,7 +354,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (site) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "expr": "sum by (site) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{site}}",
           "refId": "A"
         }
@@ -401,7 +401,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (direction) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) * 8 / 60",
+          "expr": "sum by (direction) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{direction}}",
           "refId": "A"
         }
@@ -451,7 +451,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device) (avg_over_time(netflow_flow_packets_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m])) / 60",
+          "expr": "sum by (device) ((sum_over_time(netflow_flow_packets_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[5m]) / 5)) / 60",
           "legendFormat": "{{device}}",
           "refId": "A"
         }
@@ -498,7 +498,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device, site, role, protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[15m])) * 8 / 60",
+          "expr": "sum by (device, site, role, protocol) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", site=~\"$site\", protocol=~\"$protocol\"}[15m]) / 15)) * 8 / 60",
           "format": "table",
           "instant": true,
           "refId": "A"

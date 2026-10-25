@@ -56,12 +56,16 @@ tables means the config never names a table that does not exist yet.
 ## Reading the numbers
 
 `netflow_flow_bytes_total` is a **gauge**: bytes per 60 s aggregation window
-(the `_total` is historical, not a counter).
+(the `_total` is historical, not a counter). Each window is stored once, with
+its own timestamp, and a minute without flows has no sample, so add windows up
+with `sum_over_time`. Do not use `avg_over_time`: it averages only the minutes
+that had flows, so a lone burst (an OSPF refresh every 30 minutes) counts as if
+it lasted the whole range.
 
 | Want | PromQL |
 |---|---|
-| bit/s by application | `sum by (application) (avg_over_time(netflow_flow_bytes_total[5m])) * 8 / 60` |
-| bytes in the last hour | `sum by (application) (avg_over_time(netflow_flow_bytes_total[1h])) * 60` |
+| bit/s by application | `sum by (application) (sum_over_time(netflow_flow_bytes_total[5m]) / 5) * 8 / 60` |
+| bytes in the last hour | `sum by (application) (sum_over_time(netflow_flow_bytes_total[1h]))` |
 | unclassified share | `sum(netflow_flow_bytes_total{application="other"}) / sum(netflow_flow_bytes_total)` |
 
 **Every exporter on a path reports the same flow.** Summing a branch router

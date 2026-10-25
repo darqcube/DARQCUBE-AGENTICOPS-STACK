@@ -1,0 +1,30 @@
+# Flow totals (netflow_flow_bytes_total: bytes per 60 s window, one sample per
+# window, none for a minute without flows; telegraf outputs.conf).
+#   docker run --rm -v "$PWD/observability/prometheus:/p:ro" --entrypoint promtool prom/prometheus test rules /p/tests/flows.test.yml
+# Also run by automation/tests/test_render.py when Docker is available.
+rule_files: []
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      # A lone burst every 30 minutes (an OSPF refresh): two windows in the hour.
+      - {series: 'netflow_flow_bytes_total{device="edge",protocol="ospfigp"}', values: '_x29 20560 _x29 20560'}
+      # A steady flow (hellos every minute): sixty windows.
+      - {series: 'netflow_flow_bytes_total{device="core",protocol="ospfigp"}', values: '224x60'}
+    promql_expr_test:
+      # get_flow_summary: the total over the window is the sum of its windows.
+      - expr: sum by (device) (sum_over_time(netflow_flow_bytes_total[1h]))
+        eval_time: 60m
+        exp_samples:
+          - {labels: '{device="edge"}', value: 41120}     # 2 x 20560, not 60 x 20560
+          - {labels: '{device="core"}', value: 13440}     # 60 x 224
+      # Dashboards' bit/s: the per-minute mean over 5 m with empty minutes as zero.
+      - expr: sum by (device) (sum_over_time(netflow_flow_bytes_total[5m]) / 5) * 8 / 60
+        eval_time: 60m
+        exp_samples:
+          - {labels: '{device="edge"}', value: 548.2666666666667}   # one 20560-byte minute in five
+          - {labels: '{device="core"}', value: 29.866666666666667}  # 224 bytes a minute
+      - expr: sum by (device) (sum_over_time(netflow_flow_bytes_total[5m]) / 5) * 8 / 60
+        eval_time: 45m
+        exp_samples:
+          - {labels: '{device="core"}', value: 29.866666666666667}  # no burst in this window: edge has no sample

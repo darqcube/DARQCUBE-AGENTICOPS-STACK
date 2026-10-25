@@ -1170,13 +1170,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (application) (avg_over_time(netflow_flow_bytes_total{criticality=\"critical\"}[5m])) * 8 / 60",
+          "expr": "sum by (application) ((sum_over_time(netflow_flow_bytes_total{criticality=\"critical\"}[5m]) / 5)) * 8 / 60",
           "format": "table",
           "instant": true,
           "refId": "A"
         },
         {
-          "expr": "sum by (application) (avg_over_time(netflow_flow_bytes_total{criticality=\"critical\"}[6h])) * 8 / 60",
+          "expr": "sum by (application) ((sum_over_time(netflow_flow_bytes_total{criticality=\"critical\"}[6h]) / 360)) * 8 / 60",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -1284,7 +1284,7 @@
       },
       "targets": [
         {
-          "expr": "sort_desc(topk(15, max by (site, application) (sum by (site, device, application) (avg_over_time(netflow_flow_bytes_total{site=~\"$site\", application!=\"other\"}[15m]))) * 8 / 60))",
+          "expr": "sort_desc(topk(15, max by (site, application) (sum by (site, device, application) ((sum_over_time(netflow_flow_bytes_total{site=~\"$site\", application!=\"other\"}[15m]) / 15))) * 8 / 60))",
           "legendFormat": "{{site}} \u00b7 {{application}}",
           "refId": "A",
           "instant": true
@@ -1323,12 +1323,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (direction) (avg_over_time(netflow_flow_bytes_total{role=\"internet-edge\"}[5m])) * 8 / 60",
+          "expr": "sum by (direction) ((sum_over_time(netflow_flow_bytes_total{role=\"internet-edge\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{direction}}",
           "refId": "A"
         },
         {
-          "expr": "sum(avg_over_time(netflow_flow_bytes_total{role=\"internet-edge\", application=\"other\"}[5m])) * 8 / 60",
+          "expr": "sum((sum_over_time(netflow_flow_bytes_total{role=\"internet-edge\", application=\"other\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "unclassified",
           "refId": "B"
         }

@@ -146,7 +146,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (criticality) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\", criticality=\"critical\"}[5m])) * 8 / 60",
+          "expr": "sum by (criticality) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\", criticality=\"critical\"}[5m]) / 5)) * 8 / 60",
           "refId": "A"
         }
       ],
@@ -222,7 +222,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (application) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m])) * 8 / 60",
+          "expr": "sum by (application) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{application}}",
           "refId": "A"
         }
@@ -271,7 +271,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (criticality) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m])) * 8 / 60",
+          "expr": "sum by (criticality) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{criticality}}",
           "refId": "A"
         }
@@ -320,7 +320,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (application, protocol) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m])) * 8 / 60",
+          "expr": "sum by (application, protocol) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[5m]) / 5)) * 8 / 60",
           "legendFormat": "{{application}} {{protocol}}",
           "refId": "A"
         }
@@ -369,7 +369,7 @@
       },
       "targets": [
         {
-          "expr": "sort_desc(sum by (application) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[1h])) * 60)",
+          "expr": "sort_desc(sum by (application) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[1h]) / 60)) * 60)",
           "legendFormat": "{{application}}",
           "refId": "A",
           "instant": true
@@ -408,7 +408,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device, application, criticality) (avg_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[15m])) * 8 / 60",
+          "expr": "sum by (device, application, criticality) ((sum_over_time(netflow_flow_bytes_total{device=~\"$device\", application=~\"$application\"}[15m]) / 15)) * 8 / 60",
           "format": "table",
           "instant": true,
           "refId": "A"

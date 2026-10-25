@@ -918,3 +918,34 @@ def test_link_rules_behave(tmp_path):
                         "--entrypoint", "promtool", image, "test", "rules", "/p/tests/links.test.yml"],
                        capture_output=True, text=True, timeout=180)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_flow_totals_count_each_window_once():
+    """Flow bytes are a gauge per 60 s window. Each window must be stored once
+    (Telegraf exports its timestamp) and totals must sum windows: a mean of the
+    samples x minutes counted a lone burst (an OSPF refresh every 30 minutes)
+    as if it lasted the whole window, about 30 times too much."""
+    outputs = (ROOT / "observability/telegraf/conf.d/outputs.conf").read_text()
+    flows = outputs[outputs.index('listen = ":9274"'):]
+    assert 'namepass = ["netflow"]' in flows and "export_timestamp = true" in flows
+    assert 'namedrop = ["netflow"]' in outputs[:outputs.index('listen = ":9274"')]
+    assert "telegraf:9274" in (ROOT / "observability/prometheus/prometheus.yml").read_text()
+    sources = [ROOT / "mcp/servers/prometheus.py",
+               *sorted((ROOT / "observability/grafana/provisioning/dashboards").rglob("*.json"))]
+    for path in sources:
+        assert not re.search(r"avg_over_time\(netflow_", path.read_text()), path.name
+
+
+def test_flow_totals_behave():
+    """promtool unit test (observability/prometheus/tests/flows.test.yml): a lone
+    burst counts once, a steady flow every minute, empty minutes as zero."""
+    import shutil
+    import subprocess
+    if not shutil.which("docker"):
+        pytest.skip("docker not available")
+    version = re.search(r"^PROMETHEUS_VERSION=(\S+)", (ROOT / ".env.example").read_text(), re.M)
+    image = f"prom/prometheus:{version.group(1)}" if version else "prom/prometheus"
+    r = subprocess.run(["docker", "run", "--rm", "-v", f"{ROOT / 'observability/prometheus'}:/p:ro",
+                        "--entrypoint", "promtool", image, "test", "rules", "/p/tests/flows.test.yml"],
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stdout + r.stderr

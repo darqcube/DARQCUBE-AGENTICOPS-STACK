@@ -50,7 +50,7 @@ silently. Telegraf sees only a timeout.
 |---|---|---|
 | `interface` | `oper_status` | `interface_oper_status` |
 | `cpu` | `usage` | `cpu_usage` |
-| `netflow` | `flow_bytes_total` | `netflow_flow_bytes_total` — a gauge: bytes per 60 s window |
+| `netflow` | `flow_bytes_total` | `netflow_flow_bytes_total` — a gauge: bytes per 60 s window, one sample per window (own output on `:9274`, with the window's timestamp) |
 | `memory` | `used` | `memory_used` |
 | `device` | `uptime` | `device_uptime` |
 
