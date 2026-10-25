@@ -47,8 +47,13 @@ help: ## Show this help
 preflight: ## Check host prerequisites and .env before starting
 	@./scripts/preflight.sh
 
-up: ## Start the stack and WAIT until every container is healthy
+up: ## Start the stack and WAIT until every container is healthy; stop what a switched-off profile still runs
 	$(COMPOSE) up -d --wait --wait-timeout 300
+	@# Compose leaves a running service alone when its profile is switched off (graphs: false keeps the renderer
+	@# running). Make the running stack match COMPOSE_PROFILES: stop and remove services no active profile enables.
+	@off=$$(comm -23 <($(COMPOSE) --profile '*' config --services | sort) <($(COMPOSE) config --services | sort)); \
+	 running=$$(for s in $$off; do [ -n "$$($(COMPOSE) --profile '*' ps -q $$s 2>/dev/null)" ] && echo $$s; done); \
+	 if [ -n "$$running" ]; then echo "stopping (profile off): $$running"; $(COMPOSE) --profile '*' rm -sf $$running; fi
 
 down: ## Stop the stack (volumes are kept)
 	$(COMPOSE) down

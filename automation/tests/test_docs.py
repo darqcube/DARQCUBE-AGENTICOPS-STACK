@@ -338,3 +338,12 @@ def test_make_targets_that_call_the_api_fail_loudly():
     for line in make.splitlines():
         if line.startswith("\t@") and "|" in line and ("curl" in line or "jq -Rs" in line):
             assert "set -o pipefail" in line, f"piped recipe without pipefail: {line.strip()}"
+
+
+def test_make_up_stops_services_of_switched_off_profiles():
+    """Compose leaves a running service alone when its profile is switched off: graphs: false kept the renderer
+    running until someone removed it by hand. `make up` makes the running stack match COMPOSE_PROFILES."""
+    make = (ROOT / "Makefile").read_text()
+    up = make.split("\nup:", 1)[1].split("\n\n", 1)[0]
+    assert "--profile '*' config --services" in up and "config --services" in up
+    assert "--profile '*' rm -sf" in up

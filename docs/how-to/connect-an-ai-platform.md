@@ -64,6 +64,13 @@ graph request, never re-using a link from earlier in the chat.
 
 Apply on the stack host: `python3 install.py --step 2 && make mcp-apply && make up`.
 
+**Turning graphs off** (`graphs: false`, or no `--graphs`; e.g. when the AI platform
+draws its own charts from the metrics): the same three commands. `make mcp-apply`
+unregisters both render tools, and `make up` stops and removes `grafana-renderer`:
+it removes every service whose profile is no longer in `COMPOSE_PROFILES` (Compose
+itself would leave it running). Grafana, its dashboards and `get_dashboard_link`
+stay.
+
 `mcp-pyats` tools — a feature is a name from the platform's `pyats:` allow-list
 in `platforms.yml`, never a Genie command:
 
