@@ -189,6 +189,12 @@ ALERT_WEBHOOK_URL=https://your-ai-platform.example/api/alerts
 docker compose up -d --force-recreate config-init alertmanager
 ```
 
+Or let the AI platform host generate it with the rest of its settings:
+`--alert-webhook-url <url>` on `scripts/ai-platform-connect.py` writes
+`ai_platform.alert_webhook_url` into the overlay, and `install.py` applies it
+(an empty string stops delivery; leaving the option out keeps the current
+value). The URL may carry a path secret, so the overlay stays gitignored.
+
 Every alert is then POSTed as JSON, including resolutions. This is a push, so
 the AI platform learns about a problem without polling.
 

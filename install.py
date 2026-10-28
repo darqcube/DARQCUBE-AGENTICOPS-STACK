@@ -298,7 +298,8 @@ PORT_VARS = {
 
 AUTH_MODES = ("token", "oidc", "both")
 AI_PLATFORM_KEYS = {
-    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs", "alert_profile"},
+    "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs", "alert_profile",
+         "alert_webhook_url"},
     "publish": {"enabled", "bind_ip"},
     "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role"},
 }
@@ -420,6 +421,10 @@ def validate_ai_platform(site: dict) -> list[str]:
                     f"(generate it on the ai-platform host: scripts/ai-platform-connect.py)"
                 )
 
+    hook = str(dig(site, "ai_platform.alert_webhook_url", "") or "")
+    if hook and not re.match(r"^https?://\S+$", hook):
+        problems.append("ai_platform.alert_webhook_url must be an http(s) URL, or empty")
+
     try:
         kb = as_int(dig(site, "ai_platform.max_response_kb"), "ai_platform.max_response_kb", 512)
         if not 16 <= kb <= 4096:
@@ -503,7 +508,10 @@ def site_to_env(site: dict) -> dict[str, str]:
     for name, var in PORT_VARS.items():
         env[var] = str(as_int(overrides.get(name), f"ports.overrides.{name}", chosen[name]))
 
-    env["ALERT_WEBHOOK_URL"] = str(dig(site, "alerts.webhook_url", "") or "")
+    # The ai-platform overlay may name its own alert receiver; it wins over
+    # alerts.webhook_url, as every other overlay value wins over site.yml.
+    env["ALERT_WEBHOOK_URL"] = str(dig(site, "ai_platform.alert_webhook_url")
+                                   or dig(site, "alerts.webhook_url", "") or "")
 
     profiles = ["devices", "automation"]
     if as_bool(dig(site, "ai_platform.enabled"), "ai_platform.enabled", default=True):
@@ -925,7 +933,8 @@ def read_overlay(path: Path) -> dict | None:
 
 def apply_ai_platform_to_env(path: Path) -> None:
     """Apply an ai-platform overlay to an existing .env — an install done
-    without a site file. Only the MCP keys (and GRAFANA_PUBLIC_URL) change."""
+    without a site file. Only the MCP keys (and GRAFANA_PUBLIC_URL, and
+    ALERT_WEBHOOK_URL when the overlay names one) change."""
     overlay = read_overlay(path)
     if overlay is None:
         return
@@ -940,6 +949,8 @@ def apply_ai_platform_to_env(path: Path) -> None:
     if dig(overlay, "ai_platform.allow_write") is not None:
         values["MCP_ALLOW_WRITE"] = str(
             as_bool(dig(overlay, "ai_platform.allow_write"), "ai_platform.allow_write")).lower()
+    if dig(overlay, "ai_platform.alert_webhook_url") is not None:
+        values["ALERT_WEBHOOK_URL"] = str(dig(overlay, "ai_platform.alert_webhook_url") or "")
     # Without a site file nothing else rebuilds COMPOSE_PROFILES: keep the
     # install's own profiles and only switch `graphs` on or off.
     values["COMPOSE_PROFILES"] = with_profile(current.get("COMPOSE_PROFILES", ""), "graphs",

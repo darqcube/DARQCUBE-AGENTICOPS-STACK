@@ -129,6 +129,8 @@ def site_overlay(args, issuer: str, jwks_url: str, audiences: list[str]) -> str:
         f"  max_response_kb: {args.max_response_kb}",
         f"  graphs: {'true' if args.graphs else 'false'}",
     ] + ([f"  alert_profile: {args.alert_profile}"] if args.alert_profile else [])
+    if args.alert_webhook_url is not None:
+        lines.append(f'  alert_webhook_url: "{args.alert_webhook_url}"')
     return "\n".join(lines) + "\n"
 
 
@@ -181,6 +183,9 @@ def main() -> int:
                     help="graphs in chat: start Grafana's renderer and register render_interface_graph")
     ap.add_argument("--alert-profile", choices=("standard", "demo"),
                     help="alert timing on the stack: demo fires and clears within minutes (drills); default: leave as is")
+    ap.add_argument("--alert-webhook-url", default=None,
+                    help="where the stack's Alertmanager sends alerts (ALERT_WEBHOOK_URL); "
+                         "empty string to stop sending, omit to leave it as it is")
     ap.add_argument("--max-response-kb", type=int, default=64,
                     help="cap on one tool result (default 64, for small local models)")
     ap.add_argument("--token-header", default="",

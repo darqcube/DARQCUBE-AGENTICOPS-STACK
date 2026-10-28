@@ -108,6 +108,20 @@ def test_end_to_end_output_is_what_install_accepts(gen, inst, idp, tmp_path):
 
     env = inst.ai_platform_env(inst.merge_overlay({}, overlay, "o"), "192.0.2.10", "13000")
     assert env["MCP_BIND_IP"] == "192.0.2.10" and env["MCP_AUTH_MODE"] == "oidc"
+    assert "alert_webhook_url" not in overlay["ai_platform"], "written although not asked for"
+
+
+def test_the_alert_receiver_is_written_when_given(gen, inst, idp, tmp_path):
+    out = subprocess.run(
+        [sys.executable, str(SCRIPT), "--stack-host", "127.0.0.1", "--idp", idp,
+         "--jwks-host", "192.0.2.1", "--alert-webhook-url", "http://192.0.2.1:9100/alertmanager/s",
+         "--out", str(tmp_path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    overlay = inst.read_yaml(tmp_path / "ai-platform.site.yml")
+    assert not inst.validate_ai_platform(overlay), inst.validate_ai_platform(overlay)
+    assert overlay["ai_platform"]["alert_webhook_url"] == "http://192.0.2.1:9100/alertmanager/s"
 
 
 def test_snippet_registers_all_seven_servers(gen, tmp_path):

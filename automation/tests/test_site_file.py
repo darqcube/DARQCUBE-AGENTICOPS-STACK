@@ -411,6 +411,38 @@ def test_overlay_switches_only_the_graphs_profile(inst, tmp_path, monkeypatch):
     assert inst.read_env(env)["COMPOSE_PROFILES"] == "devices,automation,mcp"
 
 
+def test_the_overlay_may_name_the_alert_receiver(inst, site):
+    """The ai-platform host generates where alerts go, like every other setting
+    it needs; it wins over the site file's alerts.webhook_url."""
+    site.setdefault("alerts", {})["webhook_url"] = "http://192.0.2.50/hook"
+    assert inst.site_to_env(site)["ALERT_WEBHOOK_URL"] == "http://192.0.2.50/hook"
+    merged = inst.merge_overlay(site, {"ai_platform": {"alert_webhook_url": "http://192.0.2.1:9100/a/s"}}, "o.yml")
+    assert not inst.validate_ai_platform(merged)
+    assert inst.site_to_env(merged)["ALERT_WEBHOOK_URL"] == "http://192.0.2.1:9100/a/s"
+
+
+def test_an_alert_receiver_must_be_a_url(inst, site):
+    site["ai_platform"]["alert_webhook_url"] = "not a url"
+    assert any("alert_webhook_url" in p for p in inst.validate_ai_platform(site))
+
+
+def test_an_overlay_sets_the_alert_receiver_only_when_it_names_one(inst, tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text("SYSLOG_COLLECTOR_IP=192.0.2.10\nGRAFANA_PORT=13000\nALERT_WEBHOOK_URL=http://192.0.2.50/keep\n")
+    overlay = tmp_path / "ai-platform.yml"
+    monkeypatch.setattr(inst, "ENV", env)
+    monkeypatch.setattr(inst, "local_addresses", lambda: set())
+    overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n")
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["ALERT_WEBHOOK_URL"] == "http://192.0.2.50/keep", "an overlay without the key changed it"
+    overlay.write_text('ai_platform:\n  publish:\n    enabled: true\n  alert_webhook_url: "http://192.0.2.1:9100/a/s"\n')
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["ALERT_WEBHOOK_URL"] == "http://192.0.2.1:9100/a/s"
+    overlay.write_text('ai_platform:\n  publish:\n    enabled: true\n  alert_webhook_url: ""\n')
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["ALERT_WEBHOOK_URL"] == "", "an empty value must switch alert delivery off"
+
+
 def test_alert_profile_defaults_to_standard(inst, site):
     site.get("alerts", {}).pop("profile", None)
     assert inst.site_to_env(site)["ALERT_PROFILE"] == "standard"
