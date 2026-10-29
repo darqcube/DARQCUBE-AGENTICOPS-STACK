@@ -120,7 +120,7 @@ authority.
 | **Infrahub** | `/` · GraphQL at `/graphql` | `INFRAHUB_PORT` | 18000 | 8000 | UI: `admin` / `infrahub` · API: header `X-INFRAHUB-KEY: $INFRAHUB_ADMIN_TOKEN` |
 | **Prometheus** | `/` | `PROMETHEUS_PORT` | 19090 | 9090 | none |
 | **Alertmanager** | `/` | `ALERTMANAGER_PORT` | 19093 | 9093 | none |
-| **Automation API** | `/docs` (Swagger) | `AUTOMATION_PORT` | 18100 | 8100 | **none** — can push config |
+| **Automation API** | `/docs` (Swagger) | `AUTOMATION_PORT` (on `AUTOMATION_BIND_IP`, loopback by default) | 18100 | 8100 | **none** — this host only by default |
 | **Loki** | no UI — use Grafana → **Explore** | `LOKI_PORT` | 13100 | 3100 | none |
 | **MCP servers** | not published — Compose network only | — | — | — | — |
 
@@ -128,9 +128,12 @@ Infrahub's UI password is Infrahub's own default; this stack does not set one.
 Change it after first login. `INFRAHUB_ADMIN_TOKEN` is an API token, not a UI
 password.
 
-Everything except Grafana and Infrahub is unauthenticated. Anyone who can reach
-`AUTOMATION_PORT` can push configuration to every device, whatever
-`MCP_ALLOW_WRITE` says. Keep these ports on a management network.
+Everything except Grafana and Infrahub is unauthenticated. The automation API
+is therefore published on loopback only (`AUTOMATION_BIND_IP`), and with
+`WRITE_MODE=approved` (the default) it refuses a direct push anyway: a device
+change is staged, approved by a person and committed
+([how-to/approve-changes.md](how-to/approve-changes.md)). Keep the other ports on
+a management network.
 
 Device-facing listeners are not UIs, but for reference: syslog
 `SYSLOG_PORT` (shipped 1514, standard 514 — TCP and UDP), NetFlow `NETFLOW_PORT`
@@ -485,6 +488,7 @@ and deleted by `make clean`.
 | `grafana-data` | observability | `grafana` | users, sessions, preferences | little — dashboards come from the repo |
 | `alertmanager-data` | observability | `alertmanager` | silences and notification state | active silences |
 | `alertmanager-config` | observability | `config-init` writes, `alertmanager` reads | the rendered `alertmanager.yml` | nothing — regenerated at every start |
+| `automation-state` | automation | `automation` | staged device changes and every decision on them (who asked, approved, committed) | the change history and audit; changes waiting for approval |
 
 **`neo4j-data` is only irreplaceable if Infrahub was edited through its UI.**
 Everything that arrived through `source-of-truth/devices/*.yml` rebuilds with

@@ -301,8 +301,35 @@ AI_PLATFORM_KEYS = {
     "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs", "alert_profile",
          "alert_webhook_url"},
     "publish": {"enabled", "bind_ip"},
-    "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role"},
+    "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role", "approvals_audience", "agent_claim",
+             "propose_role", "approve_role", "commit_role", "commit_any_role"},
 }
+
+# Device changes: the stack owner's policy (site.yml `changes:`), never the
+# connecting platform's. docs/how-to/approve-changes.md
+WRITE_MODES = ("approved", "direct")
+CHANGES_KEYS = {"write_mode", "approve_within_minutes", "commit_within_minutes", "rollback_within_minutes",
+                "fresh_signin_seconds", "four_eyes", "management_interfaces"}
+
+
+def changes_env(site: dict) -> dict[str, str]:
+    """How a device change is approved: the mode, the clocks, four eyes, management interfaces."""
+    env: dict[str, str] = {}
+    mode = str(dig(site, "changes.write_mode", "approved") or "approved").strip().lower()
+    if mode not in WRITE_MODES:
+        raise SiteError(f"changes.write_mode: expected one of {', '.join(WRITE_MODES)}, got {mode!r}")
+    env["WRITE_MODE"] = mode
+    for key, var, default in (("approve_within_minutes", "CHANGE_APPROVE_WITHIN_MINUTES", 120),
+                              ("commit_within_minutes", "CHANGE_COMMIT_WITHIN_MINUTES", 15),
+                              ("rollback_within_minutes", "CHANGE_ROLLBACK_WITHIN_MINUTES", 60),
+                              ("fresh_signin_seconds", "CHANGE_FRESH_SIGNIN_SECONDS", 300)):
+        env[var] = str(as_int(dig(site, f"changes.{key}"), f"changes.{key}", default))
+    env["CHANGE_FOUR_EYES"] = str(as_bool(dig(site, "changes.four_eyes"), "changes.four_eyes")).lower()
+    interfaces = dig(site, "changes.management_interfaces", "") or ""
+    if isinstance(interfaces, list):
+        interfaces = ",".join(str(i).strip() for i in interfaces if str(i).strip())
+    env["CHANGE_MANAGEMENT_INTERFACES"] = str(interfaces).strip()
+    return env
 
 
 def ai_platform_env(site: dict, collector_ip: str, grafana_port: str) -> dict[str, str]:
@@ -327,6 +354,15 @@ def ai_platform_env(site: dict, collector_ip: str, grafana_port: str) -> dict[st
         audiences = ",".join(str(a).strip() for a in audiences if str(a).strip())
     env["MCP_OIDC_AUDIENCES"] = str(audiences).strip()
     env["MCP_WRITE_ROLE"] = str(dig(site, "ai_platform.auth.write_role", "") or "darqcube-write").strip()
+    # The platform's names for the change rights, the audience its approvals
+    # app signs in for, and the claim naming the calling agent.
+    for key, var, default in (("propose_role", "CHANGE_PROPOSE_ROLE", "darqcube-propose"),
+                              ("approve_role", "CHANGE_APPROVE_ROLE", "darqcube-approve"),
+                              ("commit_role", "CHANGE_COMMIT_ROLE", "darqcube-commit"),
+                              ("commit_any_role", "CHANGE_COMMIT_ANY_ROLE", "darqcube-commit-any"),
+                              ("approvals_audience", "CHANGE_APPROVALS_AUDIENCE", "darqcube-approvals"),
+                              ("agent_claim", "MCP_AGENT_CLAIM", "azp")):
+        env[var] = str(dig(site, f"ai_platform.auth.{key}", "") or default).strip()
     env["MCP_MAX_RESPONSE_BYTES"] = str(
         as_int(dig(site, "ai_platform.max_response_kb"), "ai_platform.max_response_kb", 512) * 1024
     )
@@ -539,6 +575,7 @@ def site_to_env(site: dict) -> dict[str, str]:
         as_bool(dig(site, "ai_platform.allow_write"), "ai_platform.allow_write")
     ).lower()
     env.update(ai_platform_env(site, env["SYSLOG_COLLECTOR_IP"], env["GRAFANA_PORT"]))
+    env.update(changes_env(site))
 
     return env
 
@@ -548,10 +585,14 @@ def validate_site(site: dict) -> list[str]:
     problems: list[str] = []
 
     # Typos in keys are silent otherwise — the value is simply never applied.
-    known = {"site", "devices", "scale", "ports", "alerts", "ai_platform", "source_of_truth"}
+    known = {"site", "devices", "scale", "ports", "alerts", "ai_platform", "source_of_truth", "changes"}
     for key in site:
         if key not in known:
             problems.append(f"unknown top-level key '{key}' — expected one of {sorted(known)}")
+    changes = site.get("changes") or {}
+    for key in changes if isinstance(changes, dict) else ():
+        if key not in CHANGES_KEYS:
+            problems.append(f"unknown key changes.{key} — expected one of {sorted(CHANGES_KEYS)}")
 
     name = dig(site, "site.name")
     if not name:

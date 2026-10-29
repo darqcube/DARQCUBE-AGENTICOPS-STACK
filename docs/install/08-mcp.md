@@ -82,12 +82,12 @@ another, and every push records who made it.
 It archives the running config before sending and is capped by
 `MAX_CONFIG_LINES`.
 
-**It gates the MCP tool, not the API underneath.** The automation API has no
-authentication of its own, so anything that can reach port 8100 can push
-configuration regardless of this flag. Unpublishing that port closes the bypass
-and costs the AI nothing — the MCP servers reach the API over the Docker
-network. See
-[../how-to/connect-an-ai-platform.md](../how-to/connect-an-ai-platform.md#what-it-does-not-do).
+**With `WRITE_MODE=approved` (the default) there is no one-step push.** The AI
+gets `stage_device_change` and `commit_device_change` instead, and a person
+approves each change in between, through a path an agent's token cannot use:
+[../how-to/approve-changes.md](../how-to/approve-changes.md). The automation API
+underneath has no authentication of its own, so it is published on loopback
+only (`AUTOMATION_BIND_IP`) and refuses a direct push in approved mode.
 
 ## Verify
 

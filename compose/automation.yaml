@@ -35,13 +35,32 @@ services:
       # Results at /metrics (scraped by Prometheus) and /assurance/latest.
       ASSURANCE_INTERVAL_MINUTES: ${ASSURANCE_INTERVAL_MINUTES:-0}
       LOKI_URL: http://loki:3100
+      # Device changes: approved (staged, approved by a person, committed once)
+      # or direct (the old one-step push). docs/how-to/approve-changes.md
+      WRITE_MODE: ${WRITE_MODE:-approved}
+      CHANGES_DB: /var/lib/automation/changes.db
+      CHANGE_APPROVE_WITHIN_MINUTES: ${CHANGE_APPROVE_WITHIN_MINUTES:-120}
+      CHANGE_COMMIT_WITHIN_MINUTES: ${CHANGE_COMMIT_WITHIN_MINUTES:-15}
+      CHANGE_ROLLBACK_WITHIN_MINUTES: ${CHANGE_ROLLBACK_WITHIN_MINUTES:-60}
+      CHANGE_FRESH_SIGNIN_SECONDS: ${CHANGE_FRESH_SIGNIN_SECONDS:-300}
+      CHANGE_FOUR_EYES: ${CHANGE_FOUR_EYES:-false}
+      CHANGE_MANAGEMENT_INTERFACES: ${CHANGE_MANAGEMENT_INTERFACES:-}
+      CHANGE_PROPOSE_ROLE: ${CHANGE_PROPOSE_ROLE:-darqcube-propose}
+      CHANGE_APPROVE_ROLE: ${CHANGE_APPROVE_ROLE:-darqcube-approve}
+      CHANGE_COMMIT_ROLE: ${CHANGE_COMMIT_ROLE:-darqcube-commit}
+      CHANGE_COMMIT_ANY_ROLE: ${CHANGE_COMMIT_ANY_ROLE:-darqcube-commit-any}
     volumes:
       # Mounted rather than baked in, so a template or task can be edited and
       # retried without a rebuild — this is the layer that gets iterated most.
       - ../automation:/app/automation
       - ../platforms.yml:/app/platforms.yml:ro
+      # Staged changes and every decision on them (automation/changes/store.py).
+      - automation-state:/var/lib/automation
     ports:
-      - "${AUTOMATION_PORT:-8100}:8100"
+      # Loopback by default: this API has no authentication of its own, and
+      # with WRITE_MODE=approved it trusts the person mcp-netmiko verified.
+      # The MCP servers reach it over the compose network either way.
+      - "${AUTOMATION_BIND_IP:-127.0.0.1}:${AUTOMATION_PORT:-8100}:8100"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8100/healthz').status==200 else 1)\""]
       interval: 15s
@@ -50,3 +69,6 @@ services:
       start_period: 20s
     networks: [darqcube]
     restart: unless-stopped
+
+volumes:
+  automation-state:

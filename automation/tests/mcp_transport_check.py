@@ -18,6 +18,9 @@ import traceback
 # Before anything imports common: it reads its settings at import time.
 os.environ.update({
     "MCP_ALLOW_WRITE": "true",
+    # These checks pin the one-step push's gates; approved mode has its own
+    # check (changes_check.py).
+    "WRITE_MODE": "direct",
     "MCP_ALLOWED_HOSTS": "192.0.2.10:*",
     "AUTOMATION_URL": "http://127.0.0.1:9",
     "MCP_AUTH_TOKEN": "test-token",

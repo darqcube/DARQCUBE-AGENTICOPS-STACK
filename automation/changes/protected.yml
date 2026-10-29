@@ -1,0 +1,27 @@
+# Lines a device change may never contain. Checked when a change is STAGED,
+# before anyone is asked to approve it: a refused change names the line and the
+# rule. Edit this file to change the defaults for every deployment, or point
+# CHANGE_PROTECTED_FILE at your own copy.
+#
+# Each rule is a regular expression matched against one line (case-insensitive,
+# leading spaces ignored). Vendor-neutral: Cisco IOS-XE, Huawei VRP, MikroTik.
+
+rules:
+  - name: reload
+    why: restarts the device
+    match: '^(reload|reboot)\b|^/system\s+reboot\b'
+  - name: erase-configuration
+    why: erases the saved configuration
+    match: '^(write\s+erase|erase\s+(startup-config|nvram:)|reset\s+saved-configuration)\b|^/system\s+reset-configuration\b'
+  - name: remove-routing-process
+    why: removes a whole routing process
+    match: '^(no\s+router\s+(bgp|ospf|ospfv3|isis|eigrp|rip)|undo\s+(bgp|ospf|ospfv3|isis|rip))\b'
+  - name: local-users-and-aaa
+    why: changes who can log in to the device
+    match: '^(no\s+)?(username|aaa)\b|^(undo\s+)?local-user\b|^/user\b'
+
+# Interfaces that carry management access. Inside their block (after
+# "interface <name>"), these lines are refused: they would cut the device off.
+# Names come from CHANGE_MANAGEMENT_INTERFACES (comma-separated), per deployment.
+management:
+  inside_match: '^(shutdown|no\s+ip\s+address|undo\s+ip\s+address)\b|^/interface\s+disable\b'

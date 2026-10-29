@@ -135,8 +135,20 @@ ai_platform:
     jwks_url: ""
     # Comma-separated "aud" values to accept. Empty = do not check audience.
     audiences: ""
-    # Role a caller needs for push_device_config (when allow_write is on).
+    # Role a caller needs for push_device_config (changes.write_mode: direct).
     write_role: darqcube-write
+    # The rights to propose, approve and commit device changes: roles the
+    # identity provider puts in a person's token, given to GROUPS there.
+    propose_role: darqcube-propose
+    approve_role: darqcube-approve
+    commit_role: darqcube-commit
+    # ... and to commit a colleague's approved change (e.g. a shift handover).
+    commit_any_role: darqcube-commit-any
+    # The audience of the tokens that may approve: only the approvals app's
+    # own sign-in gets it. Never one of `audiences` above.
+    approvals_audience: darqcube-approvals
+    # The claim naming the calling agent.
+    agent_claim: azp
 
   # Cap on one tool result, in KiB. Lower it (e.g. 64) for a small local model,
   # whose whole context window can be smaller than the 512 default.
@@ -154,3 +166,23 @@ source_of_truth:
   # turn it on, re-run install.py (or add "auto-render" to COMPOSE_PROFILES),
   # `make up`, then `make auto-render` once. docs/how-to/auto-render.md
   auto_render: false
+
+
+changes:
+  # How a device change reaches a device (when ai_platform.allow_write is on).
+  # approved: staged, approved by a person with the approve right, committed
+  #           once, in time. direct: one step, no approval (unsafe for an AI).
+  # docs/how-to/approve-changes.md
+  write_mode: approved
+  # Minutes a change waits for a decision, an approval stays usable, and the
+  # rollback stays allowed after the push.
+  approve_within_minutes: 120
+  commit_within_minutes: 15
+  rollback_within_minutes: 60
+  # How old an approver's sign-in may be, in seconds.
+  fresh_signin_seconds: 300
+  # true: the approver must not be the person who asked.
+  four_eyes: false
+  # Interfaces carrying management access, comma-separated: a change may not
+  # shut them or remove their address, e.g. "GigabitEthernet0/0, mgmt0".
+  management_interfaces: ""

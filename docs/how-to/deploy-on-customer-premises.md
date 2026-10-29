@@ -131,23 +131,16 @@ GET  /device/{name}/config     dumps a running config
 POST /device/{name}/config     pushes configuration to a device
 ```
 
-**It has no authentication.** Anything that can reach port 8100 can call it.
-With a read-only device account (§3) the POST fails at the device, but the GET
-still returns running configurations — which contain SNMP communities, local
-password hashes and keys.
+**It has no authentication**, so it is published on **loopback only** by default
+(`AUTOMATION_BIND_IP=127.0.0.1`), and with `WRITE_MODE=approved` (the default)
+the POST refuses: device changes are staged, approved by a person and committed
+([approve-changes.md](approve-changes.md)). The GET still returns running
+configurations — SNMP communities, local password hashes and keys — to anything
+on this host.
 
-So on a customer network, do at least one of:
-
-- **Don't publish it.** Comment out the `ports:` block in
-  `compose/automation.yaml`. Everything still works — the MCP servers reach it
-  over the Docker network, and you can use it from the VM itself with
-  `docker compose exec`.
-- **Bind it to localhost**: `"127.0.0.1:${AUTOMATION_PORT:-8100}:8100"`.
-- **Firewall it** to your own workstation only.
-
-Note that `MCP_ALLOW_WRITE=false` does **not** protect this. That flag gates the
-MCP *tool*; the API underneath is always able to push. The full picture, and why
-closing the port costs an AI platform nothing:
+Keep `AUTOMATION_BIND_IP` on loopback on a customer network. The MCP servers
+reach the API over the Docker network, and `make state`, `make check` and the
+rest use it from the VM itself. The full picture:
 [connect-an-ai-platform.md](connect-an-ai-platform.md#what-it-does-not-do).
 
 ## 6. Credentials

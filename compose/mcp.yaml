@@ -118,6 +118,12 @@ services:
       # false (the default) means push_device_config is NOT REGISTERED — it is
       # absent from tools/list entirely, not merely refused when called.
       MCP_ALLOW_WRITE: ${MCP_ALLOW_WRITE:-false}
+      # approved: stage/commit tools for agents, /changes for people (the
+      # approvals audience only). direct: push_device_config. approve-changes.md
+      WRITE_MODE: ${WRITE_MODE:-approved}
+      CHANGE_APPROVALS_AUDIENCE: ${CHANGE_APPROVALS_AUDIENCE:-darqcube-approvals}
+      CHANGE_APPROVE_ROLE: ${CHANGE_APPROVE_ROLE:-darqcube-approve}
+      MCP_AGENT_CLAIM: ${MCP_AGENT_CLAIM:-azp}
     expose: ["9005"]
     ports: ["${MCP_BIND_IP:-127.0.0.1}:9005:9005"]
     healthcheck: *mcp-health

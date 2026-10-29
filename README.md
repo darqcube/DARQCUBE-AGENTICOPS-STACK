@@ -17,7 +17,7 @@ Built for demos, proofs of concept and small production networks —
 | **Network intent** | Infrahub holds what *should* exist — devices, sites, roles, platforms. Every metric and log line is labelled from it, so all four uses agree on what a device is | Infrahub UI · GraphQL · YAML + `make seed` |
 | **Observability** | Telegraf ingests SNMP, gNMI and NetFlow/IPFIX; Logstash ingests syslog. Dashboards, alerts and log search, per device, site and role | Grafana · Prometheus and Loki APIs |
 | **Automation** | Get and put configuration, parsed state, assurance checks, pre/post snapshots — Nornir, Netmiko, TextFSM, TTP and pyATS/Genie, across every vendor | `make` targets · REST API · [Python scripts](docs/how-to/automate-with-python.md) |
-| **AgenticOps** | The same capabilities as bounded MCP tools for an AI platform — read-only unless writing is explicitly enabled | [MCP servers](docs/how-to/connect-an-ai-platform.md) |
+| **AgenticOps** | The same capabilities as bounded MCP tools for an AI platform — read-only unless writing is explicitly enabled, and then every change approved by a person | [MCP servers](docs/how-to/connect-an-ai-platform.md) |
 
 Each use works on its own. Intent is the only one the others depend on.
 
@@ -402,7 +402,7 @@ seed` updates the source of truth, `make render` pushes it to the collectors.
 | [docs/INSTALL.md](docs/INSTALL.md) | install on a fresh VM — `install.py` or by hand |
 | [docs/administration/infrahub-guide.md](docs/administration/infrahub-guide.md) | sites and devices in Infrahub — UI or YAML — and verifying end to end |
 | [docs/scale.md](docs/scale.md) | the 400-device envelope and how to grow |
-| [docs/how-to/](docs/how-to/) | 25 task guides: add a device, change an alert, add a vendor… |
+| [docs/how-to/](docs/how-to/) | 26 task guides: add a device, change an alert, add a vendor… |
 | [docs/install/](docs/install/) | one page per component — config, ports, verify, problems |
 | [docs/devices/](docs/devices/) | device-side config per platform |
 | [docs/architecture.md](docs/architecture.md) | diagrams and the failure table |

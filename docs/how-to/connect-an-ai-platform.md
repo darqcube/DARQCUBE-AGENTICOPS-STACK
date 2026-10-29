@@ -211,24 +211,21 @@ to MCP.
 ### The chain, and what gates what
 
 ```
-AI platform ──bearer token──> MCP servers ──no auth──> automation API ──SSH──> devices
-                                   ▲                                              ▲
-                          MCP_ALLOW_WRITE                             device account privilege
-                          gates the AI's tool                         gates what ANY caller can do
+AI platform ──a person's token──> mcp-netmiko ──compose network──> automation API ──SSH──> devices
+                                      ▲                              (loopback only)          ▲
+                         MCP_ALLOW_WRITE: change tools exist?                    device account privilege
+                         WRITE_MODE=approved: a person approves each change      gates what ANY caller can do
 ```
 
-Two controls, at different layers, covering different things. Knowing which is
-which saves an unpleasant surprise later.
-
-### `MCP_ALLOW_WRITE` — what it does
+### `MCP_ALLOW_WRITE` — whether the change tools exist
 
 Off by default:
 
 ```bash
-MCP_ALLOW_WRITE=false     # push_device_config is NOT REGISTERED
+MCP_ALLOW_WRITE=false     # no change tool is REGISTERED
 ```
 
-The tool is absent from `tools/list` entirely — not present and refusing.
+The tools are absent from `tools/list` entirely — not present and refusing.
 A caller that cannot discover a tool cannot call it.
 
 **Only the stack owner switches it, on the stack host.** The ai-platform's
@@ -248,40 +245,32 @@ Confirm which you have:
 
 ```bash
 make mcp-check
-# netmiko: 2 tools = read only.  3 tools = push_device_config is live.
+# netmiko: 2 tools = read only.  7 = approved changes (stage, commit…).  3 = push_device_config (direct).
 ```
 
-When enabled it archives the running config before sending anything, caps the
-change at `MAX_CONFIG_LINES`, and logs every push with the device and the lines.
+### `WRITE_MODE` — how a change reaches a device
 
-### What it does **not** do
+**`approved` (the default):** the agent stages a change, a person with the
+approve right approves exactly that change through a path an agent's token
+cannot use, and the agent commits it once, within a short window. The rules,
+the rights (from your identity provider's groups) and the approvals routes for
+an approvals app: [approve-changes.md](approve-changes.md).
 
-It gates the **MCP tool**, not the HTTP API underneath. The automation API has
-no authentication of its own, so anything that can reach port 8100 can call it
-directly regardless of the flag:
+**`direct`:** the old single tool, `push_device_config`, gated only by the
+caller's `MCP_WRITE_ROLE`. For a deployment that approves changes elsewhere;
+unsafe for an AI, which could push on a prompt alone.
 
-```bash
-curl -X POST http://vm:8100/device/router1/config -d '{"lines":["..."]}'
-```
+Either way the running config is archived before anything is sent, the change
+is capped at `MAX_CONFIG_LINES`, and every action is logged with the person
+(and the agent, `MCP_AGENT_CLAIM`).
 
-That is a different threat model — not "my AI did something unexpected" but
-"something else on the network used the API directly". The flag was never meant
-to cover it, but the name invites you to assume it does.
+### The automation API underneath
 
-**This costs your AI platform nothing to fix.** The MCP servers reach the
-automation API over the Docker network, so unpublishing the host port closes
-the bypass while leaving the AI path fully working:
-
-```yaml
-# compose/automation.yaml
-#   ports:
-#     - "${AUTOMATION_PORT:-8100}:8100"      # comment out, or:
-#     - "127.0.0.1:${AUTOMATION_PORT:-8100}:8100"
-```
-
-```bash
-docker compose up -d --force-recreate automation
-```
+It has no authentication of its own, and in approved mode it trusts the person
+mcp-netmiko verified. So it is published on **loopback only**
+(`AUTOMATION_BIND_IP=127.0.0.1`, the default) and refuses a direct
+`POST /device/{name}/config` unless `WRITE_MODE=direct`. This costs the AI
+platform nothing: the MCP servers reach it over the Docker network.
 
 Your AI keeps working. You lose only `curl` from another machine, and
 `make config-get` / `make state` from the host if you localhost-bind rather
@@ -304,14 +293,12 @@ and assurance check. See
 
 ### Which combination to use
 
-| Scenario | `MCP_ALLOW_WRITE` | Device account | Publish :8100 |
-|---|---|---|---|
-| Demo on your own machine | either | either | fine |
-| PoC at a customer, read-only | `false` | **read-only** | close it |
-| AI reads, humans change | `false` | privileged | close it |
-| AI reads and changes | `true` | privileged | **close it** — the flag is then your only control |
-
-"Close it" means unpublish or localhost-bind, as above.
+| Scenario | `MCP_ALLOW_WRITE` | `WRITE_MODE` | Device account | `AUTOMATION_BIND_IP` |
+|---|---|---|---|---|
+| Demo on your own machine | either | either | either | either |
+| PoC at a customer, read-only | `false` | — | **read-only** | loopback (default) |
+| AI reads, humans change | `false` | — | privileged | loopback (default) |
+| AI reads and changes | `true` | **`approved`** (default) | privileged | **loopback** (default) — every change then needs a person's approval |
 
 ---
 

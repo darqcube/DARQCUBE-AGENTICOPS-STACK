@@ -61,8 +61,27 @@ def test_write_tool_is_absent_by_default():
 
 
 def test_write_tool_appears_only_when_explicitly_enabled():
-    enabled = start("netmiko", {"MCP_ALLOW_WRITE": "true"})
-    assert int(re.search(r"with (\d+) tool", enabled).group(1)) == 3
+    """WRITE_MODE=direct: the one-step push. approved (the default): the five
+    change tools — stage, get, commit, rollback, withdraw — and no push."""
+    direct = start("netmiko", {"MCP_ALLOW_WRITE": "true", "WRITE_MODE": "direct"})
+    assert int(re.search(r"with (\d+) tool", direct).group(1)) == 3
+    approved = start("netmiko", {"MCP_ALLOW_WRITE": "true"})
+    assert int(re.search(r"with (\d+) tool", approved).group(1)) == 7
+
+
+def test_no_change_tool_can_approve():
+    """Approval is a person's act on the /changes routes, never a tool an agent can call."""
+    source = (SERVERS / "netmiko.py").read_text()
+    tools = re.findall(r"@mcp\.tool\(\)\s+def (\w+)", source)
+    assert not [t for t in tools if "approve" in t or "reject" in t], tools
+
+
+def test_approvals_audience_is_never_an_mcp_audience():
+    """If the MCP tools accepted the approvals audience, an agent's token could approve."""
+    line = start("netmiko", {"MCP_ALLOW_WRITE": "true", "MCP_AUTH_MODE": "both",
+                             "MCP_OIDC_ISSUER": "http://idp.example", "MCP_OIDC_JWKS_URL": "http://idp.example/k",
+                             "MCP_OIDC_AUDIENCES": "ai-platform,darqcube-approvals"})
+    assert "must not include the approvals audience" in line
 
 
 # --- static analysis of the tool surface ----------------------------------

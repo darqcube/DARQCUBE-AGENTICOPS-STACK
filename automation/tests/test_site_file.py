@@ -185,6 +185,43 @@ def test_write_access_is_off_unless_asked_for(inst, site):
     assert inst.site_to_env(site)["MCP_ALLOW_WRITE"] == "true"
 
 
+def test_changes_are_approved_unless_the_owner_says_direct(inst, site):
+    env = inst.site_to_env(site)
+    assert env["WRITE_MODE"] == "approved"
+    assert (env["CHANGE_APPROVE_WITHIN_MINUTES"], env["CHANGE_COMMIT_WITHIN_MINUTES"]) == ("120", "15")
+    assert env["CHANGE_FOUR_EYES"] == "false"
+    site["changes"]["write_mode"] = "direct"
+    assert inst.site_to_env(site)["WRITE_MODE"] == "direct"
+    site["changes"]["write_mode"] = "yolo"
+    with pytest.raises(inst.SiteError, match="changes.write_mode"):
+        inst.site_to_env(site)
+
+
+def test_four_eyes_quoted_false_stays_off(inst, site):
+    site["changes"]["four_eyes"] = "false"
+    assert inst.site_to_env(site)["CHANGE_FOUR_EYES"] == "false"
+
+
+def test_management_interfaces_as_text_or_list(inst, site):
+    site["changes"]["management_interfaces"] = "GigabitEthernet0/0, mgmt0"
+    assert inst.site_to_env(site)["CHANGE_MANAGEMENT_INTERFACES"] == "GigabitEthernet0/0, mgmt0"
+    site["changes"]["management_interfaces"] = ["GigabitEthernet0/0", "mgmt0"]
+    assert inst.site_to_env(site)["CHANGE_MANAGEMENT_INTERFACES"] == "GigabitEthernet0/0,mgmt0"
+
+
+def test_change_rights_come_from_the_platforms_auth_block(inst, site):
+    site["ai_platform"]["auth"]["approve_role"] = "change-approvers"
+    env = inst.site_to_env(site)
+    assert env["CHANGE_APPROVE_ROLE"] == "change-approvers"
+    assert env["CHANGE_PROPOSE_ROLE"] == "darqcube-propose"
+    assert env["CHANGE_APPROVALS_AUDIENCE"] == "darqcube-approvals"
+
+
+def test_unknown_changes_key_is_refused(inst, site):
+    site["changes"]["four_eye"] = True
+    assert any("changes.four_eye" in p for p in inst.validate_site(site))
+
+
 # --- the contract between the two files ------------------------------------
 
 def test_every_derived_key_exists_in_env_example(inst, site):

@@ -27,7 +27,7 @@ AUTOMATION_PORT := $(strip $(AUTOMATION_PORT))
 # pytest for anyone who set up their own environment.
 PYTEST := $(if $(wildcard .venv/bin/pytest),.venv/bin/pytest,pytest)
 
-.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check mcp-heal writes-on writes-off schema seed pin-host-keys render \
+.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check mcp-heal writes-on writes-off changes change-events schema seed pin-host-keys render \
         config-get config-put state check snapshot config-parsed \
         test test-templates test-devices verify clean
 
@@ -79,10 +79,10 @@ mcp-check: ## List every MCP server's tools through a real client handshake
 mcp-heal: ## Recreate MCP servers that run without their published port (after a reboot), then check
 	@python3 scripts/mcp-check.py --heal
 
-writes-on: ## Let an AI push configuration (push_device_config, still gated by the write role): the stack owner's choice
+writes-on: ## Let an AI change configuration (approved changes by default): the stack owner's choice
 	@scripts/writes.sh on
 
-writes-off: ## Read only again: no AI can push configuration
+writes-off: ## Read only again: no AI can change configuration
 	@scripts/writes.sh off
 
 # --- source of truth -----------------------------------------------------
@@ -127,10 +127,16 @@ config-get: ## Fetch a running config:  make config-get DEV=router1
 	  && cat automation/configs/$(DEV).cfg \
 	  || { cat automation/configs/$(DEV).cfg.part; echo; rm -f automation/configs/$(DEV).cfg.part; exit 1; }
 
-config-put: ## Push config lines:  make config-put DEV=router1 FILE=change.txt
+config-put: ## Push config lines (WRITE_MODE=direct only):  make config-put DEV=router1 FILE=change.txt
 	@set -o pipefail; jq -Rs '{lines: split("\n") | map(select(length > 0))}' < $(FILE) \
 	  | curl -sS --fail-with-body -X POST localhost:$(AUTOMATION_PORT)/device/$(DEV)/config \
 	      -H 'Content-Type: application/json' -d @-
+
+changes: ## Device changes, newest first (staged, approved, committed…): docs/how-to/approve-changes.md
+	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/changes | jq '.changes[] | {id, device, state, requester, approver, committer, lines}'
+
+change-events: ## Every action on changes, allowed or refused, with the person and the agent
+	@set -o pipefail; curl -sS --fail-with-body 'localhost:$(AUTOMATION_PORT)/changes/events?limit=50' | jq -c '.events[]'
 
 state: ## Parsed operational state:  make state DEV=mt-01
 	@set -o pipefail; curl -sS --fail-with-body localhost:$(AUTOMATION_PORT)/device/$(DEV)/state | jq .

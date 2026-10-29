@@ -42,6 +42,10 @@ OIDC_ISSUER = os.environ.get("MCP_OIDC_ISSUER", "").strip()
 OIDC_JWKS_URL = os.environ.get("MCP_OIDC_JWKS_URL", "").strip()
 OIDC_AUDIENCES = [a.strip() for a in os.environ.get("MCP_OIDC_AUDIENCES", "").split(",") if a.strip()]
 WRITE_ROLE = os.environ.get("MCP_WRITE_ROLE", "").strip() or "darqcube-write"
+# The claim naming the client a token was issued to — the calling agent, when
+# the ai-platform gives each agent its own client (token exchange). Recorded on
+# every change and in the audit line.
+AGENT_CLAIM = os.environ.get("MCP_AGENT_CLAIM", "").strip() or "azp"
 
 # 512 KiB suits a large model. A small local model's whole context can be
 # smaller than that, so a deployment can lower it (site.yml max_response_kb).
@@ -224,7 +228,7 @@ class Verifier:
         credential = header[7:].strip()
 
         if self.mode in ("token", "both") and hmac.compare_digest(credential, self.token):
-            return {"user": "token", "sub": "token", "roles": ["*"], "via": "token"}
+            return {"user": "token", "sub": "token", "roles": ["*"], "via": "token", "agent": None, "auth_time": None}
         if self.mode == "token":
             raise AuthError("bad token")
         return self._verify_jwt(credential)
@@ -250,11 +254,15 @@ class Verifier:
         for client in (claims.get("resource_access") or {}).values():
             roles |= set((client or {}).get("roles") or [])
         roles |= set(claims.get("roles") or [])
+        auth_time = claims.get("auth_time")
         return {
             "user": claims.get("preferred_username") or claims.get("email") or claims["sub"],
             "sub": claims["sub"],
             "roles": sorted(roles),
             "via": "oidc",
+            "agent": claims.get(AGENT_CLAIM) if isinstance(claims.get(AGENT_CLAIM), str) else None,
+            # When the person last typed their password: an approval needs a fresh one.
+            "auth_time": auth_time if isinstance(auth_time, (int, float)) else None,
         }
 
 
@@ -303,8 +311,8 @@ class _Auth:
         await self.app(scope, recording_receive, send)
         # Prefixed so `grep audit` finds it whatever log format is active —
         # the MCP SDK configures a bare %(message)s format.
-        log.info("audit user=%s sub=%s via=%s server=%s %s", caller["user"], caller["sub"],
-                 caller["via"], self.server, _rpc_summary(bytes(body)))
+        log.info("audit user=%s sub=%s via=%s agent=%s server=%s %s", caller["user"], caller["sub"],
+                 caller["via"], caller.get("agent") or "-", self.server, _rpc_summary(bytes(body)))
 
 
 def _rpc_summary(body: bytes) -> str:

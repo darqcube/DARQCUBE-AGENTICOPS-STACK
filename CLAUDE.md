@@ -13,8 +13,11 @@ Device work is **Netmiko + TextFSM + TTP** for every vendor, with **pyATS/Genie 
 Genie genuinely returns data. pyATS is additive — never a platform's only path.
 
 Built for demos, PoCs and small production networks — **sized and tested to 400 devices** on one
-Ubuntu box. It is deliberately not hardened: no TLS between components, no approval workflows, no
-backup automation. Don't add them without being asked.
+Ubuntu box. It is deliberately not hardened: no TLS between components, no backup automation. Don't
+add them without being asked. **Device changes are the one exception (asked for):** with
+`WRITE_MODE=approved`, the default, an AI stages a change, a person approves it, and it is committed
+once, in time (`automation/changes/`, [docs/how-to/approve-changes.md](docs/how-to/approve-changes.md));
+the automation API is therefore on loopback (`AUTOMATION_BIND_IP`) and refuses a direct push.
 
 `python3 install.py` is the primary install path: one stdlib-only file, seven steps, ending in
 pytest against the running stack. Keep it dependency-free — it runs on a freshly cloned repo before
@@ -87,6 +90,7 @@ Use the Makefile rather than inventing `docker compose` invocations.
 | `make verify` | exactly what `docs/INSTALL.md` says to verify |
 | `make mcp-apply` | rebuild and recreate the seven MCP servers (after a pull or an `.env` change) |
 | `make mcp-check` | a real MCP handshake + `tools/list` against every server |
+| `make changes` / `make change-events` | staged device changes / every action on them, allowed or refused |
 | `python3 scripts/ai-platform-connect.py` | **on the ai-platform host**: generate `sites/ai-platform.yml` + the MCP server snippet |
 
 ## Scale — 400 devices is the tested ceiling
@@ -187,6 +191,9 @@ A pyATS rule a platform cannot support returns **`skipped`** with the reason —
 | MikroTik SNMP | no vendor CPU MIB — uses HOST-RESOURCES-MIB `hrProcessorLoad` |
 | UDP buffers | the most consequential host setting. syslog and flow are UDP: an undersized `net.core.rmem_max` drops datagrams with **no error anywhere**, and the application's larger request is clamped without complaint. Only `netstat -su` shows it |
 | install.py | stdlib only — it runs before pip has been used. A test asserts no third-party imports |
+| Approved changes | the automation API trusts the person and agent mcp-netmiko verified and passes in the body — so it must stay unreachable from outside the host (`AUTOMATION_BIND_IP` loopback). Rights are roles from the token (`CHANGE_*_ROLE`), given to groups by the identity provider, never names |
+| Approved changes | the approvals audience (`CHANGE_APPROVALS_AUDIENCE`) must never be in `MCP_OIDC_AUDIENCES`: an agent's token would then approve. mcp-netmiko refuses to start if it is |
+| Approved changes | one element of `lines` is one command: a newline inside one would carry a second command past the protected-line rules, so staging refuses control characters |
 | Device sessions | the inventory is cached, so `.filter()` views share `Host` objects and therefore the SSH connection. Every entry point that touches a device takes `device_lock(name)` — without it two concurrent requests interleave on one session. Pass `nr=` through when adding an operation, or you add a login |
 | Normalising | a normaliser reading a field the parser does not emit yields plausible but **wrong** booleans. `_require()` in `automation/assurance/normalise.py` exists because RouterOS flags live in `status`, not `flags` — reading the wrong key reported every running interface as down |
 | Parsing split | **TextFSM** for tabular `show` output, **TTP** for hierarchical config. Do not point TextFSM at a config file; it has no notion of nested blocks |
