@@ -229,12 +229,20 @@ MCP_ALLOW_WRITE=false     # push_device_config is NOT REGISTERED
 ```
 
 The tool is absent from `tools/list` entirely — not present and refusing.
-A caller that cannot discover a tool cannot call it. To enable:
+A caller that cannot discover a tool cannot call it.
+
+**Only the stack owner switches it, on the stack host.** The ai-platform's
+connection file cannot: `install.py` ignores an `allow_write` in it, and
+`scripts/ai-platform-connect.py` no longer writes one (`--allow-write` is
+ignored with a note). To enable, and back:
 
 ```bash
-MCP_ALLOW_WRITE=true
-docker compose up -d --force-recreate mcp-netmiko
+make writes-on    # MCP_ALLOW_WRITE=true in .env, recreates mcp-netmiko, shows its tools
+make writes-off   # read only again
 ```
+
+With a site file, also set `ai_platform.allow_write` there: `install.py`
+rebuilds `.env` from it (`make writes-on` reminds you when they differ).
 
 Confirm which you have:
 

@@ -473,3 +473,26 @@ def test_an_overlay_sets_the_alert_profile_only_when_it_names_one(inst, tmp_path
     overlay.write_text("ai_platform:\n  publish:\n    enabled: true\n  alert_profile: standard\n")
     inst.apply_ai_platform_to_env(overlay)
     assert inst.read_env(env)["ALERT_PROFILE"] == "standard"
+
+
+def test_an_overlay_cannot_switch_writes_when_merged(inst, site, capsys):
+    """Whether an AI may push configuration is the stack owner's: site.yml's value stands, an overlay's is ignored."""
+    site["ai_platform"]["allow_write"] = False
+    merged = inst.merge_overlay(site, {"ai_platform": {"allow_write": True}}, "ai-platform.yml")
+    assert inst.site_to_env(merged)["MCP_ALLOW_WRITE"] == "false"
+    assert "allow_write ignored" in capsys.readouterr().out
+    site["ai_platform"]["allow_write"] = True
+    merged = inst.merge_overlay(site, {"ai_platform": {"allow_write": False}}, "ai-platform.yml")
+    assert inst.site_to_env(merged)["MCP_ALLOW_WRITE"] == "true", "an old overlay must not switch the owner's writes off"
+
+
+def test_an_overlay_cannot_switch_writes_on_an_existing_env(inst, tmp_path, monkeypatch, capsys):
+    env = tmp_path / ".env"
+    env.write_text("SYSLOG_COLLECTOR_IP=192.0.2.10\nGRAFANA_PORT=13000\nMCP_ALLOW_WRITE=true\n")
+    overlay = tmp_path / "ai-platform.yml"
+    monkeypatch.setattr(inst, "ENV", env)
+    monkeypatch.setattr(inst, "local_addresses", lambda: set())
+    overlay.write_text("ai_platform:\n  allow_write: false\n  publish:\n    enabled: true\n")
+    inst.apply_ai_platform_to_env(overlay)
+    assert inst.read_env(env)["MCP_ALLOW_WRITE"] == "true", "the owner's setting stays"
+    assert "allow_write ignored" in capsys.readouterr().out

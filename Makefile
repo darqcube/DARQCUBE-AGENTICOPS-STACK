@@ -27,7 +27,7 @@ AUTOMATION_PORT := $(strip $(AUTOMATION_PORT))
 # pytest for anyone who set up their own environment.
 PYTEST := $(if $(wildcard .venv/bin/pytest),.venv/bin/pytest,pytest)
 
-.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check schema seed pin-host-keys render \
+.PHONY: install help preflight up down restart ps logs mcp-apply mcp-check mcp-heal writes-on writes-off schema seed pin-host-keys render \
         config-get config-put state check snapshot config-parsed \
         test test-templates test-devices verify clean
 
@@ -75,6 +75,15 @@ mcp-apply: ## Rebuild and recreate the MCP servers — after a pull, or an ai-pl
 
 mcp-check: ## List every MCP server's tools through a real client handshake
 	@python3 scripts/mcp-check.py
+
+mcp-heal: ## Recreate MCP servers that run without their published port (after a reboot), then check
+	@python3 scripts/mcp-check.py --heal
+
+writes-on: ## Let an AI push configuration (push_device_config, still gated by the write role): the stack owner's choice
+	@scripts/writes.sh on
+
+writes-off: ## Read only again: no AI can push configuration
+	@scripts/writes.sh off
 
 # --- source of truth -----------------------------------------------------
 

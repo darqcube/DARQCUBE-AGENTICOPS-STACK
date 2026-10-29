@@ -116,7 +116,6 @@ def site_overlay(args, issuer: str, jwks_url: str, audiences: list[str]) -> str:
         "# Copy to the stack VM as sites/ai-platform.yml (gitignored) and run install.py.",
         "# install.py merges this over site.yml, or applies it to an existing .env.",
         "ai_platform:",
-        f"  allow_write: {'true' if args.allow_write else 'false'}",
         "  publish:",
         "    enabled: true",
         f'    bind_ip: "{args.bind_ip or ""}"',
@@ -178,7 +177,8 @@ def main() -> int:
                     help="stack VM address to publish MCP on (default: the VM's collector_ip)")
     ap.add_argument("--write-role", default="darqcube-write")
     ap.add_argument("--allow-write", action="store_true",
-                    help="register push_device_config (still gated by --write-role)")
+                    help="ignored: whether an AI may push configuration is the stack owner's choice "
+                         "(make writes-on on the stack host)")
     ap.add_argument("--graphs", action="store_true",
                     help="graphs in chat: start Grafana's renderer and register render_interface_graph")
     ap.add_argument("--alert-profile", choices=("standard", "demo"),
@@ -196,6 +196,9 @@ def main() -> int:
                     help="the repository's path on the stack VM")
     ap.add_argument("--out", type=Path, default=Path("."), help="where to write the two files")
     args = ap.parse_args()
+    if args.allow_write:
+        print("note: --allow-write is ignored — whether an AI may push configuration is the stack owner's choice: "
+              "`make writes-on` on the stack host", file=sys.stderr)
 
     config = discover(args.idp)
     issuer = config["issuer"]

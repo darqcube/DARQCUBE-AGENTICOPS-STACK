@@ -434,15 +434,29 @@ def validate_ai_platform(site: dict) -> list[str]:
     return problems
 
 
+def drop_allow_write(overlay: dict, name: str) -> dict:
+    """An overlay's ai_platform.allow_write, removed with a note: the stack owner decides writes, not the ai-platform
+    that generated the overlay (older generators still wrote it)."""
+    block = overlay.get("ai_platform")
+    if not isinstance(block, dict) or "allow_write" not in block:
+        return overlay
+    warn(f"{name}: ai_platform.allow_write ignored — whether an AI may push configuration is the stack owner's "
+         "choice: site.yml, or `make writes-on` / `make writes-off` on this host")
+    return {**overlay, "ai_platform": {k: v for k, v in block.items() if k != "allow_write"}}
+
+
 def merge_overlay(site: dict, overlay: dict, name: str) -> dict:
     """Deep-merge an ai-platform overlay over the site file.
 
     The overlay may only speak for `ai_platform` — it is generated on another
-    machine, and must not be able to change device credentials or ports.
+    machine, and must not be able to change device credentials or ports, nor
+    whether an AI may push configuration to the devices: `allow_write` is the
+    stack owner's (site.yml, or `make writes-on`), so an overlay's is ignored.
     """
     extra = set(overlay) - {"ai_platform"}
     if extra:
         raise SiteError(f"{name} may only contain 'ai_platform' — found {sorted(extra)}")
+    overlay = drop_allow_write(overlay, name)
 
     def merge(base: dict, top: dict) -> dict:
         out = dict(base)
@@ -946,9 +960,7 @@ def apply_ai_platform_to_env(path: Path) -> None:
     current = read_env(ENV)
     values = ai_platform_env(overlay, current.get("SYSLOG_COLLECTOR_IP", ""),
                              current.get("GRAFANA_PORT", "3000"))
-    if dig(overlay, "ai_platform.allow_write") is not None:
-        values["MCP_ALLOW_WRITE"] = str(
-            as_bool(dig(overlay, "ai_platform.allow_write"), "ai_platform.allow_write")).lower()
+    drop_allow_write(overlay, path.name)   # notes it; MCP_ALLOW_WRITE stays the owner's (make writes-on/off)
     if dig(overlay, "ai_platform.alert_webhook_url") is not None:
         values["ALERT_WEBHOOK_URL"] = str(dig(overlay, "ai_platform.alert_webhook_url") or "")
     # Without a site file nothing else rebuilds COMPOSE_PROFILES: keep the

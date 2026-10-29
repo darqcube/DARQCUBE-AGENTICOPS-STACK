@@ -103,7 +103,7 @@ def test_end_to_end_output_is_what_install_accepts(gen, inst, idp, tmp_path):
     assert auth["mode"] == "oidc"
     assert auth["issuer"].startswith("http://localhost:"), "the issuer must stay as tokens carry it"
     assert auth["jwks_url"].startswith("http://192.0.2.1:"), "keys must be fetched from a reachable host"
-    assert overlay["ai_platform"]["allow_write"] is False
+    assert "allow_write" not in overlay["ai_platform"], "writes are the stack owner's, never the ai-platform's"
     assert oct(overlay_path.stat().st_mode & 0o777) == "0o600"
 
     env = inst.ai_platform_env(inst.merge_overlay({}, overlay, "o"), "192.0.2.10", "13000")
@@ -158,3 +158,15 @@ def test_the_alert_profile_is_written_only_when_asked(gen, inst, idp, tmp_path):
     assert out.returncode == 0, out.stderr
     overlay = inst.read_yaml(tmp_path / "ai-platform.site.yml")
     assert overlay["ai_platform"]["alert_profile"] == "demo" and not inst.validate_ai_platform(overlay)
+
+
+def test_allow_write_is_ignored_and_says_why(gen, inst, idp, tmp_path):
+    out = subprocess.run(
+        [sys.executable, str(SCRIPT), "--stack-host", "127.0.0.1", "--idp", idp, "--jwks-host", "192.0.2.1",
+         "--allow-write", "--out", str(tmp_path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    assert "stack owner" in out.stderr and "writes-on" in out.stderr
+    overlay = inst.read_yaml(tmp_path / "ai-platform.site.yml")
+    assert "allow_write" not in overlay["ai_platform"]
