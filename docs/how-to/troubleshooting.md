@@ -155,6 +155,43 @@ make pin-host-keys DEV=router2 REPLACE=1
 
 See [pin-ssh-host-keys.md](pin-ssh-host-keys.md).
 
+## MCP servers refuse connections after a reboot
+
+`make mcp-check` from the ai-platform host says `Connection refused` for every
+server, while `make ps` shows them all healthy. On the stack host, `make
+mcp-check` names it: `running, but its port is not published`.
+
+The MCP ports are published on `MCP_BIND_IP`. If Docker starts the containers
+before that address exists on the host (a reboot where the network comes up
+late), the containers run without their ports, and nothing reports an error.
+
+```bash
+make mcp-heal     # recreates only the servers without their port, then checks
+```
+
+To have it happen by itself after every reboot, once, as root (it waits for
+Docker, then heals):
+
+```bash
+sudo tee /etc/systemd/system/darqcube-mcp-heal.service >/dev/null <<EOF
+[Unit]
+Description=Recreate MCP servers that started without their published port
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=$USER
+WorkingDirectory=$PWD
+ExecStartPre=/bin/sleep 30
+ExecStart=/usr/bin/python3 scripts/mcp-check.py --heal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable darqcube-mcp-heal.service
+```
+
 ## Everything looks healthy but nothing works
 
 Services can all be green while nothing is connected. That is what layer 3 of

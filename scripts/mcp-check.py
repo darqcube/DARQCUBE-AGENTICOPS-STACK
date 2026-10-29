@@ -3,6 +3,7 @@
 
     python3 scripts/mcp-check.py                       # on the stack host, shared token from .env
     python3 scripts/mcp-check.py --host 192.0.2.10 --token-file user.jwt   # from the ai-platform host
+    python3 scripts/mcp-check.py --heal                # recreate servers running without their port, then check
 
 A real handshake per server — initialize, initialized, tools/list — so a pass
 means a client can actually use it. A healthy /healthz proves much less: the
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -51,6 +53,20 @@ def post(url: str, payload: dict, headers: dict) -> tuple[int, dict, list[dict]]
     return status, got, [json.loads(l[5:]) for l in body.splitlines() if l.startswith("data:")]
 
 
+def unpublished(name: str) -> bool:
+    """On the stack host: the server's container runs but Docker published no port for it. That happens when Docker
+    starts it before MCP_BIND_IP exists on the host (a reboot): the container is healthy, the port is simply absent."""
+    try:
+        out = subprocess.run(["docker", "compose", "ps", "--format", "json", f"mcp-{name}"], cwd=ROOT,
+                             capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        return False   # not on the stack host (no docker here): nothing to say
+    text = out.stdout.strip()   # newer Compose: one JSON object per line; older: one JSON array
+    rows = json.loads(text) if text.startswith("[") else [json.loads(l) for l in text.splitlines() if l.startswith("{")]
+    return any(r.get("State") == "running" and not any(p.get("PublishedPort") for p in r.get("Publishers") or [])
+               for r in rows)
+
+
 def check(host: str, name: str, port: int, token: str) -> tuple[bool, str]:
     url = f"http://{host}:{port}/mcp"
     auth = {"Authorization": f"Bearer {token}"}
@@ -59,6 +75,8 @@ def check(host: str, name: str, port: int, token: str) -> tuple[bool, str]:
             "protocolVersion": "2025-03-26", "capabilities": {},
             "clientInfo": {"name": "mcp-check", "version": "1"}}}, auth)
     except OSError as exc:
+        if unpublished(name):
+            return False, "running, but its port is not published (started before MCP_BIND_IP existed?): make mcp-heal"
         return False, f"unreachable: {exc}"
     if status != 200:
         hint = {401: "token refused", 421: "Host not allowed — MCP_ALLOWED_HOSTS"}.get(status, "")
@@ -78,7 +96,16 @@ def main() -> int:
                     help="where the MCP ports are published (default: MCP_BIND_IP from .env)")
     ap.add_argument("--token", help="bearer credential (default: MCP_AUTH_TOKEN from .env)")
     ap.add_argument("--token-file", type=Path, help="read the bearer credential from a file, e.g. a user JWT")
+    ap.add_argument("--heal", action="store_true",
+                    help="on the stack host: recreate the servers running without their published port, then check")
     args = ap.parse_args()
+    if args.heal:
+        missing = [f"mcp-{name}" for name, _ in SERVERS if unpublished(name)]
+        if missing:
+            print(f"recreating, port not published: {' '.join(missing)}")
+            subprocess.run(["docker", "compose", "up", "-d", "--wait", "--force-recreate", *missing], cwd=ROOT, check=False)
+        else:
+            print("every MCP server has its published port")
     token = args.token_file.read_text().strip() if args.token_file else (args.token or env_token())
     if not token:
         print("no credential: pass --token / --token-file, or run where .env has MCP_AUTH_TOKEN")
