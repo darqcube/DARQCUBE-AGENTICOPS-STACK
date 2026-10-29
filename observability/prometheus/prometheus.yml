@@ -7,6 +7,14 @@ global:
   # would not complain. Anything that must vary per install is set in .env and
   # substituted by the config-init service (see compose/observability.yaml).
 
+# A clock that jumps ahead (a VM resumed, NTP correcting late) makes Prometheus store samples in the future, then
+# refuse every real one as "out of bounds" until real time passes them, while every health check stays green. Accepting
+# samples up to 6 h older than the newest lets it recover as soon as the clock is right. It costs memory only for
+# out-of-order samples, normally none. docs/how-to/fix-silent-data-loss.md, section 5.
+storage:
+  tsdb:
+    out_of_order_time_window: 6h
+
 rule_files:
   - /etc/prometheus/rules/*.yml
   # The alert profile (profiles/<ALERT_PROFILE>.yml), mounted on its own by compose.

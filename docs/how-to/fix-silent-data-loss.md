@@ -1,15 +1,15 @@
 # Fix silent data loss and device lockout
 
-Four failures this stack is built to avoid. They share one property that makes
+Five failures this stack is built to avoid. They share one property that makes
 them worth their own page: **none of them produce an error.** Nothing crashes,
 no container goes unhealthy, no log line appears. Metrics look plausible, logs
 keep arriving, a config push reports success — and data is being thrown away.
 
-All four are fixed in the shipped configuration. This page is for recognising
+All five are fixed in the shipped configuration. This page is for recognising
 them if they come back after a change, on a host that was set up by hand, or on
 a fork.
 
-## Check all four in one go
+## Check all five in one go
 
 ```bash
 source .env
@@ -22,10 +22,14 @@ docker compose logs telegraf | grep -icE 'buffer overflow|did not complete withi
 
 # 3 + 4. Repeated logins and overlapping sessions on one device
 docker compose logs automation | grep -icE 'authentication failed|connection reset'
+
+# 5. Prometheus holding samples in the future (seconds ahead of now)
+curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query" \
+  --data-urlencode 'query=max(prometheus_tsdb_head_max_time_seconds) - time()' | grep -o '"[-0-9.]*"]'
 ```
 
-Three zeros and an empty first line is what healthy looks like. Anything else,
-find it below.
+Three zeros, an empty first line and a small or negative number of seconds is
+what healthy looks like. Anything else, find it below.
 
 ---
 
@@ -273,3 +277,53 @@ devices are slow — see [../scale.md](../scale.md).
 - [../scale.md](../scale.md) — the 400-device numbers and what to change as you grow
 - [troubleshooting.md](troubleshooting.md) — symptoms that *do* produce an error
 - [change-settings.md](change-settings.md) — where every tunable lives
+
+---
+
+## 5. A clock that jumped ahead — Prometheus refuses every sample
+
+### Symptom
+
+Graphs stop at a point in time and stay empty; queries for current values return
+nothing. Telegraf has the data (its own `/metrics` page shows fresh values), every
+container is healthy and Prometheus answers `/-/ready`.
+
+### Detect
+
+```bash
+source .env
+curl -s "localhost:${PROMETHEUS_PORT}/api/v1/query" \
+  --data-urlencode 'query=max(prometheus_tsdb_head_max_time_seconds) - time()'
+docker compose logs --tail 50 prometheus | grep -c 'out of bounds'
+```
+
+A first value of more than a minute or two, and "out of bounds" lines, is this
+failure. `make test` names it (`test_prometheus_holds_no_future_samples`).
+
+### Fix
+
+The shipped `prometheus.yml` accepts samples up to 6 hours older than the newest
+(`storage.tsdb.out_of_order_time_window`), so a jump of up to 6 hours heals by
+itself once the host clock is right: check it is (`timedatectl`, NTP active).
+
+For a larger jump, or an install without that setting, drop Prometheus's
+in-memory window, which holds the wrongly stamped samples. First check that no
+long-term block ends in the future (each block's `meta.json` `maxTime`; one that
+does goes too):
+
+```bash
+docker compose stop prometheus
+vol=$(docker volume ls -q | grep 'prometheus-data$')   # one volume; check it is this stack's
+docker run --rm -v "$vol:/p" alpine rm -rf /p/wal /p/chunks_head
+docker compose start prometheus
+```
+
+Only the wrongly stamped window is lost; the long-term blocks stay.
+
+### Why it is silent
+
+Prometheus refuses a sample older than what it already holds, and says so only
+as a warning in its own log. Its readiness endpoint, the scrape targets and
+every container stay green; Telegraf keeps polling and its data looks fine.
+Typical causes: a VM resumed from suspend before its clock was corrected, or a
+host restarted with a wrong hardware clock.

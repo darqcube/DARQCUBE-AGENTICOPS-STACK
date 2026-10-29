@@ -16,6 +16,17 @@ def test_prometheus_is_ready(env, http, compose_ps):
     assert "Prometheus" in str(http(f"http://localhost:{env['PROMETHEUS_PORT']}/-/ready", retries=3))
 
 
+def test_prometheus_holds_no_future_samples(env, http, compose_ps):
+    """A clock that jumped ahead leaves Prometheus holding samples in the future: it then refuses every real sample
+    while still answering /-/ready. docs/how-to/fix-silent-data-loss.md, section 5."""
+    from urllib.parse import quote
+    query = quote("max(prometheus_tsdb_head_max_time_seconds) - time()")
+    result = http(f"http://localhost:{env['PROMETHEUS_PORT']}/api/v1/query?query={query}", retries=3)["data"]["result"]
+    ahead = float(result[0]["value"][1]) if result else 0.0
+    assert ahead < 120, (f"Prometheus holds samples {ahead / 60:.0f} minutes in the future (a clock jump): it refuses "
+                         "new ones. docs/how-to/fix-silent-data-loss.md, section 5")
+
+
 def test_loki_is_ready(env, http, compose_ps):
     http(f"http://localhost:{env['LOKI_PORT']}/ready", retries=3)
 
