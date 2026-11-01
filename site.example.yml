@@ -149,6 +149,9 @@ ai_platform:
     approvals_audience: darqcube-approvals
     # The claim naming the calling agent.
     agent_claim: azp
+    # When an approver typed their password: auth_time, or iat when the approvals
+    # client issues no refresh tokens (each token comes from a fresh password).
+    fresh_signin_claim: auth_time
 
   # Cap on one tool result, in KiB. Lower it (e.g. 64) for a small local model,
   # whose whole context window can be smaller than the 512 default.

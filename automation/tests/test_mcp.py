@@ -76,6 +76,11 @@ def test_no_change_tool_can_approve():
     assert not [t for t in tools if "approve" in t or "reject" in t], tools
 
 
+def test_an_unknown_sign_in_claim_is_refused_at_start():
+    out = start("netmiko", {"CHANGE_FRESH_SIGNIN_CLAIM": "nbf"})
+    assert "CHANGE_FRESH_SIGNIN_CLAIM must be auth_time or iat" in out
+
+
 def test_approvals_audience_is_never_an_mcp_audience():
     """If the MCP tools accepted the approvals audience, an agent's token could approve."""
     line = start("netmiko", {"MCP_ALLOW_WRITE": "true", "MCP_AUTH_MODE": "both",

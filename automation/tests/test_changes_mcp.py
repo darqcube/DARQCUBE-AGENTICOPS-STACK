@@ -31,6 +31,7 @@ EXPECTED = [
     "an_approval_refusal_is_a_403_with_its_reason", "an_approver_sees_every_change",
     "a_person_without_the_approve_right_sees_only_their_changes", "the_audit_is_for_approvers",
     "someone_elses_change_is_not_found", "a_malformed_change_id_is_400", "the_audit_line_names_the_agent",
+    "iat_counts_as_the_sign_in_only_when_configured",
 ]
 
 

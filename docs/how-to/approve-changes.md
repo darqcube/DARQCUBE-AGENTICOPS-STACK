@@ -78,7 +78,13 @@ Protected lines are data: [automation/changes/protected.yml](../../automation/ch
 
 The platform's identity facts — `site.yml` `ai_platform.auth:` (or `.env`): the
 four role names, `CHANGE_APPROVALS_AUDIENCE` (default `darqcube-approvals`),
-and `MCP_AGENT_CLAIM` (default `azp`, the claim naming the calling agent).
+`MCP_AGENT_CLAIM` (default `azp`, the claim naming the calling agent), and
+`CHANGE_FRESH_SIGNIN_CLAIM` (default `auth_time`): the claim saying when the
+approver typed their password. Some providers record no `auth_time` when an app
+signs a person in with the password grant; there, set `iat` **and** make the
+approvals client issue no refresh tokens, so that every token it hands out comes
+from a password typed at that moment (a refreshed token would carry a new `iat`
+without one).
 Callers need `MCP_AUTH_MODE=oidc` or `both`: approvals need a named person.
 
 After a change: `docker compose up -d --force-recreate automation mcp-netmiko`.

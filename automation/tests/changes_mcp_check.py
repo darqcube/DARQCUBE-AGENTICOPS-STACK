@@ -256,4 +256,19 @@ with TestClient(APP) as c:
         return "agent=agent-change-executor" in line and "user=alice" in line, line
     check("the_audit_line_names_the_agent", audit_names_agent)
 
+    def iat_is_the_sign_in_when_configured():
+        # A provider without auth_time on the password grant: the approvals client issues no refresh tokens, so iat is
+        # when the password was typed. auth_time stays the default, and without it a token proves no sign-in time.
+        bare = token(aud="darqcube-approvals", roles=("darqcube-approve",), sub="u-9", user="manager", azp="approvals-app")
+        verifier = netmiko._approvals_verifier()
+        default = verifier.verify(bare)["auth_time"]
+        common.SIGNIN_CLAIM = "iat"
+        try:
+            configured = verifier.verify(bare)["auth_time"]
+        finally:
+            common.SIGNIN_CLAIM = "auth_time"
+        iat = jwt.decode(bare.split()[1], options={"verify_signature": False})["iat"]
+        return default is None and configured == iat, (default, configured, iat)
+    check("iat_counts_as_the_sign_in_only_when_configured", iat_is_the_sign_in_when_configured)
+
 print(json.dumps(results))

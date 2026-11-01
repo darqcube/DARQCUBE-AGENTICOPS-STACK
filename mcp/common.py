@@ -46,6 +46,12 @@ WRITE_ROLE = os.environ.get("MCP_WRITE_ROLE", "").strip() or "darqcube-write"
 # the ai-platform gives each agent its own client (token exchange). Recorded on
 # every change and in the audit line.
 AGENT_CLAIM = os.environ.get("MCP_AGENT_CLAIM", "").strip() or "azp"
+# The claim saying when the person last typed their password (approvals need a fresh one). auth_time is the standard
+# one. iat is equivalent only when the approvals client issues no refresh tokens, so that every token it hands out comes
+# from a password typed at that moment: for a provider that records no auth_time on the password grant.
+SIGNIN_CLAIM = os.environ.get("CHANGE_FRESH_SIGNIN_CLAIM", "").strip() or "auth_time"
+if SIGNIN_CLAIM not in ("auth_time", "iat"):
+    raise SystemExit(f"CHANGE_FRESH_SIGNIN_CLAIM must be auth_time or iat (got {SIGNIN_CLAIM!r})")
 
 # 512 KiB suits a large model. A small local model's whole context can be
 # smaller than that, so a deployment can lower it (site.yml max_response_kb).
@@ -254,7 +260,7 @@ class Verifier:
         for client in (claims.get("resource_access") or {}).values():
             roles |= set((client or {}).get("roles") or [])
         roles |= set(claims.get("roles") or [])
-        auth_time = claims.get("auth_time")
+        auth_time = claims.get(SIGNIN_CLAIM)
         return {
             "user": claims.get("preferred_username") or claims.get("email") or claims["sub"],
             "sub": claims["sub"],

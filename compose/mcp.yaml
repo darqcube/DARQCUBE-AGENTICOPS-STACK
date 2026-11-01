@@ -124,6 +124,7 @@ services:
       CHANGE_APPROVALS_AUDIENCE: ${CHANGE_APPROVALS_AUDIENCE:-darqcube-approvals}
       CHANGE_APPROVE_ROLE: ${CHANGE_APPROVE_ROLE:-darqcube-approve}
       MCP_AGENT_CLAIM: ${MCP_AGENT_CLAIM:-azp}
+      CHANGE_FRESH_SIGNIN_CLAIM: ${CHANGE_FRESH_SIGNIN_CLAIM:-auth_time}
     expose: ["9005"]
     ports: ["${MCP_BIND_IP:-127.0.0.1}:9005:9005"]
     healthcheck: *mcp-health

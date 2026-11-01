@@ -215,6 +215,12 @@ def test_change_rights_come_from_the_platforms_auth_block(inst, site):
     assert env["CHANGE_APPROVE_ROLE"] == "change-approvers"
     assert env["CHANGE_PROPOSE_ROLE"] == "darqcube-propose"
     assert env["CHANGE_APPROVALS_AUDIENCE"] == "darqcube-approvals"
+    assert env["CHANGE_FRESH_SIGNIN_CLAIM"] == "auth_time"
+    site["ai_platform"]["auth"]["fresh_signin_claim"] = "iat"
+    assert inst.site_to_env(site)["CHANGE_FRESH_SIGNIN_CLAIM"] == "iat"
+    site["ai_platform"]["auth"]["fresh_signin_claim"] = "nbf"
+    with pytest.raises(inst.SiteError, match="fresh_signin_claim"):
+        inst.site_to_env(site)
 
 
 def test_unknown_changes_key_is_refused(inst, site):

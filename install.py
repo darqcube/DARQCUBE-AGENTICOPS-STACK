@@ -301,7 +301,7 @@ AI_PLATFORM_KEYS = {
     "": {"enabled", "allow_write", "publish", "auth", "max_response_kb", "graphs", "alert_profile",
          "alert_webhook_url"},
     "publish": {"enabled", "bind_ip"},
-    "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role", "approvals_audience", "agent_claim",
+    "auth": {"mode", "issuer", "jwks_url", "audiences", "write_role", "approvals_audience", "agent_claim", "fresh_signin_claim",
              "propose_role", "approve_role", "commit_role", "commit_any_role"},
 }
 
@@ -361,8 +361,12 @@ def ai_platform_env(site: dict, collector_ip: str, grafana_port: str) -> dict[st
                               ("commit_role", "CHANGE_COMMIT_ROLE", "darqcube-commit"),
                               ("commit_any_role", "CHANGE_COMMIT_ANY_ROLE", "darqcube-commit-any"),
                               ("approvals_audience", "CHANGE_APPROVALS_AUDIENCE", "darqcube-approvals"),
-                              ("agent_claim", "MCP_AGENT_CLAIM", "azp")):
+                              ("agent_claim", "MCP_AGENT_CLAIM", "azp"),
+                              ("fresh_signin_claim", "CHANGE_FRESH_SIGNIN_CLAIM", "auth_time")):
         env[var] = str(dig(site, f"ai_platform.auth.{key}", "") or default).strip()
+    if env["CHANGE_FRESH_SIGNIN_CLAIM"] not in ("auth_time", "iat"):
+        raise SiteError("ai_platform.auth.fresh_signin_claim: expected auth_time or iat, "
+                        f"got {env['CHANGE_FRESH_SIGNIN_CLAIM']!r}")
     env["MCP_MAX_RESPONSE_BYTES"] = str(
         as_int(dig(site, "ai_platform.max_response_kb"), "ai_platform.max_response_kb", 512) * 1024
     )
