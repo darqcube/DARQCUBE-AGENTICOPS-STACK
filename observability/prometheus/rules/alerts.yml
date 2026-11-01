@@ -116,6 +116,18 @@ groups:
           summary: "No traffic to critical application {{ $labels.application }} for 15 minutes"
           description: "It carried traffic in the last 6 hours. Check its hosts and services in Infrahub (get_application_dependencies)."
 
+  - name: changes
+    rules:
+      # Approved changes (docs/how-to/approve-changes.md): a change an agent staged waits for a person with the approve
+      # right. Routed like any alert, so approvers learn it waits (mail, chat, the platform's badge) within a minute.
+      - alert: ChangeWaitingForApproval
+        expr: sum(changes{state="waiting"}) > 0
+        for: 1m
+        labels: { severity: info }
+        annotations:
+          summary: "{{ $value }} device change(s) waiting for an approval"
+          description: "An approver approves or rejects each one through the approvals path; unapproved, it expires."
+
   - name: platform
     rules:
       - alert: ScrapeTargetDown

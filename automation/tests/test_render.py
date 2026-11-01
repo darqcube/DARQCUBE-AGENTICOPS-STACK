@@ -949,3 +949,18 @@ def test_flow_totals_behave():
                         "--entrypoint", "promtool", image, "test", "rules", "/p/tests/flows.test.yml"],
                        capture_output=True, text=True, timeout=180)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_a_waiting_change_raises_an_alert():
+    """promtool unit test (observability/prometheus/tests/changes.test.yml): ChangeWaitingForApproval fires a minute
+    after a change starts waiting and clears when none waits."""
+    import shutil
+    import subprocess
+    if not shutil.which("docker"):
+        pytest.skip("docker not available")
+    version = re.search(r"^PROMETHEUS_VERSION=(\S+)", (ROOT / ".env.example").read_text(), re.M)
+    image = f"prom/prometheus:{version.group(1)}" if version else "prom/prometheus"
+    r = subprocess.run(["docker", "run", "--rm", "-v", f"{ROOT / 'observability/prometheus'}:/p:ro",
+                        "--entrypoint", "promtool", image, "test", "rules", "/p/tests/changes.test.yml"],
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stdout + r.stderr

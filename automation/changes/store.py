@@ -67,6 +67,14 @@ class Store:
                 return self._select("state = ? ORDER BY staged_at DESC LIMIT ?", (state, limit))
             return self._select("1 ORDER BY staged_at DESC LIMIT ?", (limit,))
 
+    def counts(self) -> dict[str, int]:
+        """How many changes are in each state (expired ones moved first): what /metrics exports, so a person learns that
+        a change waits for an approval (an alert, a badge) without anyone reading the changes themselves."""
+        with self._lock:
+            self._expire_all()
+            found = dict(self._db.execute("SELECT state, COUNT(*) FROM changes GROUP BY state").fetchall())
+        return {state: int(found.get(state, 0)) for state in policy.STATES}
+
     def events(self, limit: int = 200, change_id: str | None = None) -> list[dict]:
         limit = max(1, min(int(limit), 1000))
         where, args = ("WHERE change_id = ?", (change_id, limit)) if change_id else ("", (limit,))

@@ -72,8 +72,11 @@ def start_scheduled_assurance():
 
 @app.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)
 def metrics():
-    """Scheduled assurance results in Prometheus text format."""
-    return scheduler.metrics()
+    """Scheduled assurance results and the changes per state, in Prometheus text format."""
+    lines = ["# HELP changes Device changes per state (approved changes: stage, a person approves, commit).",
+             "# TYPE changes gauge"]
+    lines += [f'changes{{state="{state}"}} {count}' for state, count in changes().counts().items()]
+    return scheduler.metrics() + "\n".join(lines) + "\n"
 
 
 @app.get("/assurance/latest")

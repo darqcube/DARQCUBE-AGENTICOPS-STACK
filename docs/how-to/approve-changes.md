@@ -114,6 +114,14 @@ Five tools on mcp-netmiko (with writes on): `stage_device_change`,
 `withdraw_device_change`. None can approve. A refusal comes back as the tool's
 error, starting `refused:` with the reason, so the agent can say why.
 
+## Learning that a change waits
+
+The automation API exports how many changes are in each state, `changes{state="…"}` on `/metrics` (Prometheus scrapes it
+with the `automation` job), and **`ChangeWaitingForApproval`** fires one minute after a change starts waiting (rules:
+`observability/prometheus/rules/alerts.yml`, group `changes`). Alertmanager routes it like any alert: point a receiver at
+your approvers (mail, chat). A platform can show the same number as a badge, read from Prometheus: it is a count, never a
+change's content.
+
 ## The automation API is loopback-only
 
 The automation API has no authentication of its own and trusts the person

@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 WAITING, APPROVED, COMMITTING, COMMITTED = "waiting", "approved", "committing", "committed"
 REJECTED, WITHDRAWN, EXPIRED, FAILED = "rejected", "withdrawn", "expired", "failed"
+STATES = (WAITING, APPROVED, COMMITTING, COMMITTED, REJECTED, WITHDRAWN, EXPIRED, FAILED)
 CLOSED = (REJECTED, WITHDRAWN, EXPIRED, FAILED)
 
 

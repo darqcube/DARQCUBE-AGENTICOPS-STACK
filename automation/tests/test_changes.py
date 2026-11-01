@@ -314,3 +314,11 @@ def test_a_malformed_rule_file_fails_loudly(tmp_path):
     bad.write_text("rules:\n  - name: x\n    match: '('\n")
     with pytest.raises(line_rules.LineRuleError):
         line_rules.refusals(["anything"], path=str(bad))
+
+
+def test_counts_per_state_include_zeros_and_expire_first(store, clock):
+    store.stage(ASKER, "r1", LINES, ROLLBACK, "test")
+    counts = store.counts()
+    assert counts["waiting"] == 1 and counts["committed"] == 0 and set(counts) == set(policy.STATES)
+    clock.now += store.settings.approve_within + 1
+    assert store.counts()["waiting"] == 0 and store.counts()["expired"] == 1
