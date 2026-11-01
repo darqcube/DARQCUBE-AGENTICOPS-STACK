@@ -443,6 +443,11 @@ Infrahub, TextFSM templates against committed CLI samples, the Logstash filter
 block against real wire-format syslog lines, the assurance engine against all
 three vendors, and the documentation against the repo it describes.
 
+## Versions
+
+Releases are tags `vMAJOR.MINOR.PATCH` on `main`; what each one changes is in [CHANGELOG.md](CHANGELOG.md). Deploy a
+tag, not a branch: `git checkout v1.0.0`.
+
 ## Status and scope
 
 **This is a demo stack, not a hardened production platform.** No TLS between
