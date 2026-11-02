@@ -8,6 +8,13 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.4.1 (2026-11-02)
+
+### Fixes
+- `make render` recreates infrahub-server first when `platforms.yml` changed since it started: the file is a single-file
+  mount, so after `git checkout` of a release the container still read the old one, and the render silently left out
+  what the release added (1.4.0's OSPF poll on the first VM that upgraded).
+
 ## 1.4.0 (2026-11-02)
 
 ### Features

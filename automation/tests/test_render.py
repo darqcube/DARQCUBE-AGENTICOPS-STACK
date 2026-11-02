@@ -1124,3 +1124,14 @@ def test_ospf_rules_behave():
                         "--entrypoint", "promtool", image, "test", "rules", "/p/tests/ospf.test.yml"],
                        capture_output=True, text=True, timeout=180)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_make_render_recreates_infrahub_server_when_platforms_yml_changed():
+    """platforms.yml is a single-file bind mount: a checkout replaces the file and the container keeps the old one. 1.4.0's
+    first render on a VM left out the OSPF poll that way."""
+    makefile = (ROOT / "Makefile").read_text()
+    render = makefile[makefile.index("\nrender:"):].split("\n\n", 1)[0]
+    assert "cat /platforms.yml" in render and "cmp -s - platforms.yml" in render
+    assert "--force-recreate --wait infrahub-server" in render
+    assert "../platforms.yml:/platforms.yml:ro" in (ROOT / "compose/source-of-truth.yaml").read_text(), \
+        "if platforms.yml is no longer a single-file mount, this check can go"

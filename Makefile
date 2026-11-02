@@ -109,6 +109,12 @@ auto-render-off: ## Deactivate the auto-render webhook (back to make render by h
 	$(COMPOSE) exec -T infrahub-server python /scripts/render-hook.py --unregister
 
 render: ## Infrahub -> Telegraf + Logstash configs, and the Network Map dashboard. Run after any device or drawing change.
+	@# platforms.yml is mounted as a single file: after `git checkout` of a new release the running container still
+	@# reads the old one, and the render silently leaves out what the release added (1.4.0's OSPF poll). Recreate first.
+	@if ! $(COMPOSE) exec -T infrahub-server cat /platforms.yml 2>/dev/null | cmp -s - platforms.yml; then \
+	  echo "platforms.yml changed since infrahub-server started: recreating it before the render"; \
+	  $(COMPOSE) up -d --force-recreate --wait infrahub-server; \
+	fi
 	$(COMPOSE) exec -T -e FLOW_DEDICATED_FIRST=$(strip $(FLOW_DEDICATED_FIRST)) \
 		-e FLOW_DEDICATED_LAST=$(strip $(FLOW_DEDICATED_LAST)) infrahub-server python /scripts/render-inventory.py
 	$(COMPOSE) exec -T infrahub-server python /scripts/render-network-map.py
