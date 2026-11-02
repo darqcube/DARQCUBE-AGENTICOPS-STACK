@@ -39,7 +39,7 @@ class Device:
     """Stands in for an infrahub_sdk InfrahubNode."""
 
     def __init__(self, name, platform, ip, site, role, mode="snmp", host=None, security=None,
-                 flow=False, flow_port=None):
+                 flow=False, flow_port=None, investigate=False, interfaces=None, protocols=None):
         self.name = Attr(name)
         self.platform = Attr(platform)
         self.management_ip = Attr(ip)
@@ -49,6 +49,9 @@ class Device:
         self.telemetry_mode = Attr(mode)
         self.flow_enabled = Attr(flow)
         self.flow_port = Attr(flow_port)
+        self.auto_investigate = Attr(investigate)
+        self.auto_investigate_interfaces = Attr(interfaces)
+        self.auto_investigate_protocols = Attr(protocols)
         self.site = Rel(site)
 
 
@@ -71,6 +74,8 @@ def load_renderer(monkeypatch, devices, out_dir, services=()):
     monkeypatch.setenv("PLATFORMS_FILE", str(ROOT / "platforms.yml"))
     monkeypatch.setenv("PROFILE_DIR", str(ROOT / "observability/telegraf/profiles"))
     monkeypatch.setenv("RENDER_OUT_DIR", str(out_dir))
+    monkeypatch.setenv("ALERTMANAGER_TEMPLATE", str(ROOT / "observability/alertmanager/alertmanager.yml.tmpl"))
+    monkeypatch.setenv("ALERTMANAGER_RELOAD_URL", "")   # no Alertmanager in unit tests
 
     spec = importlib.util.spec_from_file_location(
         "render_inventory", ROOT / "source-of-truth/scripts/render-inventory.py"
@@ -103,6 +108,7 @@ def test_renders_one_resource_file_per_platform(monkeypatch, tmp_path):
         "intent.influx",
         "devices.json",
         "devices.yml",
+        "alertmanager.yml",
     }
 
 
@@ -964,3 +970,111 @@ def test_a_waiting_change_raises_an_alert():
                         "--entrypoint", "promtool", image, "test", "rules", "/p/tests/changes.test.yml"],
                        capture_output=True, text=True, timeout=180)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# --- Auto-investigate: Infrahub decides which alerts start an AI investigation ------------------------------------
+INVESTIGATE = [
+    Device("router1", "ios_xe", "10.0.0.11", "hq", "core-wan", investigate=True, interfaces="Tu.*, Et0/1",
+           protocols="bgp"),
+    Device("router2", "ios_xe", "10.0.0.12", "branch-01", "branch-wan", investigate=True),
+    Device("switch1", "ios_xe", "10.0.0.21", "hq", "access"),   # not set: off
+]
+
+
+def test_off_by_default_every_alert_notifies(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    config = yaml.safe_load((tmp_path / "alertmanager.yml").read_text())
+    assert config["route"]["receiver"] == "notify"
+    assert not [r for r in config["route"]["routes"] if r.get("receiver") == "investigate"]
+    assert {r["name"] for r in config["receivers"]} == {"notify", "investigate"}
+
+
+def test_the_config_never_holds_the_webhook_url(monkeypatch, tmp_path):
+    """The URL may carry the platform's shared secret: Alertmanager reads it from the file config-init writes."""
+    mod = load_renderer(monkeypatch, INVESTIGATE, tmp_path)
+    mod.main()
+    config = yaml.safe_load((tmp_path / "alertmanager.yml").read_text())
+    for receiver in config["receivers"]:
+        assert receiver["webhook_configs"] == [{"url_file": "/etc/alertmanager/webhook-url", "send_resolved": True}]
+    assert "__ALERT_WEBHOOK_URL__" not in (tmp_path / "alertmanager.yml").read_text()
+
+
+def test_routes_follow_each_devices_policy(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, INVESTIGATE, tmp_path)
+    mod.main()
+    routes = [r for r in yaml.safe_load((tmp_path / "alertmanager.yml").read_text())["route"]["routes"]
+              if r.get("receiver") == "investigate"]
+    matchers = sorted(tuple(r["matchers"]) for r in routes)
+    assert ('alertname="InterfaceDown"', 'device="router1"', 'ifName=~"Tu.*|Et0/1"') in matchers
+    assert ('alertname="InterfaceDown"', 'device="router2"') in matchers          # empty list: every interface
+    assert ('alertname="BGPPeerDown"', 'device="router2"') in matchers            # empty list: every watched protocol
+    assert not [m for m in matchers if 'device="switch1"' in m]
+
+
+def test_unwatched_protocols_and_bad_patterns_are_reported(monkeypatch, tmp_path, capsys):
+    devices = [Device("router1", "ios_xe", "10.0.0.11", "hq", "core-wan", investigate=True,
+                      interfaces="Tunnel1, (?=x), [", protocols="ospf, bogus")]
+    mod = load_renderer(monkeypatch, devices, tmp_path)
+    assert mod.main() == 0
+    err = capsys.readouterr().err
+    assert "ospf is not watched by the stack yet" in err
+    assert "'bogus' is not one of" in err
+    assert "lookaround" in err and "is not a pattern" in err
+    assert "IOS-XE reports ifName short" in err
+    text = (tmp_path / "alertmanager.yml").read_text()
+    assert "BGPPeerDown" not in text                     # only ospf (unwatched) was named
+    assert '(?=x)' not in text
+
+
+def test_a_template_without_the_mark_is_refused(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    with pytest.raises(ValueError, match="__AUTO_INVESTIGATE_ROUTES__"):
+        mod.render_alertmanager("route:\n  receiver: notify\n", [])
+
+
+def test_alertmanager_accepts_the_config_and_routes_as_intended(monkeypatch, tmp_path):
+    """amtool, with the Alertmanager version the stack runs: the rendered config is valid, and each alert takes the
+    path its device's policy says."""
+    import shutil
+    import subprocess
+    if not shutil.which("docker"):
+        pytest.skip("docker not available")
+    mod = load_renderer(monkeypatch, INVESTIGATE, tmp_path)
+    mod.main()
+    (tmp_path / "webhook-url").write_text("http://192.0.2.50/hook")
+    version = re.search(r"^ALERTMANAGER_VERSION=(\S+)", (ROOT / ".env.example").read_text(), re.M)
+    image = f"prom/alertmanager:{version.group(1)}" if version else "prom/alertmanager:v0.28.1"
+    run = ["docker", "run", "--rm", "-v", f"{tmp_path / 'alertmanager.yml'}:/etc/alertmanager/generated/alertmanager.yml:ro",
+           "-v", f"{tmp_path / 'webhook-url'}:/etc/alertmanager/webhook-url:ro", "--entrypoint", "amtool", image]
+    check = subprocess.run(run + ["check-config", "/etc/alertmanager/generated/alertmanager.yml"],
+                           capture_output=True, text=True, timeout=180)
+    assert check.returncode == 0, check.stdout + check.stderr
+    cases = {
+        ("alertname=InterfaceDown", "device=router1", "ifName=Tu2"): "investigate",
+        ("alertname=InterfaceDown", "device=router1", "ifName=Et0/1"): "investigate",
+        ("alertname=InterfaceDown", "device=router1", "ifName=Et0/2"): "notify",
+        ("alertname=InterfaceDown", "device=router2", "ifName=Gi3"): "investigate",
+        ("alertname=BGPPeerDown", "device=router1", "severity=critical"): "investigate",
+        ("alertname=DeviceUnreachable", "device=router2", "severity=critical"): "investigate",
+        ("alertname=InterfaceDown", "device=switch1", "ifName=Gi1"): "notify",
+        ("alertname=BGPPeerDown", "device=switch1", "severity=critical"): "notify",
+        ("alertname=WANLatencyHigh", "device=router1"): "notify",
+        ("alertname=ChangeWaitingForApproval",): "notify",
+    }
+    for labels, want in cases.items():
+        r = subprocess.run(run + ["config", "routes", "test", "--config.file=/etc/alertmanager/generated/alertmanager.yml",
+                                  *labels], capture_output=True, text=True, timeout=180)
+        assert r.stdout.strip() == want, f"{labels}: {r.stdout.strip()!r} {r.stderr[-300:]}"
+
+
+def test_config_init_writes_the_url_file_and_a_first_config():
+    """Before the first render Alertmanager still starts: the template as it is (every alert notifies)."""
+    compose = (ROOT / "compose/observability.yaml").read_text()
+    assert "printf '%s' \"$$url\" > /out/webhook-url" in compose
+    assert "cp /src/alertmanager.yml.tmpl /generated/alertmanager.yml" in compose
+    assert "--config.file=/etc/alertmanager/generated/alertmanager.yml" in compose
+    template = (ROOT / "observability/alertmanager/alertmanager.yml.tmpl").read_text()
+    assert yaml.safe_load(template)["route"]["receiver"] == "notify"
+    for name in ("compose/source-of-truth.yaml",):
+        assert (ROOT / name).read_text().count("../observability/alertmanager:/alertmanager-src:ro") == 2

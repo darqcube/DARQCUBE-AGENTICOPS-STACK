@@ -81,7 +81,8 @@ Neo4j is the memory-hungriest service; its heap is set in
 **Prometheus does not expand environment variables in its config file.** A
 `${VAR}` there is stored literally as a label value and `promtool` will not
 complain. Anything that must vary per install goes in `.env` and is substituted
-by `config-init` — that is why `alertmanager.yml` is a `.tmpl`.
+by `config-init` (Alertmanager reads its webhook URL from the file config-init writes). `alertmanager.yml` is a
+`.tmpl` because `make render` fills it with the auto-investigate routes from Infrahub.
 
 ## After changing a config file
 

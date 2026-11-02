@@ -176,6 +176,21 @@ nodes:
         optional: true
         description: Dedicated NetFlow port for an exporter behind NAT. Within FLOW_DEDICATED_FIRST..LAST.
 
+      # Which of this device's alerts start an AI investigation (Alertmanager receiver "investigate"); every other
+      # alert only notifies people. make render turns these into Alertmanager routes (docs/how-to/auto-investigate.md).
+      - name: auto_investigate
+        kind: Boolean
+        default_value: false
+        description: Alerts on this device start an AI investigation (read-only). Off - people are notified only.
+      - name: auto_investigate_interfaces
+        kind: Text
+        optional: true
+        description: Comma-separated ifName patterns (regex, whole name), e.g. Tu.*, Et0/1. Empty - every interface.
+      - name: auto_investigate_protocols
+        kind: Text
+        optional: true
+        description: Comma-separated routing protocols - bgp, ospf, isis, eigrp, rip. Empty - every one watched.
+
       - name: description
         kind: Text
         optional: true

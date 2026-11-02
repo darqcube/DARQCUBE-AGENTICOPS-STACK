@@ -196,7 +196,9 @@ Or let the AI platform host generate it with the rest of its settings:
 value). The URL may carry a path secret, so the overlay stays gitignored.
 
 Every alert is then POSTed as JSON, including resolutions. This is a push, so
-the AI platform learns about a problem without polling.
+the AI platform learns about a problem without polling. The body's `"receiver"`
+says what is asked: `investigate` (the device's policy in Infrahub asks for an AI
+investigation) or `notify` (tell people) — [auto-investigate.md](auto-investigate.md).
 
 ## 3. Actions — the automation API
 

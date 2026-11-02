@@ -180,6 +180,7 @@ services:
       # Without this, render fails, and Telegraf and Logstash — which refuse
       # to start without the rendered identity table — restart-loop with it.
       - ../observability/telegraf/profiles:/profiles:ro
+      - ../observability/alertmanager:/alertmanager-src:ro   # the template make render fills (auto-investigate routes)
       # The network drawing (per deployment) and the dashboard render-network-map.py
       # builds from it — `make render` runs both renderers here.
       - ../source-of-truth/map:/map:ro
@@ -262,6 +263,7 @@ services:
       - ../source-of-truth/scripts:/scripts:ro
       - ../platforms.yml:/platforms.yml:ro
       - ../observability/telegraf/profiles:/profiles:ro
+      - ../observability/alertmanager:/alertmanager-src:ro   # the template make render fills (auto-investigate routes)
       - ../observability/telegraf/generated:/generated
     # Compose network only — never published. Infrahub's workers call it.
     expose: ["8099"]

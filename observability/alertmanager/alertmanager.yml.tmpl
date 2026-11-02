@@ -1,29 +1,40 @@
 # Alertmanager.
 #
-# THIS FILE IS A TEMPLATE. Alertmanager has NO environment-variable expansion
-# of its own, so the config-init service substitutes __ALERT_WEBHOOK_URL__ from
-# .env and writes the result into a volume before Alertmanager starts.
-# Edit this file, not the rendered copy.
+# THIS FILE IS A TEMPLATE. `make render` (render-inventory.py) writes the running config from it to
+# observability/telegraf/generated/alertmanager.yml, putting the auto-investigate routes it builds from
+# Infrahub at __AUTO_INVESTIGATE_ROUTES__, then reloads Alertmanager. Before the first render, config-init
+# copies it as it is (no routes: every alert notifies). Edit this file, not the generated copy.
 #
 # THIS IS THE AI-PLATFORM SEAM FOR ALERTS. Set ALERT_WEBHOOK_URL in .env to an
 # AI platform endpoint and every alert is delivered there — no other change to
-# the stack. Left empty it defaults to a local no-op, so the stack starts with
-# no external dependency.
+# the stack. Two receivers share that one URL; each delivery names its receiver
+# in the body ("receiver"), so the platform knows what is asked of it:
+#   investigate  start an AI investigation (read-only), from the device's
+#                auto_investigate policy in Infrahub (docs/how-to/auto-investigate.md)
+#   notify       tell people: every other alert
+# The URL is read from a file config-init writes (url_file), so neither this
+# template nor the generated config holds it. Left empty it points at a local
+# no-op, so the stack starts with no external dependency.
 route:
-  receiver: default
+  receiver: notify
   group_by: [alertname, device]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # __AUTO_INVESTIGATE_ROUTES__
     - matchers: [severity="critical"]
-      receiver: default
+      receiver: notify
       repeat_interval: 1h
 
 receivers:
-  - name: default
+  - name: notify
     webhook_configs:
-      - url: __ALERT_WEBHOOK_URL__
+      - url_file: /etc/alertmanager/webhook-url
+        send_resolved: true
+  - name: investigate
+    webhook_configs:
+      - url_file: /etc/alertmanager/webhook-url
         send_resolved: true
 
 inhibit_rules:

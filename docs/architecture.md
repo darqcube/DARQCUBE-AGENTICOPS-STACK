@@ -487,7 +487,7 @@ and deleted by `make clean`.
 | `loki-data` | observability | `loki` | every log line | log history |
 | `grafana-data` | observability | `grafana` | users, sessions, preferences | little — dashboards come from the repo |
 | `alertmanager-data` | observability | `alertmanager` | silences and notification state | active silences |
-| `alertmanager-config` | observability | `config-init` writes, `alertmanager` reads | the rendered `alertmanager.yml` | nothing — regenerated at every start |
+| `alertmanager-config` | observability | `config-init` writes, `alertmanager` reads | `webhook-url` (from `.env`) | nothing — regenerated at every start |
 | `automation-state` | automation | `automation` | staged device changes and every decision on them (who asked, approved, committed) | the change history and audit; changes waiting for approval |
 
 **`neo4j-data` is only irreplaceable if Infrahub was edited through its UI.**
@@ -524,7 +524,7 @@ host, then restart or reload the service.
 | `observability/prometheus/profiles/` | `prometheus` | one alert profile, `${ALERT_PROFILE}.yml` (standard or demo), mounted on its own |
 | `observability/loki/` | `loki` | `loki.yml` |
 | `observability/grafana/provisioning/` | `grafana` | datasources and dashboards |
-| `observability/alertmanager/alertmanager.yml.tmpl` | `config-init` | the template it renders from |
+| `observability/alertmanager/alertmanager.yml.tmpl` | `render-inventory.py`, `config-init` | the template for `generated/alertmanager.yml` (auto-investigate routes) |
 | `observability/logstash/pipeline/` | `logstash` | the syslog pipeline |
 | `observability/logstash/patterns/` | `logstash` | vendor grok patterns |
 | `observability/telegraf/telegraf.conf` | `telegraf` | agent settings |

@@ -48,7 +48,17 @@ services:
         else
           echo "Alerts will be delivered to $$url"
         fi
-        sed "s|__ALERT_WEBHOOK_URL__|$$url|" /src/alertmanager.yml.tmpl > /out/alertmanager.yml
+        # The URL in a file (url_file): the Alertmanager config never holds it, so make render can write that
+        # config without knowing the URL (it may carry the platform's shared secret).
+        printf '%s' "$$url" > /out/webhook-url
+        chmod 0644 /out/webhook-url
+        # The config itself is make render's (Infrahub's auto-investigate routes). Before the first render:
+        # the template as it is, every alert notifies.
+        if [ ! -e /generated/alertmanager.yml ]; then
+          cp /src/alertmanager.yml.tmpl /generated/alertmanager.yml
+          chmod 0644 /generated/alertmanager.yml
+          echo "no alertmanager.yml yet — the template until the first make render (every alert notifies)"
+        fi
 
         for f in devices.json devices.yml; do
           if [ ! -e "/generated/$$f" ]; then
@@ -117,10 +127,11 @@ services:
       com.darqcube.group: observability
       com.darqcube.role: api
     command:
-      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --config.file=/etc/alertmanager/generated/alertmanager.yml
       - --storage.path=/alertmanager
     volumes:
-      - alertmanager-config:/etc/alertmanager:ro
+      - alertmanager-config:/etc/alertmanager:ro                  # webhook-url (config-init)
+      - ../observability/telegraf/generated:/etc/alertmanager/generated:ro   # alertmanager.yml (make render)
       - alertmanager-data:/alertmanager
     ports:
       - "${ALERTMANAGER_PORT:-9093}:9093"

@@ -124,18 +124,23 @@ docker compose up -d --force-recreate config-init alertmanager
 Left empty, alerts collect in the Alertmanager UI and go nowhere — the stack
 starts with no external dependency.
 
-**Alertmanager has no environment-variable expansion of its own**, so
-`observability/alertmanager/alertmanager.yml.tmpl` is a template and the
-`config-init` service substitutes the URL into a volume at startup. Edit the
-`.tmpl`, never the rendered copy.
+Two receivers share that URL: `investigate` (an AI investigation, from each device's policy in Infrahub) and
+`notify` (everything else); the body's `"receiver"` says which. Choosing what goes to `investigate`:
+[auto-investigate.md](auto-investigate.md).
 
-For Slack, email or PagerDuty, add a receiver to the template:
+**Alertmanager has no environment-variable expansion of its own**, so
+`config-init` writes the URL to a file (`/etc/alertmanager/webhook-url`) that both receivers read (`url_file`), and
+`make render` writes the config itself from `observability/alertmanager/alertmanager.yml.tmpl`. Edit the `.tmpl`,
+never the rendered copy, then `make render`.
+
+For Slack, email or PagerDuty, add it to a receiver in the template:
 
 ```yaml
 receivers:
-  - name: default
+  - name: notify
     webhook_configs:
-      - url: __ALERT_WEBHOOK_URL__
+      - url_file: /etc/alertmanager/webhook-url
+        send_resolved: true
     slack_configs:
       - api_url: https://hooks.slack.com/services/XXX
         channel: "#network"

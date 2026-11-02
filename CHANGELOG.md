@@ -8,6 +8,22 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.1.0 (2026-11-02)
+
+### Features
+- **Auto-investigate policy in Infrahub**: three Device attributes (`auto_investigate`, off by default;
+  `auto_investigate_interfaces`, `ifName` patterns; `auto_investigate_protocols`) decide which alerts start an AI
+  investigation. `make render` turns them into Alertmanager routes to a new `investigate` receiver and reloads
+  Alertmanager; every other alert goes to `notify`. Both receivers use the one `ALERT_WEBHOOK_URL`; the body's
+  `"receiver"` names the path. BGP is watched today; OSPF, IS-IS, EIGRP and RIP are accepted and reported as not
+  watched yet. `docs/how-to/auto-investigate.md`.
+
+### Changes
+- Alertmanager reads its config from `observability/telegraf/generated/alertmanager.yml` (written by `make render`;
+  config-init copies the template before the first render) and its webhook URL from a file (`url_file`), so the config
+  never holds the URL. The receiver formerly named `default` is now `notify`.
+- After upgrading: `make schema`, `make render`.
+
 ## 1.0.0 (2026-11-01)
 
 The first versioned release: what a single-VM deployment offers an AI platform, with every device change approved by
