@@ -28,12 +28,14 @@ With `auto_investigate` on, these alerts of that device go to `investigate`:
 | `DeviceUnreachable` | always |
 | `InterfaceDown` | its `ifName` matches one of the patterns (or any, when the list is empty) |
 | `BGPPeerDown` | `bgp` is listed (or the list is empty) |
+| `OSPFNeighborDown` | `ospf` is listed (or the list is empty) |
 
 A pattern is a regular expression for the **whole** name, as the device reports it in IF-MIB `ifName`. IOS-XE
 reports short names (`Gi1`, `Tu2`, `Et0/1`): `Tunnel2` matches nothing there, and `make render` warns about it. A `.`
 matches any character, so `Gi0/0.100` also matches `Gi0/0x100`; write `Gi0/0\.100` to be exact.
 
-**Protocols the stack watches today: BGP.** `ospf`, `isis`, `eigrp` and `rip` are accepted and reported by
+**Protocols the stack watches today: BGP and OSPF** (`BGPPeerDown`, `OSPFNeighborDown`; OSPF on platforms with
+`ospf: true`, see [add-a-metric.md](add-a-metric.md)). `isis`, `eigrp` and `rip` are accepted and reported by
 `make render` ("not watched by the stack yet"): no neighbour state is collected for them, so no alert exists that
 could start an investigation.
 

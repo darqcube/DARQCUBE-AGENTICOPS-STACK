@@ -124,7 +124,7 @@ ROUTES_MARK = "    # __AUTO_INVESTIGATE_ROUTES__"
 PROTOCOLS = ("bgp", "ospf", "isis", "eigrp", "rip")
 # The protocols the stack watches, and the alert each raises. A protocol named in Infrahub but not here is accepted
 # and reported: nothing collects its neighbour state yet, so nothing could start an investigation for it.
-PROTOCOL_ALERTS = {"bgp": "BGPPeerDown"}
+PROTOCOL_ALERTS = {"bgp": "BGPPeerDown", "ospf": "OSPFNeighborDown"}
 DEVICE_ALERTS = ("DeviceUnreachable",)
 INTERFACE_ALERT = "InterfaceDown"
 # IOS-XE reports ifName short (Gi1, Tu2, Et0/1): a pattern written with the long name matches nothing there.
@@ -361,6 +361,16 @@ def resource_tables(platform: str, spec: dict) -> str:
                                ("admin_status", "1.3.6.1.2.1.15.3.1.3", False), ("remote_as", "1.3.6.1.2.1.15.3.1.9", False),
                                ("established_seconds", "1.3.6.1.2.1.15.3.1.16", False),
                                ("local_addr", "1.3.6.1.2.1.15.3.1.5", True)):
+            lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
+            if tag:
+                lines.append('      is_tag = true')
+    if spec.get("ospf"):
+        # OSPF-MIB ospfNbrTable (RFC 1850, standard): one series per adjacency. neighbor is the neighbour's interface
+        # address, router_id its OSPF router id. state: 1 down .. 4 twoWay .. 8 full. A dead adjacency is removed
+        # from the table, so the rules also treat a neighbour seen in the last hour and gone now as down.
+        lines += ['', '  [[inputs.snmp.table]]', '    name = "ospf_neighbor"', '    inherit_tags = ["hostname"]']
+        for name, oid, tag in (("neighbor", "1.3.6.1.2.1.14.10.1.1", True), ("router_id", "1.3.6.1.2.1.14.10.1.3", True),
+                               ("state", "1.3.6.1.2.1.14.10.1.6", False)):
             lines += ['', '    [[inputs.snmp.table.field]]', f'      name = "{name}"', f'      oid = "{oid}"']
             if tag:
                 lines.append('      is_tag = true')

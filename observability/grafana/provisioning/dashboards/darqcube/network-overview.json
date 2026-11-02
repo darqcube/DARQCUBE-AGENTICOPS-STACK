@@ -726,6 +726,217 @@
       "id": 11
     },
     {
+      "type": "stat",
+      "title": "OSPF sessions down",
+      "description": "OSPF adjacencies neither full nor two-way, or gone from the router's table in the last hour (ospf:neighbor:down). Platforms with ospf: true in platforms.yml.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(ospf:neighbor:down{device=~\"$device\", site=~\"$site\"}) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "0",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 0,
+        "y": 10
+      },
+      "id": 25
+    },
+    {
+      "id": 26,
+      "type": "table",
+      "title": "OSPF sessions",
+      "description": "Every OSPF adjacency the routers report (OSPF-MIB ospfNbrTable), worst first. Gone: seen in the last hour, no longer in the router's table (a dead adjacency is removed, not marked down).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "darqcube-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 20,
+        "x": 4,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "ospf_neighbor_state{device=~\"$device\", site=~\"$site\"} or (max_over_time(ospf_neighbor_state{device=~\"$device\", site=~\"$site\"}[1h]) unless on (device, neighbor) ospf_neighbor_state) * 0",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "agent_host": true,
+              "hostname": true,
+              "host": true,
+              "platform": true,
+              "role": true
+            },
+            "indexByName": {
+              "device": 0,
+              "site": 1,
+              "neighbor": 2,
+              "router_id": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "device": "Device",
+              "site": "Site",
+              "neighbor": "Neighbour address",
+              "router_id": "Neighbour router id",
+              "Value": "State"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "State",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Gone",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "Down",
+                        "color": "red",
+                        "index": 1
+                      },
+                      "2": {
+                        "text": "Attempt",
+                        "color": "red",
+                        "index": 2
+                      },
+                      "3": {
+                        "text": "Init",
+                        "color": "red",
+                        "index": 3
+                      },
+                      "4": {
+                        "text": "2-Way",
+                        "color": "green",
+                        "index": 4
+                      },
+                      "5": {
+                        "text": "ExStart",
+                        "color": "orange",
+                        "index": 5
+                      },
+                      "6": {
+                        "text": "Exchange",
+                        "color": "orange",
+                        "index": 6
+                      },
+                      "7": {
+                        "text": "Loading",
+                        "color": "orange",
+                        "index": 7
+                      },
+                      "8": {
+                        "text": "Full",
+                        "color": "green",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
       "type": "table",
       "title": "WAN quality per probe (IP SLA)",
       "description": "IP SLA probes run by the routers (platforms with ipsla: true). RTT and success over the last 10\u201315 min; jitter is the spread of ICMP RTT samples. Probe names come from each operation's `tag`.",
@@ -733,7 +944,7 @@
         "h": 8,
         "w": 10,
         "x": 0,
-        "y": 10
+        "y": 17
       },
       "datasource": {
         "type": "prometheus",
@@ -895,7 +1106,7 @@
         "h": 8,
         "w": 7,
         "x": 10,
-        "y": 10
+        "y": 17
       },
       "datasource": {
         "type": "prometheus",
@@ -938,7 +1149,7 @@
         "h": 8,
         "w": 7,
         "x": 17,
-        "y": 10
+        "y": 17
       },
       "datasource": {
         "type": "prometheus",
@@ -981,7 +1192,7 @@
         "h": 7,
         "w": 5,
         "x": 0,
-        "y": 18
+        "y": 25
       },
       "datasource": {
         "type": "prometheus",
@@ -1064,7 +1275,7 @@
         "h": 7,
         "w": 19,
         "x": 5,
-        "y": 18
+        "y": 25
       },
       "datasource": {
         "type": "prometheus",
@@ -1162,7 +1373,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 25
+        "y": 32
       },
       "datasource": {
         "type": "prometheus",
@@ -1276,7 +1487,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 32
       },
       "datasource": {
         "type": "prometheus",
@@ -1315,7 +1526,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 33
+        "y": 40
       },
       "datasource": {
         "type": "prometheus",
@@ -1367,7 +1578,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 40
       },
       "datasource": {
         "type": "prometheus",
@@ -1414,7 +1625,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 48
       },
       "datasource": {
         "type": "loki",
@@ -1442,7 +1653,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 48
       },
       "datasource": {
         "type": "loki",
@@ -1493,7 +1704,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 50
+        "y": 57
       },
       "datasource": {
         "type": "loki",
@@ -1521,7 +1732,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 50
+        "y": 57
       },
       "datasource": {
         "type": "loki",

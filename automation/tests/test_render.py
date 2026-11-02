@@ -1014,16 +1014,17 @@ def test_routes_follow_each_devices_policy(monkeypatch, tmp_path):
 
 def test_unwatched_protocols_and_bad_patterns_are_reported(monkeypatch, tmp_path, capsys):
     devices = [Device("router1", "ios_xe", "10.0.0.11", "hq", "core-wan", investigate=True,
-                      interfaces="Tunnel1, (?=x), [", protocols="ospf, bogus")]
+                      interfaces="Tunnel1, (?=x), [", protocols="ospf, isis, bogus")]
     mod = load_renderer(monkeypatch, devices, tmp_path)
     assert mod.main() == 0
     err = capsys.readouterr().err
-    assert "ospf is not watched by the stack yet" in err
+    assert "ospf is not watched" not in err, "OSPF is watched since 1.4.0"
+    assert "isis is not watched by the stack yet" in err
     assert "'bogus' is not one of" in err
     assert "lookaround" in err and "is not a pattern" in err
     assert "IOS-XE reports ifName short" in err
     text = (tmp_path / "alertmanager.yml").read_text()
-    assert "BGPPeerDown" not in text                     # only ospf (unwatched) was named
+    assert "BGPPeerDown" not in text and "OSPFNeighborDown" in text   # only ospf was named
     assert '(?=x)' not in text
 
 
@@ -1056,6 +1057,8 @@ def test_alertmanager_accepts_the_config_and_routes_as_intended(monkeypatch, tmp
         ("alertname=InterfaceDown", "device=router1", "ifName=Et0/2"): "notify",
         ("alertname=InterfaceDown", "device=router2", "ifName=Gi3"): "investigate",
         ("alertname=BGPPeerDown", "device=router1", "severity=critical"): "investigate",
+        ("alertname=OSPFNeighborDown", "device=router1", "severity=critical"): "notify",       # router1 names bgp only
+        ("alertname=OSPFNeighborDown", "device=router2", "severity=critical"): "investigate",  # router2: every protocol
         ("alertname=DeviceUnreachable", "device=router2", "severity=critical"): "investigate",
         ("alertname=InterfaceDown", "device=switch1", "ifName=Gi1"): "notify",
         ("alertname=BGPPeerDown", "device=switch1", "severity=critical"): "notify",
@@ -1092,3 +1095,32 @@ def test_no_volume_is_mounted_inside_another():
                 for inner in targets:
                     assert inner == outer or not inner.startswith(outer.rstrip("/") + "/"), \
                         f"{name.name} {service}: {inner} is mounted inside {outer}"
+
+
+def test_ospf_neighbours_are_polled_where_the_platform_declares_ospf_mib(monkeypatch, tmp_path):
+    """OSPF-MIB ospfNbrTable on IOS-XE (ospf: true in platforms.yml); a platform without the flag gets no table."""
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    mod.main()
+    ios = (tmp_path / "snmp-ios_xe.conf").read_text()
+    table = ios.split('name = "ospf_neighbor"', 1)[1]
+    for oid in ("1.3.6.1.2.1.14.10.1.1", "1.3.6.1.2.1.14.10.1.3", "1.3.6.1.2.1.14.10.1.6"):
+        assert f'oid = "{oid}"' in table
+    platforms = yaml.safe_load((ROOT / "platforms.yml").read_text())
+    for platform in ("vrp", "routeros"):
+        if not platforms[platform]["snmp"].get("ospf"):
+            assert 'name = "ospf_neighbor"' not in (tmp_path / f"snmp-{platform}.conf").read_text()
+
+
+def test_ospf_rules_behave():
+    """promtool unit test (observability/prometheus/tests/ospf.test.yml): an adjacency not full, or gone from the
+    table, alerts after 2 minutes; two-way is healthy."""
+    import shutil
+    import subprocess
+    if not shutil.which("docker"):
+        pytest.skip("docker not available")
+    version = re.search(r"^PROMETHEUS_VERSION=(\S+)", (ROOT / ".env.example").read_text(), re.M)
+    image = f"prom/prometheus:{version.group(1)}" if version else "prom/prometheus"
+    r = subprocess.run(["docker", "run", "--rm", "-v", f"{ROOT / 'observability/prometheus'}:/p:ro",
+                        "--entrypoint", "promtool", image, "test", "rules", "/p/tests/ospf.test.yml"],
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stdout + r.stderr

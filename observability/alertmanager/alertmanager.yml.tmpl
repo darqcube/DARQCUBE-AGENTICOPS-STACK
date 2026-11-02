@@ -27,6 +27,7 @@ route:
     - matchers: [alertname="ChangeWaitingForApproval"]
       receiver: notify
       group_by: [alertname, change_id]
+      group_interval: 1m   # a decided change's "resolved" is sent within about a minute
     # __AUTO_INVESTIGATE_ROUTES__
     - matchers: [severity="critical"]
       receiver: notify

@@ -8,6 +8,21 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.4.0 (2026-11-02)
+
+### Features
+- **OSPF adjacencies**: platforms with `ospf: true` (IOS-XE, verified) poll OSPF-MIB's neighbour table
+  (`ospf_neighbor_state`, tags `neighbor`, `router_id`). `ospf:neighbor:down` counts an adjacency neither full nor
+  two-way, or gone from the router's table in the last hour; **`OSPFNeighborDown`** fires after 2 minutes.
+- **Network Overview**: "OSPF sessions down" and an "OSPF sessions" table (every adjacency, its state, worst first).
+- **Auto-investigate**: `ospf` in a device's `auto_investigate_protocols` now routes `OSPFNeighborDown` to
+  `investigate`.
+
+### Changes
+- A decided change's `ChangeWaitingForApproval` is reported resolved within about a minute (`group_interval: 1m` on its
+  route), not at the 5-minute group interval.
+- After upgrading: `make render` (the OSPF poll and the Alertmanager config), and reload Prometheus's rules.
+
 ## 1.3.0 (2026-11-02)
 
 ### Changes

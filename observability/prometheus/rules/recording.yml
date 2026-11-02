@@ -62,6 +62,16 @@ groups:
         expr: count(device:not_reporting) or vector(0)
       - record: network:bgp_sessions_down:count
         expr: count(bgp_peer_state != 6 and on (device, peer) bgp_peer_admin_status == 2) or vector(0)
+      # OSPF (platforms with ospf: true). An adjacency is down when it is neither full (8) nor 2-way (4, stable between
+      # two non-designated routers on a shared segment), or when it was seen in the last hour and is gone from the
+      # router's table now (a dead adjacency is removed, not marked down). Gone ones carry state 0.
+      - record: ospf:neighbor:down
+        expr: |
+          (ospf_neighbor_state != 8 and ospf_neighbor_state != 4)
+            or
+          (max_over_time(ospf_neighbor_state[1h]) unless on (device, neighbor) ospf_neighbor_state) * 0
+      - record: network:ospf_sessions_down:count
+        expr: count(ospf:neighbor:down) or vector(0)
       # IP SLA (platforms with ipsla: true). ipsla:ok is 1 when the latest
       # operation succeeded; its average over a window is the success ratio
       # (1 - loss). Jitter is the spread of the probe's RTT samples.

@@ -40,6 +40,17 @@ BGP4-MIB peer table (`bgp_peer_state`, `bgp_peer_admin_status`,
 tag `peer`). Shipped on for `ios_xe` and `vrp`; RouterOS does not implement
 BGP4-MIB. Drives the `BGPPeerDown` alert and the BGP panels.
 
+### OSPF adjacencies — `ospf: true`
+
+A platform with `snmp.ospf: true` also gets the standard OSPF-MIB neighbour
+table: `ospf_neighbor_state` (1 down … 4 two-way … 8 full), one series per
+adjacency, tags `neighbor` (its interface address) and `router_id`. Shipped on
+for `ios_xe` (verified); set it for another platform once a device of it
+answers `snmpwalk … 1.3.6.1.2.1.14.10.1.6`. A dead adjacency is removed from
+the table, so `ospf:neighbor:down` also counts one seen in the last hour and
+gone now. Drives the `OSPFNeighborDown` alert and the OSPF panels of Network
+Overview.
+
 ### IP SLA probes — `ipsla: true`
 
 `snmp.ipsla: true` (shipped on for `ios_xe`) polls CISCO-RTTMON-MIB:

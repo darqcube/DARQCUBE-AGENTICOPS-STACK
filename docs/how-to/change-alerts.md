@@ -60,7 +60,9 @@ recording rule in `observability/prometheus/rules/recording.yml` is what makes t
 
 **Intent and routing alerts shipped:** `DeviceNotReporting` (active in
 Infrahub, no SNMP/gNMI data for 10 min — names the device and site) and
-`BGPPeerDown` (a peer configured up that is not Established for 5 min).
+`BGPPeerDown` (a peer configured up that is not Established for 5 min) and
+`OSPFNeighborDown` (an adjacency neither full nor two-way, or gone from the
+router's table, for 2 min).
 
 **WAN quality alerts shipped:** `IPSLAProbeFailing` (a probe below 80 %
 success over 15 min) and `WANLatencyHigh` (ICMP probe RTT above 150 ms for

@@ -1,0 +1,45 @@
+# OSPF adjacencies (rules/recording.yml ospf:neighbor:down, rules/alerts.yml OSPFNeighborDown): not full nor two-way, or
+# gone from the router's table (a dead adjacency is removed, not marked down), for 2 minutes. Two-way is healthy.
+#   docker run --rm -v "$PWD/observability/prometheus:/p:ro" --entrypoint promtool prom/prometheus test rules /p/tests/ospf.test.yml
+# Also run by automation/tests/test_render.py when Docker is available.
+rule_files:
+  - ../rules/recording.yml
+  - ../rules/alerts.yml
+evaluation_interval: 30s
+tests:
+  - interval: 1m
+    input_series:
+      # router1's adjacency drops to init (3) from minute 5 to 10, then is full again.
+      - {series: 'ospf_neighbor_state{device="router1",neighbor="10.0.0.2",router_id="10.255.0.2",job="telegraf"}', values: '8x4 3x5 8x10'}
+      # router2's adjacency is gone from minute 5 (the router removed it): the series ends.
+      - {series: 'ospf_neighbor_state{device="router2",neighbor="10.0.0.6",router_id="10.255.0.6",job="telegraf"}', values: '8x4 stale'}
+      # switch1 sees a non-designated neighbour at two-way, steadily: healthy.
+      - {series: 'ospf_neighbor_state{device="switch1",neighbor="10.0.1.3",router_id="10.255.1.3",job="telegraf"}', values: '4x19'}
+    promql_expr_test:
+      - expr: network:ospf_sessions_down:count
+        eval_time: 3m
+        exp_samples: [{labels: 'network:ospf_sessions_down:count', value: 0}]
+      - expr: network:ospf_sessions_down:count
+        eval_time: 8m
+        exp_samples: [{labels: 'network:ospf_sessions_down:count', value: 2}]
+    alert_rule_test:
+      - {eval_time: 4m, alertname: OSPFNeighborDown, exp_alerts: []}
+      - {eval_time: 6m, alertname: OSPFNeighborDown, exp_alerts: []}   # not yet: for 2m
+      - eval_time: 8m
+        alertname: OSPFNeighborDown
+        exp_alerts:
+          - exp_labels: {severity: critical, device: router1, neighbor: 10.0.0.2, router_id: 10.255.0.2, job: telegraf}
+            exp_annotations:
+              summary: "OSPF neighbour 10.0.0.2 on router1 is down"
+              description: "Adjacency with router 10.255.0.2: state 3 (8 full, 4 two-way; 0 gone from the table) for 2 minutes."
+          - exp_labels: {severity: critical, device: router2, neighbor: 10.0.0.6, router_id: 10.255.0.6, job: telegraf}
+            exp_annotations:
+              summary: "OSPF neighbour 10.0.0.6 on router2 is down"
+              description: "Adjacency with router 10.255.0.6: state 0 (8 full, 4 two-way; 0 gone from the table) for 2 minutes."
+      - eval_time: 13m
+        alertname: OSPFNeighborDown
+        exp_alerts:
+          - exp_labels: {severity: critical, device: router2, neighbor: 10.0.0.6, router_id: 10.255.0.6, job: telegraf}
+            exp_annotations:
+              summary: "OSPF neighbour 10.0.0.6 on router2 is down"
+              description: "Adjacency with router 10.255.0.6: state 0 (8 full, 4 two-way; 0 gone from the table) for 2 minutes."

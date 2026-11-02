@@ -63,6 +63,17 @@ groups:
           summary: "BGP peer {{ $labels.peer }} on {{ $labels.device }} is not established"
           description: "bgpPeerState {{ $value }} (6 = established) for 5 minutes."
 
+  - name: ospf
+    rules:
+      # ospf:neighbor:down (rules/recording.yml): not full nor 2-way, or gone from the table.
+      - alert: OSPFNeighborDown
+        expr: ospf:neighbor:down
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "OSPF neighbour {{ $labels.neighbor }} on {{ $labels.device }} is down"
+          description: "Adjacency with router {{ $labels.router_id }}: state {{ $value }} (8 full, 4 two-way; 0 gone from the table) for 2 minutes."
+
   - name: assurance
     rules:
       # AssuranceCheckFailing: its timing depends on the alert profile (ALERT_PROFILE), so it is in
