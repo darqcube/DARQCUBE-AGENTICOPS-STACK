@@ -22,6 +22,11 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # One group per waiting change, so a second change that starts waiting is sent on its own after group_wait,
+    # not held until the first one's group is sent again.
+    - matchers: [alertname="ChangeWaitingForApproval"]
+      receiver: notify
+      group_by: [alertname, change_id]
     # __AUTO_INVESTIGATE_ROUTES__
     - matchers: [severity="critical"]
       receiver: notify

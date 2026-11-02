@@ -119,14 +119,15 @@ groups:
   - name: changes
     rules:
       # Approved changes (docs/how-to/approve-changes.md): a change an agent staged waits for a person with the approve
-      # right. Routed like any alert, so approvers learn it waits (mail, chat, the platform's badge) within a minute.
+      # right. One alert per change (change_state, 1.2.0), named by change_id, so approvers learn of each one within a
+      # minute, even while another waits; it clears when that change is decided, withdrawn or expired.
       - alert: ChangeWaitingForApproval
-        expr: sum(changes{state="waiting"}) > 0
+        expr: change_state{state="waiting"} == 1
         for: 1m
         labels: { severity: info }
         annotations:
-          summary: "{{ $value }} device change(s) waiting for an approval"
-          description: "An approver approves or rejects each one through the approvals path; unapproved, it expires."
+          summary: "Change {{ $labels.change_id }} is waiting for an approval"
+          description: "An approver approves or rejects it through the approvals path; unapproved, it expires."
 
   - name: platform
     rules:

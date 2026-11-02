@@ -117,9 +117,10 @@ error, starting `refused:` with the reason, so the agent can say why.
 ## Learning that a change waits
 
 The automation API exports how many changes are in each state, `changes{state="…"}` on `/metrics` (Prometheus scrapes it
-with the `automation` job), and **`ChangeWaitingForApproval`** fires one minute after a change starts waiting (rules:
-`observability/prometheus/rules/alerts.yml`, group `changes`). Alertmanager routes it like any alert: point a receiver at
-your approvers (mail, chat). A platform can show the same number as a badge, read from Prometheus: it is a count, never a
+with the `automation` job), and **`ChangeWaitingForApproval`** fires one minute after a change starts waiting, one alert
+per change, labelled `change_id` (rules: `observability/prometheus/rules/alerts.yml`, group `changes`); it clears when
+that change no longer waits. Alertmanager groups it per change, so each new change is sent on its own: point a receiver
+at your approvers (mail, chat), or let the AI platform notify them. A platform can show the same number as a badge, read from Prometheus: it is a count, never a
 change's content.
 
 ## Following one change

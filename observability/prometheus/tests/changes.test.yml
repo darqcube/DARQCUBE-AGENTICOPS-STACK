@@ -1,5 +1,6 @@
 # The change notification (rules/alerts.yml, group changes): ChangeWaitingForApproval fires one minute after a change
-# starts waiting and clears when none waits (approved, rejected, withdrawn or expired).
+# starts waiting, one alert per change, and clears when that change no longer waits (approved, rejected, withdrawn or
+# expired).
 #   docker run --rm -v "$PWD/observability/prometheus:/p:ro" --entrypoint promtool prom/prometheus test rules /p/tests/changes.test.yml
 # Also run by automation/tests/test_render.py when Docker is available.
 rule_files:
@@ -8,16 +9,37 @@ evaluation_interval: 30s
 tests:
   - interval: 1m
     input_series:
-      # Nothing waits for 5 minutes, two changes wait from minute 5 to 15, none after.
-      - {series: 'changes{state="waiting",job="automation"}', values: '0x4 2x10 0x10'}
+      # Change a1b2-c3d4 waits from minute 5 to 15, then is approved: its waiting series leaves /metrics, which
+      # Prometheus marks stale at the next scrape. e5f6-0718 starts waiting at minute 8, while the first still waits,
+      # and waits to the end. (`_xN` is N blanks, `v xN` N+1 samples.)
+      - {series: 'change_state{change_id="a1b2-c3d4",state="waiting",job="automation"}', values: '_x5 1x10 stale'}
+      - {series: 'change_state{change_id="a1b2-c3d4",state="approved",job="automation"}', values: '_x15 1x9'}
+      - {series: 'change_state{change_id="e5f6-0718",state="waiting",job="automation"}', values: '_x8 1x17'}
     alert_rule_test:
       - {eval_time: 4m, alertname: ChangeWaitingForApproval, exp_alerts: []}
       - {eval_time: 5m30s, alertname: ChangeWaitingForApproval, exp_alerts: []}   # not yet: for 1m
       - eval_time: 7m
         alertname: ChangeWaitingForApproval
         exp_alerts:
-          - exp_labels: {severity: info}
+          - exp_labels: {severity: info, change_id: a1b2-c3d4, state: waiting, job: automation}
             exp_annotations:
-              summary: "2 device change(s) waiting for an approval"
-              description: "An approver approves or rejects each one through the approvals path; unapproved, it expires."
-      - {eval_time: 17m, alertname: ChangeWaitingForApproval, exp_alerts: []}
+              summary: "Change a1b2-c3d4 is waiting for an approval"
+              description: "An approver approves or rejects it through the approvals path; unapproved, it expires."
+      - eval_time: 10m
+        alertname: ChangeWaitingForApproval
+        exp_alerts:
+          - exp_labels: {severity: info, change_id: a1b2-c3d4, state: waiting, job: automation}
+            exp_annotations:
+              summary: "Change a1b2-c3d4 is waiting for an approval"
+              description: "An approver approves or rejects it through the approvals path; unapproved, it expires."
+          - exp_labels: {severity: info, change_id: e5f6-0718, state: waiting, job: automation}
+            exp_annotations:
+              summary: "Change e5f6-0718 is waiting for an approval"
+              description: "An approver approves or rejects it through the approvals path; unapproved, it expires."
+      - eval_time: 17m
+        alertname: ChangeWaitingForApproval
+        exp_alerts:
+          - exp_labels: {severity: info, change_id: e5f6-0718, state: waiting, job: automation}
+            exp_annotations:
+              summary: "Change e5f6-0718 is waiting for an approval"
+              description: "An approver approves or rejects it through the approvals path; unapproved, it expires."

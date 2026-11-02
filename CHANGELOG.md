@@ -8,6 +8,14 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.3.0 (2026-11-02)
+
+### Changes
+- **`ChangeWaitingForApproval` is one alert per waiting change** (from `change_state`), labelled `change_id`, and
+  Alertmanager groups it per change: a change that starts waiting while another waits is sent on its own within
+  `group_wait`, instead of waiting for the first one's group. Its summary names the change. Before, one alert counted all
+  waiting changes (`sum(changes{state="waiting"})`).
+
 ## 1.2.0 (2026-11-02)
 
 ### Features
