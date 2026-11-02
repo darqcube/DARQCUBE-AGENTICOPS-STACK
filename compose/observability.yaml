@@ -127,11 +127,11 @@ services:
       com.darqcube.group: observability
       com.darqcube.role: api
     command:
-      - --config.file=/etc/alertmanager/generated/alertmanager.yml
+      - --config.file=/etc/alertmanager-generated/alertmanager.yml
       - --storage.path=/alertmanager
     volumes:
       - alertmanager-config:/etc/alertmanager:ro                  # webhook-url (config-init)
-      - ../observability/telegraf/generated:/etc/alertmanager/generated:ro   # alertmanager.yml (make render)
+      - ../observability/telegraf/generated:/etc/alertmanager-generated:ro   # alertmanager.yml (make render)
       - alertmanager-data:/alertmanager
     ports:
       - "${ALERTMANAGER_PORT:-9093}:9093"

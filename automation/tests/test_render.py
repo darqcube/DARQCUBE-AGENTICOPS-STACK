@@ -1045,9 +1045,9 @@ def test_alertmanager_accepts_the_config_and_routes_as_intended(monkeypatch, tmp
     (tmp_path / "webhook-url").write_text("http://192.0.2.50/hook")
     version = re.search(r"^ALERTMANAGER_VERSION=(\S+)", (ROOT / ".env.example").read_text(), re.M)
     image = f"prom/alertmanager:{version.group(1)}" if version else "prom/alertmanager:v0.28.1"
-    run = ["docker", "run", "--rm", "-v", f"{tmp_path / 'alertmanager.yml'}:/etc/alertmanager/generated/alertmanager.yml:ro",
+    run = ["docker", "run", "--rm", "-v", f"{tmp_path / 'alertmanager.yml'}:/etc/alertmanager-generated/alertmanager.yml:ro",
            "-v", f"{tmp_path / 'webhook-url'}:/etc/alertmanager/webhook-url:ro", "--entrypoint", "amtool", image]
-    check = subprocess.run(run + ["check-config", "/etc/alertmanager/generated/alertmanager.yml"],
+    check = subprocess.run(run + ["check-config", "/etc/alertmanager-generated/alertmanager.yml"],
                            capture_output=True, text=True, timeout=180)
     assert check.returncode == 0, check.stdout + check.stderr
     cases = {
@@ -1063,7 +1063,7 @@ def test_alertmanager_accepts_the_config_and_routes_as_intended(monkeypatch, tmp
         ("alertname=ChangeWaitingForApproval",): "notify",
     }
     for labels, want in cases.items():
-        r = subprocess.run(run + ["config", "routes", "test", "--config.file=/etc/alertmanager/generated/alertmanager.yml",
+        r = subprocess.run(run + ["config", "routes", "test", "--config.file=/etc/alertmanager-generated/alertmanager.yml",
                                   *labels], capture_output=True, text=True, timeout=180)
         assert r.stdout.strip() == want, f"{labels}: {r.stdout.strip()!r} {r.stderr[-300:]}"
 
@@ -1073,8 +1073,22 @@ def test_config_init_writes_the_url_file_and_a_first_config():
     compose = (ROOT / "compose/observability.yaml").read_text()
     assert "printf '%s' \"$$url\" > /out/webhook-url" in compose
     assert "cp /src/alertmanager.yml.tmpl /generated/alertmanager.yml" in compose
-    assert "--config.file=/etc/alertmanager/generated/alertmanager.yml" in compose
+    assert "--config.file=/etc/alertmanager-generated/alertmanager.yml" in compose
     template = (ROOT / "observability/alertmanager/alertmanager.yml.tmpl").read_text()
     assert yaml.safe_load(template)["route"]["receiver"] == "notify"
     for name in ("compose/source-of-truth.yaml",):
         assert (ROOT / name).read_text().count("../observability/alertmanager:/alertmanager-src:ro") == 2
+
+
+def test_no_volume_is_mounted_inside_another():
+    """A mount under a read-only mount fails at container start ("make mountpoint …: read-only file system"): 1.1.0
+    mounted Alertmanager's generated config inside its read-only /etc/alertmanager volume. Docker builds the
+    mountpoint only when the container starts, so a config check never sees it."""
+    for name in sorted((ROOT / "compose").glob("*.yaml")):
+        services = (yaml.safe_load(name.read_text()) or {}).get("services", {})
+        for service, spec in services.items():
+            targets = [str(v).split(":")[1] for v in spec.get("volumes", []) if isinstance(v, str) and ":" in str(v)]
+            for outer in targets:
+                for inner in targets:
+                    assert inner == outer or not inner.startswith(outer.rstrip("/") + "/"), \
+                        f"{name.name} {service}: {inner} is mounted inside {outer}"

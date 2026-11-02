@@ -62,7 +62,7 @@ With [auto-render](auto-render.md) on, a change saved in Infrahub is applied by 
 
 ```bash
 docker compose exec alertmanager amtool config routes test \
-  --config.file=/etc/alertmanager/generated/alertmanager.yml \
+  --config.file=/etc/alertmanager-generated/alertmanager.yml \
   alertname=InterfaceDown device=router1 ifName=Tu2
 # investigate
 ```

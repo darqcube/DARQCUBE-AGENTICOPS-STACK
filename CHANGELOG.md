@@ -8,6 +8,12 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.1.1 (2026-11-02)
+
+### Fixes
+- Alertmanager did not start on 1.1.0: its generated config was mounted inside its read-only `/etc/alertmanager`
+  volume. It is now mounted at `/etc/alertmanager-generated`; a test refuses any volume mounted inside another.
+
 ## 1.1.0 (2026-11-02)
 
 ### Features
