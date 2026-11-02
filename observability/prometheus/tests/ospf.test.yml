@@ -1,5 +1,6 @@
 # OSPF adjacencies (rules/recording.yml ospf:neighbor:down, rules/alerts.yml OSPFNeighborDown): not full nor two-way, or
-# gone from the router's table (a dead adjacency is removed, not marked down), for 2 minutes. Two-way is healthy.
+# gone from the router's table (a dead adjacency is removed, not marked down) while the router still answers, for 2
+# minutes. Two-way is healthy; a router that went silent raises no OSPF alert.
 #   docker run --rm -v "$PWD/observability/prometheus:/p:ro" --entrypoint promtool prom/prometheus test rules /p/tests/ospf.test.yml
 # Also run by automation/tests/test_render.py when Docker is available.
 rule_files:
@@ -13,6 +14,12 @@ tests:
       - {series: 'ospf_neighbor_state{device="router1",neighbor="10.0.0.2",router_id="10.255.0.2",job="telegraf"}', values: '8x4 3x5 8x10'}
       # router2's adjacency is gone from minute 5 (the router removed it): the series ends.
       - {series: 'ospf_neighbor_state{device="router2",neighbor="10.0.0.6",router_id="10.255.0.6",job="telegraf"}', values: '8x4 stale'}
+      # router2 still answers SNMP (its interfaces report) while its adjacency is gone: a real loss.
+      - {series: 'interface_oper_status{device="router2",ifName="Gi1",job="telegraf"}', values: '1x19'}
+      # router3 goes silent from minute 5 (a polling gap, or the router itself): its adjacency and its interfaces stop
+      # together. That is DeviceNotReporting's, never an OSPF alert.
+      - {series: 'ospf_neighbor_state{device="router3",neighbor="10.0.0.9",router_id="10.255.0.9",job="telegraf"}', values: '8x4 stale'}
+      - {series: 'interface_oper_status{device="router3",ifName="Gi1",job="telegraf"}', values: '1x4 stale'}
       # switch1 sees a non-designated neighbour at two-way, steadily: healthy.
       - {series: 'ospf_neighbor_state{device="switch1",neighbor="10.0.1.3",router_id="10.255.1.3",job="telegraf"}', values: '4x19'}
     promql_expr_test:

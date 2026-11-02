@@ -8,6 +8,13 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.4.2 (2026-11-03)
+
+### Fixes
+- `OSPFNeighborDown` no longer fires when the router stops answering SNMP: an adjacency counts as gone only while the
+  router still reports its interfaces. A 4-minute polling gap raised it for every adjacency at once; a silent router is
+  `DeviceNotReporting`'s. The "OSPF sessions" table on Network Overview follows the same rule.
+
 ## 1.4.1 (2026-11-02)
 
 ### Fixes

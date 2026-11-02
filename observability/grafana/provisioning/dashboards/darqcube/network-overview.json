@@ -795,7 +795,7 @@
       "id": 26,
       "type": "table",
       "title": "OSPF sessions",
-      "description": "Every OSPF adjacency the routers report (OSPF-MIB ospfNbrTable), worst first. Gone: seen in the last hour, no longer in the router's table (a dead adjacency is removed, not marked down).",
+      "description": "Every OSPF adjacency the routers report (OSPF-MIB ospfNbrTable), worst first. Gone: seen in the last hour, no longer in the router's table while the router still answers SNMP (a dead adjacency is removed, not marked down).",
       "datasource": {
         "type": "prometheus",
         "uid": "darqcube-prometheus"
@@ -808,7 +808,7 @@
       },
       "targets": [
         {
-          "expr": "ospf_neighbor_state{device=~\"$device\", site=~\"$site\"} or (max_over_time(ospf_neighbor_state{device=~\"$device\", site=~\"$site\"}[1h]) unless on (device, neighbor) ospf_neighbor_state) * 0",
+          "expr": "ospf_neighbor_state{device=~\"$device\", site=~\"$site\"} or (max_over_time(ospf_neighbor_state{device=~\"$device\", site=~\"$site\"}[1h]) unless on (device, neighbor) ospf_neighbor_state and on (device) group by (device) (interface_oper_status)) * 0",
           "format": "table",
           "instant": true,
           "refId": "A"

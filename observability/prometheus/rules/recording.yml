@@ -64,12 +64,18 @@ groups:
         expr: count(bgp_peer_state != 6 and on (device, peer) bgp_peer_admin_status == 2) or vector(0)
       # OSPF (platforms with ospf: true). An adjacency is down when it is neither full (8) nor 2-way (4, stable between
       # two non-designated routers on a shared segment), or when it was seen in the last hour and is gone from the
-      # router's table now (a dead adjacency is removed, not marked down). Gone ones carry state 0.
+      # router's table now (a dead adjacency is removed, not marked down). Gone ones carry state 0. "Gone" only while
+      # the router still answers SNMP (its interfaces report): a router that went silent, or a polling gap, is
+      # DeviceNotReporting's, never an OSPF outage (1.4.2: a 4-minute polling gap raised OSPFNeighborDown everywhere).
       - record: ospf:neighbor:down
         expr: |
           (ospf_neighbor_state != 8 and ospf_neighbor_state != 4)
             or
-          (max_over_time(ospf_neighbor_state[1h]) unless on (device, neighbor) ospf_neighbor_state) * 0
+          (
+            (max_over_time(ospf_neighbor_state[1h]) unless on (device, neighbor) ospf_neighbor_state)
+              and on (device)
+            group by (device) (interface_oper_status)
+          ) * 0
       - record: network:ospf_sessions_down:count
         expr: count(ospf:neighbor:down) or vector(0)
       # IP SLA (platforms with ipsla: true). ipsla:ok is 1 when the latest
