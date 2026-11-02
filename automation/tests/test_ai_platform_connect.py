@@ -124,6 +124,21 @@ def test_the_alert_receiver_is_written_when_given(gen, inst, idp, tmp_path):
     assert overlay["ai_platform"]["alert_webhook_url"] == "http://192.0.2.1:9100/alertmanager/s"
 
 
+def test_the_fresh_signin_claim_is_written_when_given_and_reaches_the_env(gen, inst, idp, tmp_path):
+    """An identity provider that records no auth_time on the password grant needs iat. Generated only by the site file
+    before 1.2.0, a re-applied overlay put auth_time back, and every approval was refused as not fresh."""
+    out = subprocess.run(
+        [sys.executable, str(SCRIPT), "--stack-host", "127.0.0.1", "--idp", idp,
+         "--jwks-host", "192.0.2.1", "--fresh-signin-claim", "iat", "--out", str(tmp_path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    overlay = inst.read_yaml(tmp_path / "ai-platform.site.yml")
+    assert not inst.validate_ai_platform(overlay), inst.validate_ai_platform(overlay)
+    assert overlay["ai_platform"]["auth"]["fresh_signin_claim"] == "iat"
+    assert inst.site_to_env(overlay)["CHANGE_FRESH_SIGNIN_CLAIM"] == "iat"
+
+
 def test_snippet_registers_all_seven_servers(gen, tmp_path):
     snippet = yaml.safe_load(gen.mcp_snippet("192.0.2.10", "X-Test-Token"))
     servers = snippet["mcp_servers"]

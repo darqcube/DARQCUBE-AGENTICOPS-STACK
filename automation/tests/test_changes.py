@@ -316,6 +316,15 @@ def test_a_malformed_rule_file_fails_loudly(tmp_path):
         line_rules.refusals(["anything"], path=str(bad))
 
 
+def test_recent_states_name_each_change_and_nothing_else(store, clock):
+    change = store.stage(ASKER, "r1", LINES, ROLLBACK, "test")
+    assert store.recent_states() == {change["id"]: "waiting"}
+    clock.now += store.settings.approve_within + 1
+    assert store.recent_states() == {change["id"]: "expired"}, "expired first, like the counts"
+    clock.now += 86400
+    assert store.recent_states() == {}, "older than a day: no longer exported"
+
+
 def test_counts_per_state_include_zeros_and_expire_first(store, clock):
     store.stage(ASKER, "r1", LINES, ROLLBACK, "test")
     counts = store.counts()

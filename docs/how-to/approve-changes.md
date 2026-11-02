@@ -122,6 +122,14 @@ with the `automation` job), and **`ChangeWaitingForApproval`** fires one minute 
 your approvers (mail, chat). A platform can show the same number as a badge, read from Prometheus: it is a count, never a
 change's content.
 
+## Following one change
+
+`change_state{change_id="…",state="…"} 1` on the same `/metrics`: one series per change staged in the last 24 hours, with
+its current state (expired ones moved first). It names only the change's id and state, never the device, the lines or a
+person, so a platform can show the person who asked for a change that it was approved (and let them continue to the
+commit) without that person signing in to the approvals path. Reading the change itself, and approving it, still need
+the approvals path's own sign-in.
+
 ## The automation API is loopback-only
 
 The automation API has no authentication of its own and trusts the person

@@ -75,6 +75,16 @@ class Store:
             found = dict(self._db.execute("SELECT state, COUNT(*) FROM changes GROUP BY state").fetchall())
         return {state: int(found.get(state, 0)) for state in policy.STATES}
 
+    def recent_states(self, within: float = 86400.0) -> dict[str, str]:
+        """Each change staged within `within` seconds, by id, with its state (expired ones moved first): what /metrics
+        exports per change, so a person can follow their own change (a run's approval card) without reading it. Only
+        the id and the state: never the device, the lines or a person."""
+        with self._lock:
+            self._expire_all()
+            rows = self._db.execute("SELECT id, state FROM changes WHERE staged_at >= ?",
+                                    (self.clock() - within,)).fetchall()
+        return {change_id: state for change_id, state in rows}
+
     def events(self, limit: int = 200, change_id: str | None = None) -> list[dict]:
         limit = max(1, min(int(limit), 1000))
         where, args = ("WHERE change_id = ?", (change_id, limit)) if change_id else ("", (limit,))

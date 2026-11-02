@@ -76,6 +76,12 @@ def metrics():
     lines = ["# HELP changes Device changes per state (approved changes: stage, a person approves, commit).",
              "# TYPE changes gauge"]
     lines += [f'changes{{state="{state}"}} {count}' for state, count in changes().counts().items()]
+    # One series per change staged in the last 24 h: its state, for the person following it (a portal card). The ids
+    # are the store's own (four hex, a dash, four hex), so they need no escaping.
+    lines += ["# HELP change_state The state of each change staged in the last 24 hours (1 = its current state).",
+              "# TYPE change_state gauge"]
+    lines += [f'change_state{{change_id="{cid}",state="{state}"}} 1'
+              for cid, state in sorted(changes().recent_states().items())]
     return scheduler.metrics() + "\n".join(lines) + "\n"
 
 

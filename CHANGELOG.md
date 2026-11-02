@@ -8,6 +8,15 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.2.0 (2026-11-02)
+
+### Features
+- **`change_state{change_id, state}`** on the automation API's `/metrics`: each change staged in the last 24 hours with
+  its current state (only the id and the state). A platform shows the person who asked for a change that it was approved
+  without a sign-in to the approvals path. `docs/how-to/approve-changes.md`, "Following one change".
+- **`--fresh-signin-claim auth_time|iat`** on `scripts/ai-platform-connect.py`: the overlay carries the sign-in claim, so
+  re-applying it no longer puts `auth_time` back on a platform that needs `iat` (every approval was refused as not fresh).
+
 ## 1.1.1 (2026-11-02)
 
 ### Fixes

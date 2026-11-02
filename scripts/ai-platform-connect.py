@@ -125,6 +125,7 @@ def site_overlay(args, issuer: str, jwks_url: str, audiences: list[str]) -> str:
         f'    jwks_url: "{jwks_url}"',
         f'    audiences: "{",".join(audiences)}"',
         f"    write_role: {args.write_role}",
+    ] + ([f"    fresh_signin_claim: {args.fresh_signin_claim}"] if args.fresh_signin_claim else []) + [
         f"  max_response_kb: {args.max_response_kb}",
         f"  graphs: {'true' if args.graphs else 'false'}",
     ] + ([f"  alert_profile: {args.alert_profile}"] if args.alert_profile else [])
@@ -176,6 +177,10 @@ def main() -> int:
     ap.add_argument("--bind-ip", default="",
                     help="stack VM address to publish MCP on (default: the VM's collector_ip)")
     ap.add_argument("--write-role", default="darqcube-write")
+    ap.add_argument("--fresh-signin-claim", choices=("auth_time", "iat"),
+                    help="the token claim an approval's sign-in time is read from (CHANGE_FRESH_SIGNIN_CLAIM): iat for "
+                         "an identity provider that records no auth_time on the password grant. Left out, install.py "
+                         "applies its default (auth_time), so name it whenever the platform needs iat")
     ap.add_argument("--allow-write", action="store_true",
                     help="ignored: whether an AI may push configuration is the stack owner's choice "
                          "(make writes-on on the stack host)")
