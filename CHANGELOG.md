@@ -8,6 +8,14 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.5.1 (2026-11-05)
+
+### Fixes
+- `make render` no longer deletes its Telegraf files before writing them again: a file written again is overwritten in
+  place, and only what the run no longer writes is removed, at the end. Telegraf watches the directory and once reloaded
+  while `intent.conf` was gone, dropping `intent_device_present` (and 1.5.0's `intent_link_present`) until it restarted.
+  After upgrading from 1.5.0 with that symptom: `docker compose restart telegraf`, once.
+
 ## 1.5.0 (2026-11-05)
 
 ### Features

@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import re
 import sys
 import types
@@ -798,6 +799,20 @@ def test_intent_lists_each_end_of_every_active_cable(monkeypatch, tmp_path):
         "intent_link,device=router1,ifName=Gi0/1,neighbor=sw-hw-01,neighbor_port=GE0/0/1,cable=router1-sw present=1i",
         "intent_link,device=sw-hw-01,ifName=GE0/0/1,neighbor=router1,neighbor_port=Gi0/1,cable=router1-sw present=1i",
     ]   # decommissioned: none; x9 is not rendered, so only mt-01's end
+
+
+def test_rewritten_files_are_never_removed_first(monkeypatch, tmp_path):
+    """Telegraf watches the directory: a reload while intent.conf was deleted (render removed every file first and
+    wrote them again) dropped the intent input until Telegraf restarted. A file written again is overwritten in place;
+    only what this run no longer writes is removed, at the end."""
+    removed = []
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    (tmp_path / "snmp-gone.conf").write_text("stale")
+    real_remove = mod.os.remove
+    monkeypatch.setattr(mod.os, "remove", lambda path: (removed.append(os.path.basename(path)), real_remove(path)))
+    assert mod.main() == 0
+    assert removed == ["snmp-gone.conf"]
 
 
 def test_no_cables_modelled_renders_no_links(monkeypatch, tmp_path):

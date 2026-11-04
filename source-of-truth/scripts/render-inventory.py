@@ -488,12 +488,14 @@ def main() -> int:
 
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    # Clear previous output first. Without this, shrinking the fleet (or
-    # dropping a platform) leaves an orphaned shard file behind and Telegraf
-    # keeps polling devices that are no longer in the source of truth.
-    for stale in os.listdir(OUT_DIR):
-        if stale.startswith(("snmp-", "gnmi", "netflow-", "intent")) and stale.endswith((".conf", ".influx")):
-            os.remove(os.path.join(OUT_DIR, stale))
+    # Previous output that this run does not write again is removed at the
+    # end. Without that, shrinking the fleet (or dropping a platform) leaves an
+    # orphaned shard file behind and Telegraf keeps polling devices that are no
+    # longer in the source of truth. Never removed up front: Telegraf watches
+    # this directory, and a reload while a file was gone dropped that input
+    # until Telegraf restarted (intent.conf, 2026-11-05).
+    previous = [f for f in os.listdir(OUT_DIR)
+                if f.startswith(("snmp-", "gnmi", "netflow-", "intent")) and f.endswith((".conf", ".influx"))]
 
     identity: dict[str, dict] = {}
     # Both keyed by SNMP security level first: one level per Telegraf input.
@@ -728,6 +730,9 @@ def main() -> int:
             warnings.append(problem)
     else:
         warnings.append(f"no Alertmanager template at {ALERTMANAGER_TEMPLATE} — alertmanager.yml not rendered")
+
+    for stale in set(previous) - set(written):
+        os.remove(os.path.join(OUT_DIR, stale))
 
     # --- report -----------------------------------------------------------
     print(f"Rendered {len(devices)} device(s) from Infrahub into {OUT_DIR}:")
