@@ -1,0 +1,36 @@
+# Rule unit tests for intended cables (group links in rules/recording.yml).
+#   docker run --rm -v "$PWD/observability/prometheus:/p:ro" --entrypoint promtool prom/prometheus test rules /p/tests/cables.test.yml
+# Also run by automation/tests/test_render.py when Docker is available.
+rule_files: [../rules/recording.yml]
+evaluation_interval: 30s
+tests:
+  - interval: 30s
+    input_series:
+      # c1: a Gi0/1 <-> b Gi0/2, both ends reported; b's port goes down at 5m
+      - {series: 'intent_link_present{device="a",ifName="Gi0/1",neighbor="b",neighbor_port="Gi0/2",cable="c1"}', values: '1x40'}
+      - {series: 'intent_link_present{device="b",ifName="Gi0/2",neighbor="a",neighbor_port="Gi0/1",cable="c1"}', values: '1x40'}
+      - {series: 'interface_oper_status{device="a",ifName="Gi0/1"}', values: '1x40'}
+      - {series: 'interface_oper_status{device="b",ifName="Gi0/2"}', values: '1x10 2x30'}
+      # c2: a Gi0/2 <-> provider p; only a is rendered, its port never reported
+      - {series: 'intent_link_present{device="a",ifName="Gi0/2",neighbor="p",neighbor_port="Et1",cable="c2"}', values: '1x40'}
+    promql_expr_test:
+      - expr: cable:end:up
+        eval_time: 2m
+        exp_samples:
+          - {labels: 'cable:end:up{device="a",ifName="Gi0/1",neighbor="b",neighbor_port="Gi0/2",cable="c1"}', value: 1}
+          - {labels: 'cable:end:up{device="b",ifName="Gi0/2",neighbor="a",neighbor_port="Gi0/1",cable="c1"}', value: 1}
+          - {labels: 'cable:end:up{device="a",ifName="Gi0/2",neighbor="p",neighbor_port="Et1",cable="c2"}', value: 0}
+      - expr: network:cables_intended:count
+        eval_time: 2m
+        exp_samples: [{labels: 'network:cables_intended:count', value: 2}]
+      - expr: network:cables_down:count
+        eval_time: 2m
+        exp_samples: [{labels: 'network:cables_down:count', value: 1}]
+      # b's port down: c1 counts as down, and still does long after (no 30 min memory)
+      - expr: cable:end:up{cable="c1",device="b"}
+        eval_time: 19m
+        exp_samples:
+          - {labels: 'cable:end:up{device="b",ifName="Gi0/2",neighbor="a",neighbor_port="Gi0/1",cable="c1"}', value: 0}
+      - expr: network:cables_down:count
+        eval_time: 19m
+        exp_samples: [{labels: 'network:cables_down:count', value: 2}]

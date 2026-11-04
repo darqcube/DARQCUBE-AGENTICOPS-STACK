@@ -46,6 +46,8 @@ curl -X POST localhost:${PROMETHEUS_PORT:-9090}/-/reload
 | `intent_device_present` | 1 per device active in Infrahub (from `make render`) |
 | `device:not_reporting` | recording rule — intended devices with no SNMP/gNMI data |
 | `link:info` / `link:end:up` | network map — one series per link (`kind` lldp or bgp); `link:end:up` 1 = interface up (lldp) or session established (bgp) |
+| `intent_link_present` | 1 per end of each active cable in Infrahub (from `make render`); labels `device`, `ifName`, `neighbor`, `neighbor_port`, `cable` |
+| `cable:end:up` | recording rule — each intended cable end, 1 = its port up, 0 = down or not reporting; never ages out (LLDP's links forget after 30 min) |
 | `assurance_rule_state` | scheduled assurance — `1` per device and rule, label `state` = pass / fail / error / skipped |
 | `netflow_flow_bytes_total` / `netflow_flow_packets_total` | NetFlow/IPFIX — **bytes (packets) per 60 s window, a gauge**, one sample per window and none for a minute without flows (totals: `sum_over_time`); labels `protocol`, `direction`, `application`, `criticality` |
 | `device:cpu_usage:max` | recording rule — one value per device |

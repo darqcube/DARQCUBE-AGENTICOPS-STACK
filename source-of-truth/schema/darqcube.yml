@@ -209,6 +209,58 @@ nodes:
         description: Free-form grouping for people browsing. Never a metric or log label.
 
   # -------------------------------------------------------------------------
+  # How devices are cabled to each other. Optional: a deployment that models
+  # none is unaffected. `make render` writes one intent_link series per cable
+  # end, so a link that went down hours ago, or never came up, is still known.
+  # -------------------------------------------------------------------------
+  - name: Cable
+    namespace: Network
+    label: Cable
+    description: A physical link between two device ports.
+    default_filter: name__value
+    display_labels: [name__value]
+    order_by: [name__value]
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: Unique cable name, e.g. router1-sw-hw-01.
+      - name: a_port
+        kind: Text
+        optional: true
+        description: The A end's interface as the device reports it (ifName), e.g. Gi0/1. Required by make seed.
+      - name: b_port
+        kind: Text
+        optional: true
+        description: The B end's interface as the device reports it (ifName). Required by make seed.
+      - name: status
+        kind: Dropdown
+        default_value: active
+        description: Lifecycle state. Only active cables are expected to be up.
+        choices:
+          - name: active
+          - name: planned
+          - name: decommissioned
+      - name: description
+        kind: Text
+        optional: true
+    relationships:
+      - name: a_device
+        peer: NetworkDevice
+        identifier: cable__a_device
+        optional: false
+        cardinality: one
+        kind: Attribute
+      - name: b_device
+        peer: NetworkDevice
+        identifier: cable__b_device
+        optional: false
+        cardinality: one
+        kind: Attribute
+
+  # -------------------------------------------------------------------------
   # What the network serves. Optional: a deployment that models only devices
   # is unaffected. Seeded from source-of-truth/devices/*.yml like devices —
   # see docs/how-to/model-applications.md.

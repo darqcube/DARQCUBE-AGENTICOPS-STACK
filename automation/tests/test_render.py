@@ -55,7 +55,7 @@ class Device:
         self.site = Rel(site)
 
 
-def load_renderer(monkeypatch, devices, out_dir, services=()):
+def load_renderer(monkeypatch, devices, out_dir, services=(), cables=()):
     """Import render-inventory.py with the SDK replaced by a stub."""
     sdk = types.ModuleType("infrahub_sdk")
 
@@ -64,7 +64,7 @@ def load_renderer(monkeypatch, devices, out_dir, services=()):
             pass
 
         def filters(self, **kw):
-            return list(services) if kw.get("kind") == "NetworkService" else devices
+            return {"NetworkService": list(services), "NetworkCable": list(cables)}.get(kw.get("kind"), devices)
 
     sdk.InfrahubClientSync = StubClient
     sdk.Config = lambda **kw: None
@@ -773,6 +773,52 @@ def test_intent_lists_every_rendered_device_with_its_labels(monkeypatch, tmp_pat
     assert router1 == "intent_device,device=router1,site=hq,role=core,platform=ios_xe,telemetry=snmp present=1i,rank=1i"  # rank is name order: mt-01 comes first
     conf = (tmp_path / "intent.conf").read_text()
     assert "/etc/telegraf/telegraf.d/generated/intent.influx" in conf and 'data_format = "influx"' in conf
+
+
+class Cable:
+    """Stands in for a NetworkCable node."""
+
+    def __init__(self, name, a, a_port, b, b_port, status="active"):
+        self.name, self.status = Attr(name), Attr(status)
+        self.a_device, self.a_port = Rel(a), Attr(a_port)
+        self.b_device, self.b_port = Rel(b), Attr(b_port)
+
+
+def test_intent_lists_each_end_of_every_active_cable(monkeypatch, tmp_path):
+    """intent_link_present: one series per cable end, from that end's device, so
+    either device's interface metrics join it on (device, ifName)."""
+    cables = [Cable("router1-sw", "router1", "Gi0/1", "sw-hw-01", "GE0/0/1"),
+              Cable("old", "router1", "Gi0/2", "mt-01", "ether1", status="decommissioned"),
+              Cable("to-unknown", "mt-01", "ether2", "x9", "Et1")]
+    mod = load_renderer(monkeypatch, THREE, tmp_path, cables=cables)
+    assert mod.main() == 0
+    links = [l for l in (tmp_path / "intent.influx").read_text().splitlines() if l.startswith("intent_link,")]
+    assert links == [
+        "intent_link,device=mt-01,ifName=ether2,neighbor=x9,neighbor_port=Et1,cable=to-unknown present=1i",
+        "intent_link,device=router1,ifName=Gi0/1,neighbor=sw-hw-01,neighbor_port=GE0/0/1,cable=router1-sw present=1i",
+        "intent_link,device=sw-hw-01,ifName=GE0/0/1,neighbor=router1,neighbor_port=Gi0/1,cable=router1-sw present=1i",
+    ]   # decommissioned: none; x9 is not rendered, so only mt-01's end
+
+
+def test_no_cables_modelled_renders_no_links(monkeypatch, tmp_path):
+    mod = load_renderer(monkeypatch, THREE, tmp_path)
+    assert mod.main() == 0
+    assert "intent_link" not in (tmp_path / "intent.influx").read_text()
+
+
+def test_cable_rules_behave():
+    """promtool unit test (observability/prometheus/tests/cables.test.yml): each cable end takes its port's state, a
+    port never reported is down, and a cable down long ago is still down (LLDP forgets after 30 minutes)."""
+    import shutil
+    import subprocess
+    if not shutil.which("docker"):
+        pytest.skip("docker not available")
+    version = re.search(r"^PROMETHEUS_VERSION=(\S+)", (ROOT / ".env.example").read_text(), re.M)
+    image = f"prom/prometheus:{version.group(1)}" if version else "prom/prometheus"
+    r = subprocess.run(["docker", "run", "--rm", "-v", f"{ROOT / 'observability/prometheus'}:/p:ro",
+                        "--entrypoint", "promtool", image, "test", "rules", "/p/tests/cables.test.yml"],
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stdout + r.stderr
 
 
 def test_intent_escapes_tag_values():

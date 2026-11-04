@@ -50,6 +50,8 @@ SECTIONS = (
     ("tags", "BuiltinTag"),
     ("sites", "NetworkSite"),
     ("devices", "NetworkDevice"),
+    # How devices are cabled (optional). Both ends name devices.
+    ("cables", "NetworkCable"),
     # What the network serves (optional; docs/how-to/model-applications.md).
     # A prefix may name its gateway device, a host its prefix, a service its
     # host and application — so each comes after what it refers to.
@@ -212,6 +214,15 @@ def check_prefix(rec: dict) -> list[str]:
     return [] if rec.get("prefix") else ["needs a prefix, e.g. 10.0.1.0/24"]
 
 
+def check_cable(rec: dict) -> list[str]:
+    """A cable joins two ports; the ifName is what joins it to the metrics."""
+    problems = [f"needs {end}, the interface name as the device reports it (e.g. Gi0/1)"
+                for end in ("a_port", "b_port") if not rec.get(end)]
+    if rec.get("a_device") and (rec.get("a_device"), rec.get("a_port")) == (rec.get("b_device"), rec.get("b_port")):
+        problems.append("both ends are the same port")
+    return problems
+
+
 def check_relations(sections: dict) -> list[str]:
     """Rules that span records, so they cannot live on a single one.
 
@@ -220,8 +231,24 @@ def check_relations(sections: dict) -> list[str]:
     - A host that runs services needs an address, or nothing can be matched
       to it.
     - A host's address must fall inside the prefix it says it lives in.
+    - One port carries one cable (decommissioned ones aside): two would make
+      the port's link state answer for both.
     """
     errors: list[str] = []
+    ports: dict[tuple, str] = {}
+    for src, rec in sections.get("cables", []):
+        if rec.get("status", "active") == "decommissioned":
+            continue
+        for end in ("a", "b"):
+            port = (rec.get(f"{end}_device"), rec.get(f"{end}_port"))
+            if not all(port):
+                continue
+            if port in ports:
+                errors.append(f"{src}: cable '{rec['name']}' uses {port[0]} {port[1]}, "
+                              f"already used by cable '{ports[port]}'")
+            else:
+                ports[port] = rec["name"]
+
     hosts = {str(r["name"]): (src, r) for src, r in sections.get("hosts", [])}
     prefixes = {str(r["name"]): r for _, r in sections.get("prefixes", [])}
 
@@ -306,6 +333,8 @@ def validate(sections: dict, views: dict, known: dict, platforms: dict) -> list[
 
             if kind == "NetworkDevice":
                 errors.extend(f"{where}: {p}" for p in check_device(rec, platforms))
+            elif kind == "NetworkCable":
+                errors.extend(f"{where}: {p}" for p in check_cable(rec))
             elif kind == "NetworkService":
                 errors.extend(f"{where}: {p}" for p in check_service(rec))
             elif kind == "NetworkPrefix":

@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# EXAMPLE cables (how devices are cabled). Never seeded from here — copy it first:
+#
+#   cp source-of-truth/devices/examples/*.yml source-of-truth/devices/
+#
+# Optional: a deployment that models no cables can leave this out. Each active
+# cable becomes intent_link_present, one series per end, at `make render`, and
+# the rule cable:end:up gives each end's state from its own port: a link that
+# went down hours ago, or never came up, is still known (LLDP forgets it after
+# 30 minutes, and never sees a port with no LLDP neighbour, e.g. a provider's).
+#
+# Fields:
+#   name       unique, e.g. router1-sw-hw-01
+#   a_device   required; must exist in devices.yml
+#   a_port     required; the interface name as a_device reports it (ifName,
+#              e.g. Gi0/1 — the name in interface_oper_status, not the long one)
+#   b_device   required; must exist in devices.yml
+#   b_port     required; the same for b_device
+#   status     active (default) | planned | decommissioned — only active
+#              cables are rendered. One port carries one cable at a time.
+#   description  optional
+# ---------------------------------------------------------------------------
+
+cables:
+  - name: router1-sw-hw-01
+    a_device: router1
+    a_port: Gi2
+    b_device: sw-hw-01
+    b_port: GE0/0/1
+    description: Core to access
+
+  - name: router1-mt-01
+    a_device: router1
+    a_port: Gi3
+    b_device: mt-01
+    b_port: ether1
+    description: WAN to the branch

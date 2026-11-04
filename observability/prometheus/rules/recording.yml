@@ -221,3 +221,18 @@ groups:
         expr: count(link:info) or vector(0)
       - record: network:links_down:count
         expr: count((link:end:up == 0) and on (device, ifName, neighbor, kind) link:info) or vector(0)
+      # Cables Infrahub says exist (make render writes intent_link_present, one
+      # series per cable end): each end's state from its own port, 1 up, 0 down
+      # or not reporting. Unlike the LLDP links above (30 min memory), an intended
+      # cable never ages out: down for hours, or never up, it stays here as 0.
+      - record: cable:end:up
+        expr: >-
+          max by (device, ifName, neighbor, neighbor_port, cable) (
+            intent_link_present
+              * on (device, ifName) group_left () max by (device, ifName) (interface_oper_status == bool 1)
+            or intent_link_present * 0
+          )
+      - record: network:cables_intended:count
+        expr: count(count by (cable) (intent_link_present)) or vector(0)
+      - record: network:cables_down:count
+        expr: count(count by (cable) (cable:end:up == 0)) or vector(0)

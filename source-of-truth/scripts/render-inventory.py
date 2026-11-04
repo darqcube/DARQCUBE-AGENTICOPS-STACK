@@ -13,7 +13,8 @@ Writes: /generated/
     netflow-dedicated.conf one NetFlow listener per device with flow_port set
     intent.conf + intent.influx  one intent_device series per active device —
                            what SHOULD be reporting, so dashboards and alerts can
-                           name a device that is in Infrahub but silent
+                           name a device that is in Infrahub but silent — and one
+                           intent_link series per end of each active cable
     services-dst.json      server ip:port/proto -> application (flow requests)
     services-src.json      the same, keyed for flow replies
     netflow-applications.conf  the lookups that apply them — only when services exist
@@ -270,6 +271,43 @@ def fetch_services(client) -> list:
     except Exception as exc:  # SchemaNotFoundError, or an older schema
         print(f"   (no services: {exc})", file=sys.stderr)
         return []
+
+
+def fetch_cables(client) -> list:
+    """Cables with both devices resolved. Optional like services: none modelled,
+    or an Infrahub without the kind, means no intent_link series."""
+    try:
+        return client.filters(kind="NetworkCable", branch=BRANCH,
+                              prefetch_relationships=True, populate_store=True)
+    except Exception as exc:  # SchemaNotFoundError, or an older schema
+        print(f"   (no cables: {exc})", file=sys.stderr)
+        return []
+
+
+def cable_ends(cables, rendered: set[str]) -> tuple[list[dict], list[str]]:
+    """One record per end of each active cable, seen from that end's device.
+
+    Both ends, so the series joins either device's interface metrics on
+    (device, ifName). An end on a device that is not rendered (not active, or
+    not pollable) is left out: nothing would ever report its port.
+    """
+    ends, warnings = [], []
+    for cable in cables:
+        name = cable.name.value
+        if (getattr(cable.status, "value", "active") or "active") != "active":
+            continue
+        a = cable.a_device.peer if cable.a_device else None
+        b = cable.b_device.peer if cable.b_device else None
+        a_port, b_port = getattr(cable.a_port, "value", None), getattr(cable.b_port, "value", None)
+        if a is None or b is None or not a_port or not b_port:
+            warnings.append(f"cable {name}: a device or port is missing — not rendered")
+            continue
+        for (dev, port), (peer, peer_port) in (((a.name.value, a_port), (b.name.value, b_port)),
+                                               ((b.name.value, b_port), (a.name.value, a_port))):
+            if dev in rendered:
+                ends.append({"device": dev, "ifName": port, "neighbor": peer, "neighbor_port": peer_port,
+                             "cable": name})
+    return ends, warnings
 
 
 def service_tables(services) -> tuple[dict, dict, list[str]]:
@@ -635,6 +673,8 @@ def main() -> int:
     if intended:
         def esc(v: str) -> str:   # influx line protocol tag-value escaping
             return str(v).replace("\\", "\\\\").replace(",", "\\,").replace("=", "\\=").replace(" ", "\\ ")
+        ends, cable_warnings = cable_ends(fetch_cables(client), {r["device"] for r in intended})
+        warnings.extend(cable_warnings)
         path = os.path.join(OUT_DIR, "intent.influx")
         with open(path, "w") as fh:
             # rank: the device's position in name order. PromQL cannot compare
@@ -642,6 +682,10 @@ def main() -> int:
             for rank, rec in enumerate(sorted(intended, key=lambda r: r["device"])):
                 tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "site", "role", "platform", "telemetry"))
                 fh.write(f"intent_device,{tags} present=1i,rank={rank}i\n")
+            # intent_link_present: each cable end, from its own device's side.
+            for rec in sorted(ends, key=lambda r: (r["device"], r["ifName"])):
+                tags = ",".join(f"{k}={esc(rec[k])}" for k in ("device", "ifName", "neighbor", "neighbor_port", "cable"))
+                fh.write(f"intent_link,{tags} present=1i\n")
         _readable(path)
         written.append("intent.influx")
         write("intent.conf",

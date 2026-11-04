@@ -246,7 +246,7 @@ def test_shipped_examples_cover_every_section(seed):
     """The examples are someone's starting point for the service model too."""
     sections, errors = seed.load_records(EXAMPLES)
     assert not errors
-    for section in ("prefixes", "hosts", "applications", "services"):
+    for section in ("cables", "prefixes", "hosts", "applications", "services"):
         assert sections[section], f"examples/ has no {section}"
 
 
@@ -254,6 +254,7 @@ def test_sections_are_ordered_by_dependency(seed):
     """A record may only refer to kinds seeded before it."""
     order = [name for name, _ in seed.SECTIONS]
     assert order.index("devices") < order.index("prefixes") < order.index("hosts")
+    assert order.index("devices") < order.index("cables")
     assert order.index("hosts") < order.index("services")
     assert order.index("applications") < order.index("services")
 
@@ -338,3 +339,40 @@ def test_worked_example_in_the_model_applications_guide_is_valid(seed, tmp_path)
         for key, items in doc.items():
             merged.setdefault(key, []).extend(items)
     assert check(seed, tmp_path, *base, merged) == []
+
+
+# --- cables -------------------------------------------------------------------
+
+SWITCH = {"name": "sw1", "site": "hq", "role": "access", "platform": "ios_xe", "management_ip": "10.0.0.21"}
+CABLE = {"name": "router1-sw1", "a_device": "router1", "a_port": "Gi0/1", "b_device": "sw1", "b_port": "Gi0/24"}
+
+
+def cabled(*cables):
+    return {"sites": [SITE], "devices": [DEVICE, SWITCH], "cables": list(cables)}
+
+
+def test_a_valid_cable_passes(seed, tmp_path):
+    assert check(seed, tmp_path, cabled(CABLE)) == []
+
+
+def test_cable_needs_both_ports(seed, tmp_path):
+    errors = check(seed, tmp_path, cabled({k: v for k, v in CABLE.items() if k != "b_port"}))
+    assert any("needs b_port" in e for e in errors)
+
+
+def test_cable_must_name_known_devices(seed, tmp_path):
+    errors = check(seed, tmp_path, cabled({**CABLE, "b_device": "nope"}))
+    assert any("b_device 'nope' does not exist" in e for e in errors)
+
+
+def test_cable_cannot_loop_to_its_own_port(seed, tmp_path):
+    errors = check(seed, tmp_path, cabled({**CABLE, "b_device": "router1", "b_port": "Gi0/1"}))
+    assert any("both ends are the same port" in e for e in errors)
+
+
+def test_one_port_carries_one_cable(seed, tmp_path):
+    """Two cables on a port would both take that port's state."""
+    twin = {**CABLE, "name": "router1-sw1-again", "b_port": "Gi0/23"}
+    errors = check(seed, tmp_path, cabled(CABLE, twin))
+    assert any("router1 Gi0/1, already used by cable 'router1-sw1'" in e for e in errors)
+    assert check(seed, tmp_path, cabled(CABLE, {**twin, "status": "decommissioned"})) == []

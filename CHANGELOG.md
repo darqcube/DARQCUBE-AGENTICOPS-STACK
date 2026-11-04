@@ -8,6 +8,22 @@ Versions are git tags `vMAJOR.MINOR.PATCH` on `main`, newest first here.
 
 A platform that depends on a feature names the version it needs (for example: the approvals path needs 1.0.0 or later).
 
+## 1.5.0 (2026-11-05)
+
+### Features
+- **Cables in Infrahub**: a new `NetworkCable` node (two devices, their ports as the devices name them, a status),
+  seeded from a `cables:` section like every other kind (`source-of-truth/devices/examples/cables.yml`). A port carries
+  one cable at a time; `make seed` refuses a second.
+- **`intent_link_present`**: `make render` writes one series per end of each active cable, beside
+  `intent_device_present` (labels `device`, `ifName`, `neighbor`, `neighbor_port`, `cable`).
+- **`cable:end:up`**: each intended cable end's state from its own port (1 up, 0 down or not reporting), with
+  `network:cables_intended:count` and `network:cables_down:count`. Unlike LLDP's links it never ages out, and it covers
+  ports with no LLDP neighbour.
+
+### After upgrading
+- `make schema`, add your cables (`cp source-of-truth/devices/examples/cables.yml source-of-truth/devices/`, edit),
+  `make seed`, `make render`, and reload Prometheus's rules.
+
 ## 1.4.2 (2026-11-03)
 
 ### Fixes

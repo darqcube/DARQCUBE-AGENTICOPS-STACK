@@ -328,6 +328,14 @@ names every device that is in Infrahub but silent, the `DeviceNotReporting`
 alert fires on it, and the dashboards show it — "is everything we own
 monitored?" answered from the source of truth, not from guesswork.
 
+Cables work the same way. Each active `NetworkCable` (two devices and their
+ports, `source-of-truth/devices/examples/cables.yml`) becomes one
+`intent_link` series per end, and the rule `cable:end:up` gives each end its
+port's state. LLDP's links (below) are what the devices see now and forget a
+neighbour 30 minutes after losing it; a cable in Infrahub is what SHOULD be
+there, so a link down for hours, one that never came up, or one to a device
+that runs no LLDP (a provider's) is still known.
+
 **The network map.** The Network Map dashboard is drawn, not guessed: a
 drawing in `source-of-truth/map/` (nodes, positions, which interface each
 link uses) becomes a Weathermap panel at `make render`, and each link shows
